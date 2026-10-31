@@ -463,6 +463,32 @@ internal static class Program
                     new BackgroundPreviewTrimPlanner.Candidate("same", 2) }, 64, 30, false),
             "trim planner rejects duplicate candidate keys");
 
+        // Verified Android 1.0 callback exception policy: report one failure and continue.
+        string callbackOrder = "";
+        int reportedCallbackErrors = 0;
+        Exception? reportedCallbackError = null;
+        Action<int>[] callbacks =
+        {
+            value => callbackOrder += "A",
+            value => throw new InvalidOperationException("preview callback failure"),
+            value => callbackOrder += "C"
+        };
+        BackgroundPreviewCallbackDispatcher.Dispatch(callbacks, 7, error =>
+        {
+            reportedCallbackErrors++;
+            reportedCallbackError = error;
+        });
+        AssertEqual("AC", callbackOrder, "callback dispatcher continues after an individual callback throws");
+        AssertEqual("1", reportedCallbackErrors.ToString(), "callback dispatcher reports exactly one callback exception");
+        AssertTrue(reportedCallbackError is InvalidOperationException,
+            "callback dispatcher forwards the original exception to the reporter");
+        AssertThrows<ArgumentNullException>(() =>
+            BackgroundPreviewCallbackDispatcher.Dispatch<int>(null!, 0, error => { }),
+            "callback dispatcher requires callback sequence");
+        AssertThrows<ArgumentNullException>(() =>
+            BackgroundPreviewCallbackDispatcher.Dispatch(Array.Empty<Action<int>>(), 0, null!),
+            "callback dispatcher requires error reporter");
+
         Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks");
         return 0;
     }
