@@ -9,7 +9,7 @@ namespace AzureArchive.BackgroundCompat
     /// </summary>
     public sealed class SpineAtlasPageCache<TTexture> : IDisposable where TTexture : class
     {
-        private sealed class Entry
+        internal sealed class Entry
         {
             public readonly TTexture Texture;
             public int References;
@@ -106,7 +106,7 @@ namespace AzureArchive.BackgroundCompat
             private readonly string resourceKey;
             private readonly Entry entry;
 
-            private Lease(SpineAtlasPageCache<TTexture> owner, string resourceKey, Entry entry)
+            internal Lease(SpineAtlasPageCache<TTexture> owner, string resourceKey, Entry entry)
             {
                 this.owner = owner;
                 this.resourceKey = resourceKey;
@@ -127,7 +127,7 @@ namespace AzureArchive.BackgroundCompat
             {
                 SpineAtlasPageCache<TTexture> current = owner;
                 if (current == null) return;
-                owner = null;
+                owner = null!;
                 current.ReleaseLease(resourceKey, entry);
             }
         }
