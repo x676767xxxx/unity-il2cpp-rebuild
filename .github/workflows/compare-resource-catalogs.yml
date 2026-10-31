@@ -1,0 +1,86 @@
+name: Compare iOS Android Windows resource catalogs
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/compare-resource-catalogs.yml"
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file binutils
+      - name: Download release inputs
+        run: |
+          set -euo pipefail
+          mkdir -p work/{ios,android,windows,out}
+          curl -fL --retry 3 -o work/ios/old.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          curl -fL --retry 3 -o work/windows/windows.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+      - name: Extract and inspect catalogs and assets
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, zipfile, pathlib, re, hashlib, plistlib, os
+          root=pathlib.Path("work"); out=root/"out"; out.mkdir(exist_ok=True)
+          sources={"ios":root/"ios/old.ipa","android":root/"android/base.apk","windows":root/"windows/windows.zip"}
+          summaries={}
+          for platform, archive in sources.items():
+              dest=root/platform/"unpacked"; dest.mkdir(exist_ok=True)
+              with zipfile.ZipFile(archive) as z:
+                  names=z.namelist()
+                  z.extractall(dest)
+              app=next(dest.glob("Payload/*.app"),None) if platform=="ios" else None
+              base=app if app else dest
+              files=[p for p in base.rglob("*") if p.is_file()]
+              catalogs=[p for p in files if p.name.lower()=="catalog.json"]
+              asset_candidates=[]
+              for p in files:
+                  n=p.name.lower()
+                  if any(k in n for k in ("spine","skeleton","addressable")) or n.endswith((".bundle",".assetbundle",".assets",".ress",".resource",".skel",".atlas")):
+                      asset_candidates.append((str(p.relative_to(base)),p.stat().st_size))
+              if platform=="ios" and app and (app/"Info.plist").exists():
+                  try:
+                      pl=plistlib.loads((app/"Info.plist").read_bytes())
+                      (out/"ios-info-plist.json").write_text(json.dumps(pl,indent=2,default=str))
+                  except Exception as e:
+                      (out/"ios-info-plist-error.txt").write_text(repr(e))
+              catdata=[]
+              for cp in catalogs:
+                  try:
+                      obj=json.loads(cp.read_text(errors="replace"))
+                      loc=obj.get("m_Locations",[]) if isinstance(obj,dict) else []
+                      keys=obj.get("m_Keys",[]) if isinstance(obj,dict) else []
+                      ids=obj.get("m_InternalIds",[]) if isinstance(obj,dict) else []
+                      providers=obj.get("m_ProviderIds",[]) if isinstance(obj,dict) else []
+                      catdata.append({"path":str(cp.relative_to(base)),"bytes":cp.stat().st_size,"locations":len(loc),"keys":len(keys),"internal_ids":len(ids),"providers":len(providers),"location_samples":loc[:12],"key_samples":keys[:80],"internal_id_samples":ids[:100],"provider_ids":providers[:80]})
+                  except Exception as e: catdata.append({"path":str(cp.relative_to(base)),"error":repr(e)})
+              summaries[platform]={"file_count":len(files),"catalogs":catdata,"asset_candidates":sorted(asset_candidates,key=lambda x:-x[1])[:500],"file_types":{}}
+              for p in files:
+                  ext=p.suffix.lower() or "[no extension]"
+                  summaries[platform]["file_types"][ext]=summaries[platform]["file_types"].get(ext,0)+1
+          (out/"resource-catalog-summary.json").write_text(json.dumps(summaries,indent=2,ensure_ascii=False))
+          lines=["# Cross-platform resource catalog inspection","", "Catalog JSON is parsed structurally where present. File-name matches are candidates only; they do not prove an asset is loaded or compatible.",""]
+          for platform,s in summaries.items():
+              lines += [f"## {platform}",f"- Files: {s['file_count']}",f"- Catalogs: {len(s['catalogs'])}"]
+              for c in s["catalogs"]:
+                  lines += [f"### {c['path']} ({c.get('bytes','?')} bytes)",f"- Locations: {c.get('locations','unknown')}; keys: {c.get('keys','unknown')}; internal IDs: {c.get('internal_ids','unknown')}; providers: {c.get('providers','unknown')}"]
+                  if c.get("error"): lines += [f"- Parse error: {c['error']}"]
+                  lines += ["- Provider IDs:"]+[f"  - {x}" for x in c.get("provider_ids",[])[:80]]
+                  lines += ["- Internal ID samples:"]+[f"  - {x}" for x in c.get("internal_id_samples",[])[:100]]
+                  lines += ["- Key samples:"]+[f"  - {x}" for x in c.get("key_samples",[])[:80]]
+              lines += ["### Largest / named asset candidates","| Path | Bytes |","|---|---:|"]
+              lines += [f"| `{p}` | {n} |" for p,n in s["asset_candidates"][:200]]
+              lines += ["","### File extensions"]
+              lines += [f"- {k}: {v}" for k,v in sorted(s["file_types"].items(),key=lambda x:-x[1])[:40]]
+              lines += [""]
+          (out/"resource-catalog-report.md").write_text("\n".join(lines))
+          PY
+      - name: Upload catalog comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-resource-catalog-comparison
+          path: work/out/
