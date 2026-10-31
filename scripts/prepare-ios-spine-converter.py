@@ -78,6 +78,14 @@ extern "C" void AzureArchiveSpineFreeBuffer(void* buffer) { std::free(buffer); }
 (root / "src" / "ios_abi.cpp").write_text(abi, encoding="utf-8")
 header = Path(__file__).resolve().parents[1] / "scripts" / "azurearchive_spine_converter_abi.h"
 (root / "include" / "azurearchive_spine_converter_abi.h").write_text(header.read_text(encoding="utf-8"), encoding="utf-8")
+common = root / "src" / "common.cpp"
+common_text = common.read_text(encoding="utf-8")
+required_includes = ["#include <sstream>", "#include <cstring>", "#include <cstdlib>", "#include <cstdio>", "#include <cmath>", "#include <iomanip>"]
+for include in required_includes:
+    if include not in common_text:
+        common_text = common_text.replace('#include "SkeletonData.h"', '#include "SkeletonData.h"\\n' + include, 1)
+common.write_text(common_text, encoding="utf-8")
+
 cmake_text = cmake.read_text(encoding="utf-8")
 marker = "add_executable(SpineAtlasDowngrade"
 if "azurearchive_spine_converter_ios" not in cmake_text:
