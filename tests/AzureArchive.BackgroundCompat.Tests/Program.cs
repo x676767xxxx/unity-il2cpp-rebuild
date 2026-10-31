@@ -485,6 +485,13 @@ internal static class Program
             new[] { new BackgroundSkeletonTrimPlanner.Candidate("active", 900L * 1024L * 1024L, true, 0) },
             900L * 1024L * 1024L).Length.ToString(),
             "skeleton trim never evicts an asset with consumers");
+        AssertEqual("tie-first,tie-second", string.Join(",", BackgroundSkeletonTrimPlanner.Plan(
+            new[]
+            {
+                new BackgroundSkeletonTrimPlanner.Candidate("tie-first", 1, false, 4),
+                new BackgroundSkeletonTrimPlanner.Candidate("tie-second", 1, false, 4)
+            }, BackgroundSkeletonTrimPlanner.MemoryThresholdBytes + 2)),
+            "skeleton trim preserves input order for equal access scores");
         AssertThrows<ArgumentOutOfRangeException>(() => new BackgroundSkeletonTrimPlanner.Candidate(
             "negative", -1, false, 0), "skeleton candidate rejects negative estimated size");
         AssertThrows<ArgumentOutOfRangeException>(() => BackgroundSkeletonTrimPlanner.Plan(
@@ -540,7 +547,7 @@ internal static class Program
             BackgroundPreviewCallbackDispatcher.Dispatch(Array.Empty<Action<int>>(), 0, null!),
             "callback dispatcher requires error reporter");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 11 Spine reference lifecycle checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks");
         return 0;
     }
 
