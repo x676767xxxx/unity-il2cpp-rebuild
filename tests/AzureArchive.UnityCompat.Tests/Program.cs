@@ -80,8 +80,7 @@ internal static class Program
         Assert(startError is InvalidOperationException && Addressables.ReleaseCount == 0, "synchronous Addressables start failure reported");
 
         Addressables.Reset();
-        AddressableAssetLease<UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle<object>, object>? callbackLease = null;
-        AddressablesRuntimeAdapter.Load<object>("bundle://callback", lease => { callbackLease = lease; throw new InvalidOperationException("consumer callback"); });
+        AddressablesRuntimeAdapter.Load<object>("bundle://callback", lease => throw new InvalidOperationException("consumer callback"));
         var callbackOperation = Addressables.Last<object>();
         AssertThrows<InvalidOperationException>(() => callbackOperation.Complete(new object()), "consumer callback exception");
         Assert(Addressables.ReleaseCount == 1 && callbackOperation.Released, "consumer callback exception releases successful handle");
@@ -89,7 +88,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>(null!, lease => { }), "null Addressables key");
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>("bundle://key", null!), "null Addressables success callback");
 
-        Console.WriteLine("PASS: 10 Unity decoder checks; 4 Spine bridge argument checks; 10 Addressables async adapter checks");
+        Console.WriteLine("PASS: 10 Unity decoder checks; 4 Spine bridge argument checks; 11 Addressables async adapter checks");
         return 0;
     }
 
