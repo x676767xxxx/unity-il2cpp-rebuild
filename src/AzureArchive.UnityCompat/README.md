@@ -17,7 +17,7 @@
 ## Status
 This is candidate Unity C# source, not an integrated game patch. It has **not** been compiled against UnityEngine assemblies, run in Unity, or tested on iOS. Unity texture creation and destruction must occur on the Unity main thread. The cleanup behavior on decoder exceptions is a conservative implementation choice; the corresponding original IL contains unresolved decompiler regions.
 
-The standalone .NET Standard path utility in `../AzureArchive.BackgroundCompat` is independently build-tested, but it is not connected to this decoder yet.
+The overload `BackgroundImageDecoder.DecodeCustomResource(BackgroundResourceDescriptor)` consumes the descriptor's root-confined `FullPath` from `../AzureArchive.BackgroundCompat`; callers should use this descriptor-based entry point for override resources.
 
 ## Addressables adapter
 
@@ -35,3 +35,16 @@ Install it before the relevant catalog-backed loads begin. The supplied URL call
 The platform-matched iOS 0.7.9.2 dump confirms both `ScenarioResourceManager.AddrLoadUrl` (static string field) and `Addressables.InternalIdTransformFunc` (public static `Func<IResourceLocation, string>` property). `InstallFromRuntimeType(Type)` can bind the hook to a supplied game type, and `InstallFromGameRuntime()` locates the global `ScenarioResourceManager` in `Assembly-CSharp` or the loaded assemblies and reads `AddrLoadUrl` lazily. The test suite covers lazy URL changes and rejects a missing/wrongly typed field.
 
 This is a source-level integration adapter, not yet called from the shipped game's startup path. The standalone tests use an isolated API stub; compile and test against the exact Unity 2023.2.20f1c1 / Addressables assemblies before shipping.
+
+
+## Static background runtime cache
+
+`BackgroundImageRuntimeCache` mirrors the recovered Android `ScenarioResourceManager.GetBackgroundTexture(BackgroundResource)` split:
+
+- Custom Image: decode the descriptor's safe `FullPath`, cache by full path, and destroy only cache-owned custom textures on `Dispose`.
+- Native Image: load as Unity `Texture` (not only Texture2D), apply the game's existing `CorrectPath(string)`, deduplicate concurrent requests, and retain the Addressables operation in an idempotent lease.
+- The cache can bind a live manager instance with `CreateFromGameRuntime(manager)`, or resolve the inherited `Singleton<ScenarioResourceManager>.Instance` with `CreateFromGameRuntimeSingleton(typeof(ScenarioResourceManager))`. Call the singleton factory only after the game manager has initialized.
+- Dispose the cache on the Unity main thread when the owning manager/presenter is destroyed. In-flight Addressables requests cannot be cancelled; if they finish after disposal, the cache releases their leases without publishing the asset.
+- Non-Image resources are rejected. Spine skeleton/atlas playback must use the separate Spine runtime path and is not implemented by this class.
+
+CI [run 41199317839](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41199317839) passed the isolated Unity API-stub compile/tests, including native/custom cache ownership, CorrectPath binding, singleton lookup, and pending-load disposal. This is not a Unity Editor or device test.
