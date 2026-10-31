@@ -1,0 +1,61 @@
+name: Cpp2IL recovery test
+on:
+  workflow_dispatch:
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download game builds
+        run: |
+          mkdir -p work/ios work/android work/windows work/tools work/out
+          curl -fL --retry 3 -o work/ios/app.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o work/android/app.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          curl -fL --retry 3 -o work/windows/app.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+          unzip -q work/ios/app.ipa -d work/ios/extracted
+          unzip -q work/windows/app.zip -d work/windows/extracted
+      - name: Download latest Cpp2IL development build
+        run: |
+          curl -fL --retry 3 -o work/tools/cpp2il.zip "https://nightly.link/SamboyCoding/Cpp2IL/workflows/dotnet-core/development/Cpp2IL-net9-linux-x64.zip"
+          mkdir -p work/tools/cpp2il
+          unzip -q work/tools/cpp2il.zip -d work/tools/cpp2il
+          chmod +x work/tools/cpp2il/Cpp2IL || true
+          find work/tools/cpp2il -maxdepth 2 -type f -printf '%p\n'
+      - name: List output formats
+        run: |
+          BIN=$(find work/tools/cpp2il -type f -name Cpp2IL | head -1)
+          "$BIN" --list-output-formats > work/out/output-formats.txt 2>&1 || true
+      - name: Attempt Android 1.0 CIL recovery
+        continue-on-error: true
+        run: |
+          BIN=$(find work/tools/cpp2il -type f -name Cpp2IL | head -1)
+          mkdir -p work/out/cpp2il-android
+          "$BIN" --game-path="$PWD/work/android/app.apk" --output-as=dll_il_recovery --output-to="$PWD/work/out/cpp2il-android" --verbose > work/out/android-cpp2il.log 2>&1
+          echo "EXIT_CODE=$?" >> work/out/android-cpp2il.log
+      - name: Attempt Windows 1.0.1 CIL recovery
+        continue-on-error: true
+        run: |
+          BIN=$(find work/tools/cpp2il -type f -name Cpp2IL | head -1)
+          EXE=$(find work/windows/extracted -type f -iname '*.exe' | head -1)
+          if [ -z "$EXE" ]; then echo "No Windows executable found in ZIP" > work/out/windows-cpp2il.log; exit 0; fi
+          mkdir -p work/out/cpp2il-windows
+          "$BIN" --game-path="$(dirname "$PWD/$EXE")" --output-as=dll_il_recovery --output-to="$PWD/work/out/cpp2il-windows" --verbose > work/out/windows-cpp2il.log 2>&1
+          echo "EXIT_CODE=$?" >> work/out/windows-cpp2il.log
+      - name: Attempt iOS 0.7.9.2 CIL recovery
+        continue-on-error: true
+        run: |
+          BIN=$(find work/tools/cpp2il -type f -name Cpp2IL | head -1)
+          APP="$PWD/work/ios/extracted/Payload/AzureArchive.app"
+          mkdir -p work/out/cpp2il-ios
+          "$BIN" --game-path="$APP" --output-as=dll_il_recovery --output-to="$PWD/work/out/cpp2il-ios" --verbose > work/out/ios-cpp2il.log 2>&1
+          echo "EXIT_CODE=$?" >> work/out/ios-cpp2il.log
+      - name: Inventory recovered outputs
+        if: always()
+        run: |
+          find work/out -type f -printf '%p %s bytes\n' | sort > work/out/output-inventory.txt
+          echo "### Cpp2IL output inventory" >> "$GITHUB_STEP_SUMMARY"
+          cat work/out/output-inventory.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/out/
