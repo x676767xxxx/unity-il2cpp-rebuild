@@ -1,0 +1,83 @@
+name: Android 1.0 gameplay call-site analysis
+on:
+  workflow_dispatch:
+jobs:
+  callsites:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android ARM64 disassembly
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-android-arm64-disassembly-corrected
+          path: work/in/native
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41170866048
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download recovered C# output
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-decompiled-source
+          path: work/in/csharp
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41170018509
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Android APK and disassemble call sites
+        run: |
+          mkdir -p work/android work/out
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -p work/android/base.apk lib/arm64-v8a/libil2cpp.so > work/android/libil2cpp.so
+          sudo apt-get update && sudo apt-get install -y llvm
+          llvm-objdump -d work/android/libil2cpp.so > work/out/full-arm64-disassembly.txt
+      - name: Analyze direct call references and managed call sites
+        run: |
+          python3 - <<'PY'
+          import pathlib,re
+          root=pathlib.Path("work")
+          out=root/"out"
+          targets={
+            "ScenarioResourceManager.InitializeAuthoringResources":0x3264CA8,
+            "ScenarioResourceManager.ResolveBackground":0x3260EE0,
+            "ScenarioResourceManager.GetBackgroundTexture":0x326172C,
+            "ScenarioResourceManager.GetBackgroundPreviewAsync":0x3261EA0,
+            "AuthoringResourceCatalog.Search":0x336A1F0,
+            "AuthoringResourceCatalog.Resolve":0x336B5DC,
+            "AuthoringResourceCatalog.StageReferencedResources":0x3372058,
+            "AuthoringResourceCatalog.Import":0x3375FE8,
+          }
+          dis=(out/"full-arm64-disassembly.txt").read_text(errors="ignore").splitlines()
+          report=[]
+          for name,addr in targets.items():
+              report.append("\n## "+name+" target="+hex(addr))
+              hits=[]
+              for i,line in enumerate(dis):
+                  m=re.search(r'\bbl\s+0x([0-9a-fA-F]+)',line)
+                  if m and int(m.group(1),16)==addr:
+                      hits.append(i)
+              report.append("direct BL call sites="+str(len(hits)))
+              for i in hits[:100]:
+                  report.extend(dis[max(0,i-8):min(len(dis),i+5)])
+          csfiles=list((root/"in/csharp").rglob("*.cs"))
+          report.append("\n## Recovered C# references")
+          patterns=[
+            "ResolveBackground","GetBackgroundTexture","GetBackgroundPreviewAsync",
+            "InitializeAuthoringResources","AuthoringResourceCatalog","StageReferencedResources"
+          ]
+          for pat in patterns:
+              report.append("\n### "+pat)
+              count=0
+              for p in csfiles:
+                  lines=p.read_text(errors="ignore").splitlines()
+                  for i,line in enumerate(lines):
+                      if pat in line:
+                          report.append(f"{p}:{i+1}: "+line[:500])
+                          count+=1
+                          if count>=100: break
+                  if count>=100: break
+              report.append("matches shown="+str(count))
+          (out/"callsite-analysis.txt").write_text("\n".join(report))
+          PY
+      - name: Upload call-site report
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-android-callsite-analysis
+          path: work/out/callsite-analysis.txt
