@@ -55,6 +55,7 @@ jobs:
                         ("ScenarioResourceManager.InitializeAuthoringResources","InitializeAuthoringResources(string databasePath, string fileNamesPath, string bgmInfoPath)",0x3264CA8),
                         ("UserSettings.ReadUserSettings.MoveNext","private bool MoveNext()",0x3289908),
                         ("UIPatchDownload.CoChangeSource.MoveNext","private bool MoveNext()",0x3285C5C),
+            ("UIPatchDownload.CoChangeSource.SubmitSource","internal void <CoChangeSource>b__13_1(string source)",0x3285AB0),
                         ("AuthoringCliHost.Bootstrap","Bootstrap()",0x33838E4),
                         ("AuthoringOfflineResources.TryGetStartupUrl","TryGetStartupUrl(out string url)",0x33C5E00),
                         ("AuthoringOfflineResources.get_IsActive","get_IsActive()",0x33C5D68),
