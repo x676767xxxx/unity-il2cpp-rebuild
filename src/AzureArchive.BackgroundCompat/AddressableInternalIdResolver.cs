@@ -49,7 +49,7 @@ namespace AzureArchive.BackgroundCompat
                 suffix.IndexOf('\\') >= 0 ||
                 suffix.IndexOf('?') >= 0 ||
                 suffix.IndexOf('#') >= 0 ||
-                suffix.IndexOf('\\0') >= 0)
+                suffix.IndexOf('\0') >= 0)
                 throw new InvalidDataException("Addressables bundle suffix must be a relative URL path.");
 
             string[] segments = suffix.Substring(1).Split('/');
@@ -65,7 +65,7 @@ namespace AzureArchive.BackgroundCompat
                 if (decoded == "." || decoded == ".." ||
                     decoded.IndexOf('/') >= 0 || decoded.IndexOf('\\') >= 0 ||
                     decoded.IndexOf(':') >= 0 ||
-                    decoded.IndexOf('\\0') >= 0)
+                    decoded.IndexOf('\0') >= 0)
                     throw new InvalidDataException("Addressables bundle path contains an unsafe segment.");
             }
         }
