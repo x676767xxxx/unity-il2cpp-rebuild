@@ -186,7 +186,7 @@ The completed extraction artifact from workflow [41201474393](https://github.com
 | 1 | `0x5B` | `0x32710B4` | Resume path entering the `AsyncOperationHandle<Texture>` status check; tests `preferThumbnail` and the handle status |
 | 2 | `0x55` | `0x327109C` | Sets state back to `-1`, then enters the second `AsyncOperationHandle<Texture>` status/result path at `0x3271184` |
 | 3 | `0x58` | `0x32710A8` | Sets state to `-1`, then enters the `Task<byte[]>` read/continuation path at `0x327154C` |
-| 4 | `0x2C` | `0x3271000` | Sets state to `-1`, then enters an alternate `Task<byte[]>` read/continuation path |
+| 4 | `0x2C` | `0x3270FF8` | Sets state to `-1`, then enters an alternate `Task<byte[]>` read/continuation path |
 | 5 | `0xA4` | `0x32711D8` | Sets state to `-1`, then enters the `Task<RuntimeSpineLoader.Files>` continuation path |
 
 Field identities are confirmed by the generated state-machine type declaration in Android `dump.cs`: `resource` at `0x20`, `preferThumbnail` at `0x30`, `key` at `0x38`, `texture` at `0x40`, `addressable` at `0x48`, `full` at `0x50`, `handle` (`AsyncOperationHandle<Texture>`) at `0x58`, `read` (`Task<byte[]>`) at `0x78`, and `read` (`Task<RuntimeSpineLoader.Files>`) at `0x80`.
