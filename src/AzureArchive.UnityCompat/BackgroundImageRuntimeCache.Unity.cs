@@ -87,6 +87,32 @@ namespace AzureArchive.UnityCompat
                 LoadCustom(resource, onLoaded, onFailed);
         }
 
+        /// <summary>
+        /// Resolves the game's inherited Singleton&lt;ScenarioResourceManager&gt;.Instance
+        /// property, then binds its instance CorrectPath(string) method.
+        /// Call after the game singleton has been initialized.
+        /// </summary>
+        public static BackgroundImageRuntimeCache CreateFromGameRuntimeSingleton(Type scenarioResourceManagerType)
+        {
+            if (scenarioResourceManagerType == null)
+                throw new ArgumentNullException(nameof(scenarioResourceManagerType));
+
+            PropertyInfo? instanceProperty = scenarioResourceManagerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+
+            if (instanceProperty == null || !instanceProperty.CanRead ||
+                !scenarioResourceManagerType.IsAssignableFrom(instanceProperty.PropertyType))
+                throw new InvalidOperationException(
+                    "ScenarioResourceManager must expose a static Instance property returning its own type.");
+
+            object? instance = instanceProperty.GetValue(null);
+            if (instance == null)
+                throw new InvalidOperationException("ScenarioResourceManager.Instance is not initialized.");
+
+            return CreateFromGameRuntime(instance);
+        }
+
         private void LoadCustom(
             BackgroundResourceDescriptor resource,
             Action<Texture2D> onLoaded,
