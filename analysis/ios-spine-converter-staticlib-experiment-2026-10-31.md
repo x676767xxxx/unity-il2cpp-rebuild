@@ -18,3 +18,17 @@ The workflow configures CMake with the Xcode iPhoneOS SDK and arm64 architecture
 
 ## License and status
 The source is used for the user's stated personal, noncommercial purpose. Preserve its PolyForm Noncommercial License 1.0.0 notice. No IPA or Unity integration is produced by this experiment.
+
+
+## Successful iPhoneOS ARM64 build (run 41181017359)
+- GitHub Actions: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41181017359
+- Result: completed successfully on a `macos-14-arm64` runner with Xcode 15.4 / iPhoneOS 17.5 SDK.
+- CMake configured for `CMAKE_SYSTEM_NAME=iOS`, `CMAKE_OSX_SYSROOT=iphoneos`, `CMAKE_OSX_ARCHITECTURES=arm64`, deployment target iOS 13.0.
+- Built `libazurearchive_spine_converter_ios.a` (8,195,344 bytes).
+- The archive was downloaded and inspected: its object members are Mach-O 64-bit arm64 objects.
+- The runner's `xcrun nm -gU` confirmed exported symbols `_AzureArchiveSpineConvertBuffer`, `_AzureArchiveSpineJsonToBinary`, and `_AzureArchiveSpineFreeBuffer`.
+- Artifact: `azurearchive-spine-converter-ios-arm64`, ID `13034582585`, compressed size 1,938,921 bytes.
+
+This is now a **compiled iPhoneOS ARM64 static library**, not merely pseudocode. It remains a custom converter ABI, not a verified drop-in replacement for the game's native converter. UnityFramework linkage, matching the game's native ABI, Spine managed runtime upgrade, resource-loader integration, and IPA build are still outstanding.
+
+A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to SKEL and SKEL round-trip). That test has not yet completed.
