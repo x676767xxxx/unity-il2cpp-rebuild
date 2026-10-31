@@ -106,7 +106,7 @@ namespace AzureArchive.BackgroundCompat
             private readonly string resourceKey;
             private readonly Entry entry;
 
-            internal Lease(SpineAtlasPageCache<TTexture> owner, string resourceKey, Entry entry)
+            private Lease(SpineAtlasPageCache<TTexture> owner, string resourceKey, Entry entry)
             {
                 this.owner = owner;
                 this.resourceKey = resourceKey;
