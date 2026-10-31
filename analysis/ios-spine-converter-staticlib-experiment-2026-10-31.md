@@ -54,3 +54,11 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 - Scanned the current port branch tree: no Unity `Assets/`, `ProjectSettings/`, `.xcodeproj` or `.xcworkspace` exists. Therefore this repository currently has no Unity project into which the archive can be integrated and no project settings/build target to produce an IPA.
 - Added the guarded C# iOS P/Invoke bridge, but it is only source scaffolding until the native archive is linked into a Unity-generated Xcode target. It has not been compiled by Unity/Xcode.
 - Next required input is a matching Unity project/source tree (or a reproducible project export), including the existing iOS plugin layout and app entry scene. Without it, attempting an IPA build here would be fabricated.
+
+
+## Managed bridge compile/test integration
+
+- Added `SpineConverterNative.Unity.cs` to the Unity compatibility test project with `UNITY_IOS` defined, so the iOS-only P/Invoke declarations are compiled by CI rather than silently excluded.
+- Added four pre-native argument-validation tests: null/empty JSON and null/empty skeleton input. These tests deliberately do not call the unavailable `__Internal` native symbols on Linux.
+- The resulting workflow run [41185474591](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185474591) was in progress at the time of this note; no pass is claimed yet.
+- This checks C# compilation and managed argument validation only. It does not prove the iOS static archive is linked into UnityFramework, that symbol resolution works in Xcode, or that the native calls work on device.
