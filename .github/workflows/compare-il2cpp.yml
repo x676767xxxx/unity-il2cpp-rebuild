@@ -1,0 +1,77 @@
+name: Compare AzureArchive IL2CPP platforms
+on:
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        run: |
+          mkdir -p work/{ios,android,windows,tools,out}
+          curl -fL --retry 3 -o work/ios/app.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o work/windows/app.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+          curl -fL --retry 3 -o work/android/app.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -q work/ios/app.ipa -d work/ios/extracted
+          unzip -q work/windows/app.zip -d work/windows/extracted
+          unzip -q work/android/app.apk -d work/android/extracted
+      - name: Inventory native binaries and metadata
+        run: |
+          python3 - <<'PY'
+          import pathlib, hashlib, subprocess
+          roots = {"iOS": pathlib.Path("work/ios/extracted"), "Android": pathlib.Path("work/android/extracted"), "Windows": pathlib.Path("work/windows/extracted")}
+          out=[]
+          for platform, root in roots.items():
+              out.append("## "+platform)
+              files=list(root.rglob("*"))
+              for p in files:
+                  if not p.is_file(): continue
+                  n=p.name.lower()
+                  if n in {"unityframework","gameassembly.dll","libil2cpp.so","global-metadata.dat"} or "global-metadata.dat" in n:
+                      b=p.read_bytes()
+                      sha=hashlib.sha256(b).hexdigest()
+                      desc=subprocess.run(["file",str(p)],capture_output=True,text=True).stdout.strip()
+                      out.append(f"{p} | bytes={len(b)} | sha256={sha} | {desc}")
+              # Relevant Unity runtime and app metadata
+              for p in files:
+                  if p.is_file() and p.name in {"Info.plist","globalgamemanagers","boot.config"}:
+                      out.append(f"SUPPORT {p} bytes={p.stat().st_size}")
+          pathlib.Path("work/out/native-inventory.txt").write_text("\n".join(out))
+          PY
+      - name: Download IL2CPP dumper
+        run: |
+          curl -fL --retry 3 -o work/tools/dumper.zip https://github.com/Perfare/Il2CppDumper/releases/latest/download/Il2CppDumper-linux-x64.zip
+          unzip -q work/tools/dumper.zip -d work/tools/dumper
+          chmod +x work/tools/dumper/Il2CppDumper || true
+      - name: Attempt IL2CPP metadata and code analysis
+        continue-on-error: true
+        run: |
+          set +e
+          DUMPER="$PWD/work/tools/dumper/Il2CppDumper"
+          find work/ios/extracted work/android/extracted work/windows/extracted -type f -name global-metadata.dat > work/out/metadata-files.txt
+          find work/ios/extracted work/android/extracted work/windows/extracted -type f \( -name UnityFramework -o -name libil2cpp.so -o -name GameAssembly.dll \) > work/out/native-files.txt
+          while IFS= read -r meta; do
+            case "$meta" in
+              *ios*) plat=ios ;;
+              *android*) plat=android ;;
+              *windows*) plat=windows ;;
+              *) plat=unknown ;;
+            esac
+            case "$plat" in
+              ios) bin=$(find work/ios/extracted -type f -name UnityFramework | head -1) ;;
+              android) bin=$(find work/android/extracted -type f -name libil2cpp.so | head -1) ;;
+              windows) bin=$(find work/windows/extracted -type f -name GameAssembly.dll | head -1) ;;
+              *) continue ;;
+            esac
+            if [ -n "$bin" ] && [ -f "$bin" ]; then
+              mkdir -p "work/out/dump-$plat"
+              echo "DUMP $plat binary=$bin metadata=$meta" >> work/out/dumper.log
+              "$DUMPER" "$bin" "$meta" "work/out/dump-$plat" >> work/out/dumper.log 2>&1
+            else
+              echo "NO_BINARY_FOR $plat metadata=$meta" >> work/out/dumper.log
+            fi
+          done < work/out/metadata-files.txt
+          find work/out -maxdepth 2 -type f -printf '%p %s bytes\n' > work/out/output-files.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-il2cpp-comparison
+          path: work/out/
