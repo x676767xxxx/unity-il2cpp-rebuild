@@ -104,20 +104,20 @@ internal static class Program
         var nativeImageDescriptor = new BackgroundResourceDescriptor(
             94u, "native-image", BackgroundResourceKind.Image, BackgroundResourceOrigin.Native,
             "Addressables/Backgrounds/native.png", null, false);
-        Texture2D? nativeLoadedA = null;
-        Texture2D? nativeLoadedB = null;
+        Texture? nativeLoadedA = null;
+        Texture? nativeLoadedB = null;
         nativeImageCache.Load(nativeImageDescriptor, texture => nativeLoadedA = texture);
         nativeImageCache.Load(nativeImageDescriptor, texture => nativeLoadedB = texture);
         Assert(nativeLoadedA == null && nativeLoadedB == null, "native background load remains asynchronous");
         Assert(Addressables.LastKey?.ToString() == "manifest:Addressables/Backgrounds/native.png",
             "native background key passes through game CorrectPath adapter");
-        var nativeImageOperation = Addressables.Last<Texture2D>();
+        var nativeImageOperation = Addressables.Last<Texture>();
         var nativeImage = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         nativeImageOperation.Complete(nativeImage);
         Assert(ReferenceEquals(nativeImage, nativeLoadedA) && ReferenceEquals(nativeImage, nativeLoadedB),
             "concurrent native background requests share one Addressables result");
         Assert(nativeImageCache.CachedNativeCount == 1, "native background cache retains one Addressables lease");
-        Texture2D? nativeLoadedCached = null;
+        Texture? nativeLoadedCached = null;
         nativeImageCache.Load(nativeImageDescriptor, texture => nativeLoadedCached = texture);
         Assert(ReferenceEquals(nativeImage, nativeLoadedCached), "native background cache serves retained asset");
         Assert(Addressables.ReleaseCount == 0, "native background lease remains retained until cache disposal");
