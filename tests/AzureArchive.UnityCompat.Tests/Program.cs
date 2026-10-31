@@ -69,6 +69,36 @@ internal static class Program
         AssertThrows<ArgumentException>(() => SpineConverterNative.ConvertToSpine42Binary(Array.Empty<byte>()), "empty Spine skeleton");
 
         Addressables.Reset();
+        int previousTransformCalls = 0;
+        Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string> previousTransform =
+            location => { previousTransformCalls++; return location.InternalId; };
+        Addressables.InternalIdTransformFunc = previousTransform;
+        var tokenLocation = new UnityEngine.ResourceManagement.ResourceLocations.TestResourceLocation(
+            "{ScenarioResourceManager.AddrLoadUrl}/backgrounds/scene.bundle");
+        var untouchedLocation = new UnityEngine.ResourceManagement.ResourceLocations.TestResourceLocation(
+            "https://static.example.org/unchanged.bundle");
+        var hook = AddressablesInternalIdTransformHook.Install(() => "https://cdn.example.org/game/");
+        Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string> activeTransform =
+            Addressables.InternalIdTransformFunc!;
+        Assert(activeTransform(tokenLocation) == "https://cdn.example.org/game/backgrounds/scene.bundle",
+            "Addressables hook resolves verified catalog token");
+        Assert(activeTransform(untouchedLocation) == untouchedLocation.InternalId,
+            "Addressables hook preserves unrelated IDs");
+        Assert(previousTransformCalls == 2, "Addressables hook chains previous transform");
+        hook.Dispose();
+        Assert(ReferenceEquals(Addressables.InternalIdTransformFunc, previousTransform),
+            "Addressables hook restores previous transform");
+
+        Addressables.Reset();
+        var hookWithLaterOwner = AddressablesInternalIdTransformHook.Install(() => "https://cdn.example.org/game");
+        Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string> laterTransform =
+            location => "later:" + location.InternalId;
+        Addressables.InternalIdTransformFunc = laterTransform;
+        hookWithLaterOwner.Dispose();
+        Assert(ReferenceEquals(Addressables.InternalIdTransformFunc, laterTransform),
+            "Addressables hook does not overwrite a later owner");
+
+        Addressables.Reset();
         AddressableAssetLease<UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle<object>, object>? loadedLease = null;
         Exception? loadError = null;
         AddressablesRuntimeAdapter.Load<object>("bundle://scene", lease => loadedLease = lease, error => loadError = error);
@@ -106,7 +136,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>(null!, lease => { }), "null Addressables key");
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>("bundle://key", null!), "null Addressables success callback");
 
-        Console.WriteLine("PASS: 13 Unity decoder checks; 4 Spine bridge argument checks; 11 Addressables async adapter checks");
+        Console.WriteLine("PASS: Unity decoder and path checks; 4 Spine bridge argument checks; Addressables token hook and async ownership checks");
         return 0;
     }
 
