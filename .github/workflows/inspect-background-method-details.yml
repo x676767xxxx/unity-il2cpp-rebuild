@@ -100,7 +100,7 @@ jobs:
               report.append("Nested iterator IL file was not produced.")
               continue
             lines = p.read_text(errors="replace").splitlines()
-            hits = [i for i,line in enumerate(lines) if re.search(r"\\bMoveNext\\s*\\(", line) and ".method" not in line]
+            hits = [i for i,line in enumerate(lines) if re.search(r"\bMoveNext\s*\(", line) and ".method" not in line]
             report.append(f"#### MoveNext: {len(hits)} declarations")
             for i in hits[:4]:
               start=i
@@ -119,7 +119,7 @@ jobs:
                 continue
               fence=chr(96)*3
               report += [f"Source lines {start+1}-{end+1}:",fence+"il",*lines[start:end+1],fence]
-          Path("analysis/full-exact-background-method-il-2026-10-31.md").write_text("\\n".join(report)+"\\n")
+          Path("analysis/full-exact-background-method-il-2026-10-31.md").write_text("\n".join(report)+"\n")
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
