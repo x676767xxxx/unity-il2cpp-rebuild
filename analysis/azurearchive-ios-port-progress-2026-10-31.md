@@ -180,3 +180,21 @@ Only a demonstrated difference should produce a code change. Existing adapters r
 
 ### Completion boundary
 The current branch still has only three standalone .NET project files and no Unity `Assets/`, `Packages/`, `ProjectSettings/`, Xcode project or workspace. No production CDN value is established, no real-player Addressables test exists, and no signed/device-tested IPA exists.
+
+## Additional native source-flow audit — 2026-10-31
+
+Direct inspection of Android ARM64 artifact azurearchive-android-arm64-disassembly-corrected (artifact ID 13039996236, produced by successful workflow run https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41192985832) confirms:
+- CheckForUpdate.MoveNext calls AuthoringOfflineResources.TryGetStartupUrl(out string) at RVA 0x33c5e00 before the ordinary catalog update state machine.
+- The offline helper calls ValidateDirectory and returns a string through its out parameter on a success path. This is a candidate optional offline/manual startup override, not proven as the production CDN.
+- UserSettings.ReadUserSettings.MoveNext calls UserSettings.InitializeSettings; no visible write to ScenarioResourceManager.AddrLoadUrl appears in this short body.
+- UIPatchDownload.CoChangeSource.MoveNext handles the UI source-change coroutine and invokes a final helper at RVA 0x325a97c; no direct visible static-field store to AddrLoadUrl appears in this body either.
+- The authoring CLI fallback remains authoring-specific. Neither settings-read nor source-change coroutine currently proves the mobile gameplay URL assignment.
+
+### Next exact investigation
+1. Resolve the target and full declaration for 0x325a97c and inspect its callers/callee effects; it may clarify source-change persistence but must not be assumed to set AddrLoadUrl.
+2. Inspect AuthoringOfflineResources.TryGetStartupUrl success/failure branches and IsActive gating together with serialized offline startup metadata.
+3. Map the ScenarioResourceManager.AddrLoadUrl static field metadata token/storage location and search all ARM64 writes to that location across the Android binary; cross-check every candidate against managed field metadata.
+4. If no managed/native field write is found, inspect Addressables token substitution and runtime configuration/provider initialization before adding any iOS code.
+5. Keep the existing Addressables bootstrap adapters unchanged until the source value and initialization order are proven.
+
+No C# source files were added or modified in this checkpoint.
