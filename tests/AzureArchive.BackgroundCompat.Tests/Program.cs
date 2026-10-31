@@ -83,6 +83,45 @@ internal static class Program
         AssertEqual("global-match", idResolved.Name, "ID-based resolution selects global fallback");
         AssertFalse(BackgroundOverrideResolver.TryResolve(42u, null, null, out idResolved),
             "ID-based resolution accepts null override sequences");
+
+        int scenarioLookups = 0;
+        var nativeRow = new ScenarioBackgroundRecord(42u, "backgrounds/scene-night.png", BackgroundResourceKind.Image);
+        var resolvedLocal = ScenarioBackgroundResolver.Resolve(
+            42u, localBackgrounds, globalBackgrounds,
+            requestedId => { scenarioLookups++; return nativeRow; });
+        AssertTrue(resolvedLocal != null, "scenario resolver returns local override");
+        AssertEqual("local-first-match", resolvedLocal!.Name, "scenario resolver local override wins before Excel");
+        AssertEqual("0", scenarioLookups.ToString(), "scenario lookup skipped after override hit");
+        var resolvedGlobal = ScenarioBackgroundResolver.Resolve(
+            42u, Array.Empty<BackgroundResourceDescriptor>(), globalBackgrounds,
+            requestedId => { scenarioLookups++; return nativeRow; });
+        AssertTrue(resolvedGlobal != null, "scenario resolver returns global override");
+        AssertEqual("global-match", resolvedGlobal!.Name, "scenario resolver global override wins before Excel");
+        AssertEqual("0", scenarioLookups.ToString(), "scenario lookup skipped after global override hit");
+        var resolvedNative = ScenarioBackgroundResolver.Resolve(
+            42u, null, null,
+            requestedId => { scenarioLookups++; return nativeRow; });
+        AssertTrue(resolvedNative != null, "scenario resolver creates native fallback");
+        AssertEqual("scene-night", resolvedNative!.Name, "native fallback name uses filename stem");
+        AssertEqual("backgrounds/scene-night.png", resolvedNative.Path, "native fallback preserves Excel filename path");
+        AssertEqual("Native", resolvedNative.Origin.ToString(), "native fallback source");
+        AssertEqual("Image", resolvedNative.Kind.ToString(), "native fallback background type");
+        AssertEqual("1", scenarioLookups.ToString(), "native fallback performs one scenario lookup");
+        var zeroId = ScenarioBackgroundResolver.Resolve(
+            0u, null, null,
+            requestedId => { scenarioLookups++; return nativeRow; });
+        AssertTrue(zeroId == null, "zero background ID resolves to null");
+        AssertEqual("1", scenarioLookups.ToString(), "zero background ID skips scenario lookup");
+        var mismatchedRow = ScenarioBackgroundResolver.Resolve(
+            43u, null, null,
+            requestedId => new ScenarioBackgroundRecord(42u, "backgrounds/wrong.png", BackgroundResourceKind.Image));
+        AssertTrue(mismatchedRow == null, "scenario resolver rejects mismatched Name ID");
+        var missingRow = ScenarioBackgroundResolver.Resolve(
+            44u, null, null,
+            requestedId => null);
+        AssertTrue(missingRow == null, "scenario resolver returns null when Excel row is absent");
+        AssertThrows<ArgumentNullException>(() => ScenarioBackgroundResolver.Resolve(
+            42u, null, null, null!), "scenario resolver requires lookup delegate");
         AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
 
         const string catalogToken = AddressableInternalIdResolver.AddrLoadUrlToken;
@@ -184,7 +223,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 16 ScenarioBackgroundResolver checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
         return 0;
     }
 
