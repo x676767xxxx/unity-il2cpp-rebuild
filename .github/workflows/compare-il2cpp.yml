@@ -26,52 +26,56 @@ jobs:
               for p in files:
                   if not p.is_file(): continue
                   n=p.name.lower()
-                  if n in {"unityframework","gameassembly.dll","libil2cpp.so","global-metadata.dat"} or "global-metadata.dat" in n:
+                  if n in {"unityframework","gameassembly.dll","libil2cpp.so","global-metadata.dat"}:
                       b=p.read_bytes()
                       sha=hashlib.sha256(b).hexdigest()
                       desc=subprocess.run(["file",str(p)],capture_output=True,text=True).stdout.strip()
                       out.append(f"{p} | bytes={len(b)} | sha256={sha} | {desc}")
-              # Relevant Unity runtime and app metadata
               for p in files:
                   if p.is_file() and p.name in {"Info.plist","globalgamemanagers","boot.config"}:
                       out.append(f"SUPPORT {p} bytes={p.stat().st_size}")
           pathlib.Path("work/out/native-inventory.txt").write_text("\n".join(out))
           PY
-      - name: Download IL2CPP dumper
+      - name: Upload inventory even if later analysis fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-native-inventory
+          path: work/out/native-inventory.txt
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 7.0.x
+      - name: Download IL2CPP Dumper
         run: |
-          curl -fL --retry 3 -o work/tools/dumper.zip https://github.com/Perfare/Il2CppDumper/releases/latest/download/Il2CppDumper-linux-x64.zip
+          curl -fL --retry 3 -o work/tools/dumper.zip https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net7-v6.7.46.zip
           unzip -q work/tools/dumper.zip -d work/tools/dumper
-          chmod +x work/tools/dumper/Il2CppDumper || true
+          find work/tools/dumper -maxdepth 2 -type f | sort > work/out/dumper-package-files.txt
       - name: Attempt IL2CPP metadata and code analysis
         continue-on-error: true
         run: |
           set +e
-          DUMPER="$PWD/work/tools/dumper/Il2CppDumper"
+          DUMPER=$(find work/tools/dumper -iname 'Il2CppDumper.dll' -type f | head -1)
+          echo "DUMPER_DLL=$DUMPER" > work/out/dumper.log
           find work/ios/extracted work/android/extracted work/windows/extracted -type f -name global-metadata.dat > work/out/metadata-files.txt
-          find work/ios/extracted work/android/extracted work/windows/extracted -type f \( -name UnityFramework -o -name libil2cpp.so -o -name GameAssembly.dll \) > work/out/native-files.txt
           while IFS= read -r meta; do
             case "$meta" in
-              *ios*) plat=ios ;;
-              *android*) plat=android ;;
-              *windows*) plat=windows ;;
-              *) plat=unknown ;;
-            esac
-            case "$plat" in
-              ios) bin=$(find work/ios/extracted -type f -name UnityFramework | head -1) ;;
-              android) bin=$(find work/android/extracted -type f -name libil2cpp.so | head -1) ;;
-              windows) bin=$(find work/windows/extracted -type f -name GameAssembly.dll | head -1) ;;
+              work/ios/*) plat=ios; bin=$(find work/ios/extracted -type f -name UnityFramework | head -1) ;;
+              work/android/*) plat=android; bin=$(find work/android/extracted -type f -name libil2cpp.so | head -1) ;;
+              work/windows/*) plat=windows; bin=$(find work/windows/extracted -type f -name GameAssembly.dll | head -1) ;;
               *) continue ;;
             esac
-            if [ -n "$bin" ] && [ -f "$bin" ]; then
+            if [ -n "$DUMPER" ] && [ -n "$bin" ] && [ -f "$bin" ]; then
               mkdir -p "work/out/dump-$plat"
               echo "DUMP $plat binary=$bin metadata=$meta" >> work/out/dumper.log
-              "$DUMPER" "$bin" "$meta" "work/out/dump-$plat" >> work/out/dumper.log 2>&1
+              dotnet "$DUMPER" "$bin" "$meta" "work/out/dump-$plat" >> work/out/dumper.log 2>&1
+              echo "EXIT_CODE=$?" >> work/out/dumper.log
             else
-              echo "NO_BINARY_FOR $plat metadata=$meta" >> work/out/dumper.log
+              echo "MISSING_DUMPER_OR_BINARY $plat metadata=$meta bin=$bin" >> work/out/dumper.log
             fi
           done < work/out/metadata-files.txt
-          find work/out -maxdepth 2 -type f -printf '%p %s bytes\n' > work/out/output-files.txt
+          find work/out -maxdepth 3 -type f -printf '%p %s bytes\n' > work/out/output-files.txt
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: azurearchive-il2cpp-comparison
           path: work/out/
