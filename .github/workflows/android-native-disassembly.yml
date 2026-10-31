@@ -37,6 +37,11 @@ jobs:
           # RVAs below were verified against the exact method declaration in dump.cs.
           targets=[
             ("ScenarioResourceManager.InitializeAuthoringResources","InitializeAuthoringResources(string databasePath",0x3264CA8),
+            ("ScenarioResourceManager.CheckForUpdate","CheckForUpdate()",0x32646B0),
+            ("ScenarioResourceManager.Awake","Awake()",0x3264724),
+            ("ScenarioResourceManager.InitializeAfterSplash","InitializeAfterSplash()",0x326498C),
+            ("ScenarioResourceManager.Initialize","Initialize()",0x3264A00),
+            ("ScenarioResourceManager.UpdateAddressable","UpdateAddressable()",0x3265514),
             ("ScenarioResourceManager.ResolveBackground","ResolveBackground(uint id)",0x3260EE0),
             ("ScenarioResourceManager.GetBackgroundPreviewAsync","GetBackgroundPreviewAsync(BackgroundResource resource",0x3261EA0),
             ("ScenarioResourceManager.GetBackgroundTexture(BackgroundResource)","GetBackgroundTexture(BackgroundResource resource)",0x326172C),
