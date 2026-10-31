@@ -192,5 +192,5 @@ internal static class ScenarioResourceManager
 
 internal static class InvalidAddrLoadUrlFixture
 {
-    public static int AddrLoadUrl;
+    public static int AddrLoadUrl = 0;
 }
