@@ -62,6 +62,27 @@ internal static class Program
         AssertEqual("global-match", selected, "global override selected");
         AssertFalse(BackgroundOverrideResolver.TryResolve<string>(null, null, x => true, out selected), "null lists have no result");
         AssertFalse(BackgroundOverrideResolver.TryResolve(local, global, x => x == "missing", out selected), "no matching override");
+
+        var localBackgrounds = new[]
+        {
+            new BackgroundResourceDescriptor(41, "local-other", BackgroundResourceKind.Image, BackgroundResourceOrigin.LocalCustom, "other.png", root, false),
+            new BackgroundResourceDescriptor(42, "local-first-match", BackgroundResourceKind.Image, BackgroundResourceOrigin.LocalCustom, "first.png", root, false),
+            new BackgroundResourceDescriptor(42, "local-second-match", BackgroundResourceKind.Image, BackgroundResourceOrigin.LocalCustom, "second.png", root, false)
+        };
+        var globalBackgrounds = new[]
+        {
+            new BackgroundResourceDescriptor(42, "global-match", BackgroundResourceKind.Image, BackgroundResourceOrigin.GlobalCustom, "global.png", root, false)
+        };
+        AssertTrue(BackgroundOverrideResolver.TryResolve(42u, localBackgrounds, globalBackgrounds, out var idResolved),
+            "ID-based local override resolution");
+        AssertEqual("local-first-match", idResolved.Name, "ID-based resolution uses first local ID match before global");
+        AssertTrue(BackgroundOverrideResolver.TryResolve(99u, localBackgrounds, globalBackgrounds, out idResolved) == false,
+            "ID-based resolution returns false when no override matches");
+        AssertTrue(BackgroundOverrideResolver.TryResolve(42u, Array.Empty<BackgroundResourceDescriptor>(), globalBackgrounds, out idResolved),
+            "ID-based global override fallback");
+        AssertEqual("global-match", idResolved.Name, "ID-based resolution selects global fallback");
+        AssertFalse(BackgroundOverrideResolver.TryResolve(42u, null, null, out idResolved),
+            "ID-based resolution accepts null override sequences");
         AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
 
         const string catalogToken = AddressableInternalIdResolver.AddrLoadUrlToken;
