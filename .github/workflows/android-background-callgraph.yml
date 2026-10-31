@@ -127,7 +127,7 @@ jobs:
           from pathlib import Path
           import struct
           binary = Path("work/bin/libil2cpp.so").read_bytes()
-          if binary[:6] != b"\\x7fELF\\x02\\x01":
+          if binary[:6] != b"\x7fELF\x02\x01":
               raise SystemExit("Expected ELF64 little-endian Android ARM64 binary")
           shoff = struct.unpack_from("<Q", binary, 40)[0]
           shentsize = struct.unpack_from("<H", binary, 58)[0]
@@ -139,7 +139,7 @@ jobs:
           target, count = 0x13377E6, 6
           for section in sections:
               name_off, _, _, addr, offset, size, *_ = section
-              name = names[name_off:names.find(b"\\0", name_off)].decode(errors="replace")
+              name = names[name_off:names.find(b"\0", name_off)].decode(errors="replace")
               if addr <= target and target + count <= addr + size:
                   file_offset = offset + target - addr
                   table = binary[file_offset:file_offset + count]
@@ -149,9 +149,9 @@ jobs:
                   if table != expected:
                       raise SystemExit(f"Unexpected jump table bytes: {table.hex(' ')}")
                   Path("work/out/preview-coroutine-state-jumptable.txt").write_text(
-                      f"section={name} virtual_address=0x{target:x} file_offset=0x{file_offset:x}\\n"
-                      f"bytes={table.hex(' ')}\\n" +
-                      "".join(f"state_{i}: byte=0x{b:02x} target=0x{0x3270F48 + b * 4:x}\\n" for i, b in enumerate(table))
+                      f"section={name} virtual_address=0x{target:x} file_offset=0x{file_offset:x}\n"
+                      f"bytes={table.hex(' ')}\n" +
+                      "".join(f"state_{i}: byte=0x{b:02x} target=0x{0x3270F48 + b * 4:x}\n" for i, b in enumerate(table))
                   )
                   break
           else:
