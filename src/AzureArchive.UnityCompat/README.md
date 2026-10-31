@@ -48,3 +48,10 @@ This is a source-level integration adapter, not yet called from the shipped game
 - Non-Image resources are rejected. Spine skeleton/atlas playback must use the separate Spine runtime path and is not implemented by this class.
 
 CI [run 41199317839](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41199317839) passed the isolated Unity API-stub compile/tests, including native/custom cache ownership, CorrectPath binding, singleton lookup, and pending-load disposal. This is not a Unity Editor or device test.
+
+
+## Spine owned-object cleanup
+
+`SpineOwnedObjectCleanup.Unity.cs` mirrors the Android 1.0 `RuntimeSpineLoader.DestroyOwned` split: ignore Unity-null objects, call deferred `Object.Destroy` while `Application.isPlaying`, and call `Object.DestroyImmediate` otherwise. `Rollback` consumes the partial object snapshot returned by `SpineAssetConstructionLedger.Abort`. Both operations must run on Unity's main thread.
+
+CI [run 41205621240](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41205621240) now explicitly includes this source in the UnityCompat test compilation and passes play-mode destruction, edit-mode destruction, null-object handling, batch rollback, and null-collection validation against isolated Unity API stubs. This confirms the source compiles against the stubs and its branch behavior is exercised; it is not yet compiled against the actual Unity assemblies or executed in the Unity player.
