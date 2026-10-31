@@ -3,7 +3,6 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "analysis/run-raw-il-export.txt"
       - ".github/workflows/ios-raw-il-export.yml"
 jobs:
   export-il:
@@ -33,35 +32,35 @@ jobs:
             done
             grep -i 'AuthoringResourceCatalog' "work/out/$platform/types.txt" > "work/out/$platform/authoring-type-candidates.txt" || true
             while IFS= read -r line; do
-              type_name=$(printf '%s' "$line" | sed -E 's/^[[:space:]]*[A-Z][[:space:]]+//')
+              type_name=$(printf '%s' "$line" | sed -E 's/^[[:space:]]*Class[[:space:]]+//')
               [ -z "$type_name" ] && continue
               safe_name=$(printf '%s' "$type_name" | tr '+./<> ' '______' | tr -cd '[:alnum:]_-')
               work/tools/ilspycmd --ilcode --type "$type_name" "$DLL" > "work/out/$platform/Authoring-$safe_name.il" 2> "work/out/$platform/Authoring-$safe_name.log" || true
             done < "work/out/$platform/authoring-type-candidates.txt"
           done
-      - name: Extract target methods and call operands
+      - name: Extract exact target method declarations
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
           out=Path("work/out")
-          names=["ResolveBackground","GetBackgroundTexture","GetBackgroundPreviewAsync","InitializeAuthoringResources","Search","Resolve","Import","StageReferencedResources","ApplyDisplayRank","GetSkeletonDataAssetAtPath"]
+          names=["ResolveBackground","GetBackgroundTexture","GetBackgroundTextureAsync","GetBackgroundPreviewAsync","InitializeAuthoringResources","Search","Resolve","Import","StageReferencedResources","ApplyDisplayRank","GetSkeletonDataAssetAtPath"]
           report=["# Raw IL export inspection summary",""]
           for platform in ["android","windows"]:
               report += [f"## {platform}",""]
               for p in sorted((out/platform).glob("*.il")):
                   txt=p.read_text(errors="ignore")
                   for name in names:
-                      if name in txt:
-                          hits=[x.strip() for x in txt.splitlines() if name in x]
-                          report.append(f"- {p.name}: {name} ({len(hits)} matching IL lines)")
-                          report.extend("  "+x[:240] for x in hits[:8])
+                      hits=[x.strip() for x in txt.splitlines() if re.search(r'\\b'+re.escape(name)+r'\\s*\\(',x)]
+                      if hits:
+                          report.append(f"- {p.name}: {name} ({len(hits)} declaration/call lines)")
+                          report.extend("  "+x[:240] for x in hits[:12])
               report.append("")
-          (out/"raw-il-inspection-summary.md").write_text("\n".join(report))
+          (out/"raw-il-inspection-summary.md").write_text("\\n".join(report))
           PY
       - name: Upload raw IL
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-raw-il-ios-port
+          name: azurearchive-raw-il-ios-port-fixed
           path: work/out/
