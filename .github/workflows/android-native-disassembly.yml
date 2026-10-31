@@ -1,6 +1,9 @@
 name: Android native method disassembly
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/android-native-disassembly.yml'
 jobs:
   disassemble:
     runs-on: ubuntu-latest
