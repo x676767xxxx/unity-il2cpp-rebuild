@@ -30,4 +30,8 @@ The adapter is compiled in CI against isolated API stubs that mirror the old iOS
 
 `AddressablesInternalIdTransformHook.Install(getAddrLoadUrl)` registers a transform through `Addressables.InternalIdTransformFunc`. It chains any previously registered transform, rewrites only IDs beginning with the verified `{ScenarioResourceManager.AddrLoadUrl}` token, and leaves unrelated IDs unchanged. Disposing restores the previous delegate only if this hook still owns the global slot, avoiding overwriting a later subsystem's registration.
 
-Install it before the relevant catalog-backed loads begin. The supplied URL callback must read the actual game runtime configuration; do not pass the authoring CLI fallback URL without proving it is the mobile runtime value. The standalone tests use an isolated API stub; compile and test against the exact Unity 2023.2.20f1c1 / Addressables assemblies before shipping.
+Install it before the relevant catalog-backed loads begin. The supplied URL callback must read the actual game runtime configuration; do not pass the authoring CLI fallback URL without proving it is the mobile runtime value.
+
+The platform-matched iOS 0.7.9.2 dump confirms both `ScenarioResourceManager.AddrLoadUrl` (static string field) and `Addressables.InternalIdTransformFunc` (public static `Func<IResourceLocation, string>` property). `InstallFromRuntimeType(Type)` can bind the hook to a supplied game type, and `InstallFromGameRuntime()` locates the global `ScenarioResourceManager` in `Assembly-CSharp` or the loaded assemblies and reads `AddrLoadUrl` lazily. The test suite covers lazy URL changes and rejects a missing/wrongly typed field.
+
+This is a source-level integration adapter, not yet called from the shipped game's startup path. The standalone tests use an isolated API stub; compile and test against the exact Unity 2023.2.20f1c1 / Addressables assemblies before shipping.
