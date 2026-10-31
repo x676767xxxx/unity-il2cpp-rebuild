@@ -111,3 +111,17 @@ Native helper disassembly verifies:
 
 ### Implementation consequence
 The tested `BackgroundPreviewRequestCoalescer<TTexture>` covers only the pending-key/callback-list part of `QueueBackgroundPreview`. A real adapter still needs the recovered six-state coroutine flow, both async read types, native handle ownership, RenderTexture lifecycle, 1024 sizing, preview cache record/ref-count/last-use fields, LRU trim and error cleanup. Do not replace those with a generic image-only cache.
+
+
+### Resource-release helper details — verified from native helper bodies
+
+The corrected full disassembly also exposes the helper bodies, not only their call sites:
+
+- `ReleaseBackgroundPreview(texture)` searches the cache record by texture identity. If no matching record exists it takes the no-match return path. For a match, it decrements `Users`, updates `LastUse` to the current frame, and invokes `TrimBackgroundPreviews(false)`. The method returns whether a matching preview record was found.
+- `DestroyBackgroundPreview(preview)` first checks Unity object validity. If the texture is already a destroyed/null Unity object, it exits without issuing a second destruction/release. Otherwise it branches on the record's `Addressable` flag: addressable records go through `Addressables.Release(texture)`; non-addressable records go through the Unity object destruction path.
+- The normal trim loop enumerates unused records, orders them by `LastUse`, and evaluates the running byte total and current cache count before each deletion. After deletion it subtracts the size returned by the size helper and re-reads the cache count on the next iteration.
+- This establishes a useful adapter contract: decrement/update first; never evict an entry with positive users; make Unity-object release idempotent with respect to already-destroyed objects; choose exactly one release mechanism from the stored ownership flag; and only then continue the trim loop.
+
+### Coroutine reconstruction boundary
+
+The iterator metadata and native call graph establish six states and the separate async operations (file-byte task, Spine-files task and Addressables handle), but the generated state machine has several compiler/runtime helper calls whose high-level exception and callback semantics are not yet fully mapped. In particular, do not yet claim a complete ordering for: Addressables handle acquisition vs completion, callback-list fan-out vs cache registration, temporary RenderTexture ownership vs final Texture ownership, and exception fan-out to every pending callback. Those are the remaining reverse-engineering targets before a production Unity coroutine adapter is written.
