@@ -144,3 +144,14 @@ The nested page loader has two confirmed behaviors from Android 1.0:
 The asynchronous worker closure simply calls the synchronous file reader with the captured base path and DXT5-support flag. This supports keeping file reading separate from Unity object creation.
 
 The HasConsumers getter is a strict references-greater-than-one check. The cache's own retained reference is the baseline; additional references indicate live consumers. The cleanup helper checks whether the Unity application is playing and chooses the matching deferred or immediate object-destruction path. Preserve that distinction in the eventual Unity adapter.
+
+## Reference-count compatibility primitive added (2026-10-31)
+
+`src/AzureArchive.BackgroundCompat/SpineAssetReferenceLedger.cs` now isolates the confirmed reference-count rules without pretending to own Unity objects:
+- A new cached asset starts with one cache-owned reference.
+- `HasConsumers` is true only when references > 1.
+- `Retain()` increments only while the count is positive and rejects a zero-count asset.
+- `Release()` reports the transition to zero exactly once; further calls at zero return false.
+- The ledger does not destroy objects. The eventual Unity adapter must still dispose the Spine atlas/material graph and call the verified play-mode-aware `DestroyOwned` path.
+
+Eleven deterministic lifecycle checks were added to the existing compatibility test executable. This is a state-model test, not proof that the target game's `RuntimeSpineAsset` has been replaced or integrated.
