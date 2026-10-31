@@ -100,3 +100,31 @@ This closes the converter-plugin packaging gate only. The package includes an iO
 6. Generate and verify a signed IPA only after all runtime checks pass.
 
 No duplicate plugin or source file was added for this checkpoint; the existing progress document was updated in place.
+
+
+## iOS 0.7.9.2 background API baseline recovered from actual IPA — 2026-10-31
+
+A successful platform-matched Il2CppDumper run against the actual iOS 0.7.9.2 IPA produced `ios-dump/dump.cs` and `DummyDll/Assembly-CSharp.dll` in Actions artifact `azurearchive-ios-il2cpp-method-map` (run [41194368222](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41194368222), artifact ID `13040330066`). Inspection of the recovered top-level `ScenarioResourceManager` declaration confirms the old iOS player already has:
+- `TryGetBackgroundOverridePath(uint, out string)`
+- `GetBackgroundTexture(uint)`
+- `GetBackgroundTextureAsync(uint, bool, Action<Texture>)`
+- `GetBackgroundType(uint)`
+- `GetTextureFromPersistentDataAsync(string, string, Action<Texture2D>)`
+- `GetResourceOverrideRoot()` and `CorrectPath(string)`
+- `AddrLoadUrl` as a public static string field
+- `GlobalOverrideData` and `LocalOverrideData`
+- Existing caches for custom background textures and loaded Addressables objects.
+
+This materially changes the static-image port strategy: do not rebuild the entire old iOS ID-based image loader from scratch. First inspect its exact behavior and reuse/extend the old iOS implementation where it matches Android 1.0. The Android-specific missing surface remains the resource-object overload, full `ResolveBackground` / `EnumerateBackgrounds` model, preview coalescing/cache, and custom Spine acquisition. Metadata declarations and fields do not prove method-body equivalence or runtime correctness.
+
+A follow-up update to the existing iOS method-map workflow adds the exact old-iOS disassembly targets for `TryGetBackgroundOverridePath`, `GetBackgroundTexture`, `GetBackgroundTextureAsync`, and `GetBackgroundType`. Run [41195591074](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41195591074) is validating those ranges against the actual Mach-O `__text` section. Do not claim those method bodies are validated until that run succeeds and its disassembly artifact is inspected.
+
+### Revised next implementation sequence
+1. Finish and inspect the old-iOS background method disassembly; compare behavior with Android 1.0 recovered IL.
+2. Reuse the old iOS image/addressables path for native images where equivalent; implement only missing Android 1.0 behavior as adapters/extensions.
+3. Implement resource-object resolution and override semantics with tests against extracted Android/Windows metadata and real fixtures.
+4. Add preview cache/callback coalescing only if confirmed necessary for the target gameplay/UI path.
+5. Keep Spine as a separate later milestone; the converter plugin artifact alone does not supply the Spine 4.2 runtime or the actual game's loader/presenter.
+6. Integrate into the real Unity/Xcode project, then compile and device-test.
+
+No duplicate source file was added in this checkpoint; only the existing workflow and existing progress report were updated.
