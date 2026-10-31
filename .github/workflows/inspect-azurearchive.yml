@@ -11,51 +11,48 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Inventory and compare actual game assets
+      - name: Extract catalog remote bundle map
         run: |
           python3 - <<'PY'
-          import zipfile,pathlib,hashlib,collections,os
+          import zipfile,pathlib,json,re,collections,hashlib
           files={"iOS":"inspect/AzureArchive_IOS_0.7.9.2.ipa","Android":"inspect/base.apk","Windows":"inspect/AzureArchive_Win_1.0.1.zip"}
-          zs={k:zipfile.ZipFile(v) for k,v in files.items()}
-          out=[]; records={}
+          out=[]; catalogs={}
           def add(x=""): out.append(str(x))
-          exts=(".bundle",".assetbundle",".unity3d",".assets",".resource",".ress",".bank",".bytes",".json")
-          for platform,z in zs.items():
-            rec=[]
-            for n in z.namelist():
-              if n.endswith("/"): continue
-              base=n.rsplit("/",1)[-1]; low=n.lower()
-              info=z.getinfo(n)
-              if info.file_size>=128*1024 and (low.endswith(exts) or "/aa/" in low or "streamingassets" in low or "assetbundle" in low):
-                h=hashlib.sha256()
-                with z.open(n) as f:
-                  for chunk in iter(lambda:f.read(1024*1024),b""): h.update(chunk)
-                rec.append((base,n,info.file_size,h.hexdigest()))
-            records[platform]=rec
+          for platform,path in files.items():
+            z=zipfile.ZipFile(path); names=z.namelist()
+            cn=next((n for n in names if n.endswith("/catalog.json") and "/aa/" in n.lower()),None)
             add("## "+platform)
-            add("Candidate resource files >=128 KiB: "+str(len(rec)))
-            add("Total candidate bytes: "+str(sum(x[2] for x in rec)))
-            for x in sorted(rec,key=lambda x:x[2],reverse=True)[:35]:
-              add(f"  {x[0]} | {x[2]} bytes | sha256={x[3]} | {x[1]}")
-          add("## Exact SHA256 comparison (candidate resources)")
+            if not cn: add("NO CATALOG FOUND"); continue
+            raw=z.read(cn); c=json.loads(raw); catalogs[platform]=c
+            ids=c.get("m_InternalIds",[])
+            add(f"Catalog={cn} bytes={len(raw)} sha256={hashlib.sha256(raw).hexdigest()}")
+            add("InternalIds count="+str(len(ids)))
+            for i,x in enumerate(ids):
+              if isinstance(x,str) and (x.startswith("http://") or x.startswith("https://")):
+                add(f"URL[{i}] {x[:1000]}")
+            for key in ("m_ProviderIds","m_ResourceProviderData","m_Keys","m_BucketDataString","m_EntryDataString","m_ExtraDataString","m_KeyDataString"):
+              v=c.get(key)
+              if isinstance(v,list):
+                add(f"{key} count={len(v)}")
+                for item in v[:8]: add("  "+repr(item)[:1000])
+              elif isinstance(v,str):
+                add(f"{key} chars={len(v)} prefix={v[:500]!r}")
+              elif v is not None: add(f"{key} type={type(v).__name__} value={repr(v)[:1000]}")
+            # Search raw catalog text for CDN and bundle references
+            txt=raw.decode("utf-8","replace")
+            urls=sorted(set(re.findall(r'https?://[^\\"\\s]+',txt)))
+            add("Unique literal URLs="+str(len(urls)))
+            for u in urls[:100]: add("  "+u[:1000])
+          add("## Catalog pairwise equality")
           for a,b in (("iOS","Android"),("iOS","Windows"),("Android","Windows")):
-            aa,bb=records[a],records[b]
-            ha=collections.defaultdict(list); hb=collections.defaultdict(list)
-            for x in aa: ha[x[3]].append(x)
-            for x in bb: hb[x[3]].append(x)
-            common=set(ha)&set(hb)
-            add(f"{a} vs {b}: identical-content hashes={len(common)}; unique-left-files={sum(len(v) for k,v in ha.items() if k not in hb)}; unique-right-files={sum(len(v) for k,v in hb.items() if k not in ha)}")
-            for h in list(sorted(common))[:20]:
-              add(f"  SAME {ha[h][0][0]} ({ha[h][0][2]} bytes)")
-            onlya=[x for x in aa if x[3] not in hb]
-            onlyb=[x for x in bb if x[3] not in ha]
-            add(f"  {a}-only samples:")
-            for x in sorted(onlya,key=lambda x:x[2],reverse=True)[:15]: add(f"    {x[0]} {x[2]} {x[3][:16]}")
-            add(f"  {b}-only samples:")
-            for x in sorted(onlyb,key=lambda x:x[2],reverse=True)[:15]: add(f"    {x[0]} {x[2]} {x[3][:16]}")
-          pathlib.Path("inspect/asset-hash-comparison.txt").write_text("\n".join(out))
+            if a in catalogs and b in catalogs:
+              ca,cb=catalogs[a],catalogs[b]
+              add(f"{a} vs {b}:")
+              for k in ("m_InternalIds","m_ProviderIds","m_ResourceProviderData","m_Keys","m_BucketDataString","m_EntryDataString","m_ExtraDataString","m_KeyDataString"):
+                add(f"  {k}: equal={ca.get(k)==cb.get(k)}")
+          pathlib.Path("inspect/catalog-map.txt").write_text("\n".join(out))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-asset-hash-comparison
-          path: inspect/asset-hash-comparison.txt
+          name: azurearchive-catalog-map
+          path: inspect/catalog-map.txt
