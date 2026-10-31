@@ -1,0 +1,45 @@
+using System;
+using System.IO;
+using AzureArchive.BackgroundCompat;
+
+internal static class Program
+{
+    private static int Main()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "azurearchive-background-tests", "resources");
+        string expected = Path.GetFullPath(Path.Combine(root, "images", "scene.png"));
+
+        AssertEqual(expected, SafeResourcePath.ResolveUnderRoot(root, "images/scene.png"), "nested path");
+        AssertEqual(expected, SafeResourcePath.ResolveUnderRoot(root, @"images\scene.png"), "Windows separators");
+
+        AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot("", "a.png"), "empty root");
+        AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, " "), "empty relative");
+        AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, "../outside.png"), "parent traversal");
+        AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, @"images\..\..\outside.png"), "mixed traversal");
+        AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, Path.GetFullPath("outside.png")), "absolute path");
+        AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, @"C:\outside.png"), "drive-qualified path");
+
+        Console.WriteLine("PASS: 8 SafeResourcePath checks");
+        return 0;
+    }
+
+    private static void AssertEqual(string expected, string actual, string name)
+    {
+        if (!string.Equals(expected, actual, StringComparison.Ordinal))
+            throw new Exception(name + ": expected '" + expected + "', got '" + actual + "'");
+    }
+
+    private static void AssertThrows<T>(Action action, string name) where T : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (T)
+        {
+            return;
+        }
+
+        throw new Exception(name + ": expected " + typeof(T).Name);
+    }
+}
