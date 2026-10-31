@@ -32,8 +32,9 @@ jobs:
           mkdir -p work/out/{android,windows}
           for platform in android windows; do
             root="work/in/recovery/cpp2il-$platform"
-            for type in BackgroundResource ScenarioResourceManager; do
-              work/tools/ilspycmd --ilcode --type "$type" "$root/Assembly-CSharp.dll" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log"
+            for type in BackgroundResource ScenarioResourceManager 'ScenarioResourceManager+<CoLoadBackgroundPreview>d__28'; do
+              output_name=$(printf '%s' "$type" | tr '+<>/' '____')
+              work/tools/ilspycmd --ilcode --type "$type" "$root/Assembly-CSharp.dll" > "work/out/$platform/$output_name.il" 2> "work/out/$platform/$output_name.log"
             done
           done
       - name: Extract full exact method bodies and commit report
@@ -86,7 +87,39 @@ jobs:
             "- Android and Windows bodies are compared independently; do not merge platform-specific differences.",
             "- The method declaration and call sites are evidence, but do not establish successful runtime behavior on old iOS.",
             "- No C# compatibility code, Unity build, signing, or IPA is produced."]
-          Path("analysis/full-exact-background-method-il-2026-10-31.md").write_text("\n".join(report)+"\n")
+          # The compiler-generated preview coroutine is a nested type. Export its
+          # MoveNext body separately because the original method exporter only
+          # includes top-level managed types.
+          nested_name = "ScenarioResourceManager+<CoLoadBackgroundPreview>d__28"
+          nested_file = "ScenarioResourceManager__CoLoadBackgroundPreview_d__28"
+          report.append("## Compiler-generated preview coroutine")
+          for platform in ["android", "windows"]:
+            p = out/platform/f"{nested_file}.il"
+            report.append(f"### {platform}")
+            if not p.exists():
+              report.append("Nested iterator IL file was not produced.")
+              continue
+            lines = p.read_text(errors="replace").splitlines()
+            hits = [i for i,line in enumerate(lines) if re.search(r"\\bMoveNext\\s*\\(", line) and ".method" not in line]
+            report.append(f"#### MoveNext: {len(hits)} declarations")
+            for i in hits[:4]:
+              start=i
+              while start>0 and i-start<12 and ".method" not in lines[start]:
+                start-=1
+              if ".method" not in lines[start]:
+                report.append("Could not locate MoveNext method header near line "+str(i+1))
+                continue
+              end=None
+              for j in range(i+1,len(lines)):
+                if "} // end of method" in lines[j] and "MoveNext" in lines[j]:
+                  end=j
+                  break
+              if end is None:
+                report.append("No MoveNext end marker after line "+str(i+1))
+                continue
+              fence=chr(96)*3
+              report += [f"Source lines {start+1}-{end+1}:",fence+"il",*lines[start:end+1],fence]
+          Path("analysis/full-exact-background-method-il-2026-10-31.md").write_text("\\n".join(report)+"\\n")
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
