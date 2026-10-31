@@ -16,6 +16,7 @@
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesInternalIdTransformHook.Unity.cs" Link="AddressablesInternalIdTransformHook.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesTransformBootstrap.Unity.cs" Link="AddressablesTransformBootstrap.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/BackgroundImageDecoder.Unity.cs" Link="BackgroundImageDecoder.Unity.cs" />
+    <Compile Include="../../src/AzureArchive.UnityCompat/BackgroundImageRuntimeCache.Unity.cs" Link="BackgroundImageRuntimeCache.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs" Link="SpineConverterNative.Unity.cs" />
   </ItemGroup>
 </Project>
