@@ -47,5 +47,23 @@ namespace AzureArchive.BackgroundCompat
                 null,
                 false);
         }
+        /// <summary>
+        /// Mirrors Android 1.0 TryGetBackgroundOverridePath: only custom Image
+        /// resources expose a filesystem override path. Native resources and all
+        /// non-Image kinds return false with a null path.
+        /// </summary>
+        public static bool TryGetBackgroundOverridePath(
+            BackgroundResourceDescriptor? resource,
+            out string? path)
+        {
+            path = null;
+            if (resource == null ||
+                resource.Origin == BackgroundResourceOrigin.Native ||
+                resource.Kind != BackgroundResourceKind.Image)
+                return false;
+
+            path = resource.FullPath;
+            return path != null;
+        }
     }
 }
