@@ -1,6 +1,9 @@
 name: Inspect AzureArchive release assets
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/inspect-azurearchive.yml"
 jobs:
   inspect:
     runs-on: ubuntu-latest
