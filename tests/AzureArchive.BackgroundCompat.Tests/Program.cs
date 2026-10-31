@@ -350,7 +350,35 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
+        var previewQueue = new BackgroundPreviewRequestCoalescer<string>();
+        int previewStarts = 0;
+        Action<string> previewA = value => { };
+        Action<string> previewB = value => { };
+        Action<string> previewC = value => { };
+        if (previewQueue.TryEnqueue("scene-a|thumbnail", previewA)) previewStarts++;
+        if (previewQueue.TryEnqueue("scene-a|thumbnail", previewB)) previewStarts++;
+        if (previewQueue.TryEnqueue("scene-a|thumbnail", previewC)) previewStarts++;
+        AssertEqual("1", previewStarts.ToString(), "same preview key starts one in-flight load");
+        AssertEqual("1", previewQueue.PendingCount.ToString(), "coalesced preview uses one pending entry");
+        AssertTrue(previewQueue.TryComplete("scene-a|thumbnail", out Action<string>[] previewCallbacks),
+            "preview completion retrieves pending callbacks");
+        AssertEqual("3", previewCallbacks.Length.ToString(), "preview completion returns every joined callback");
+        AssertTrue(ReferenceEquals(previewA, previewCallbacks[0]) &&
+            ReferenceEquals(previewB, previewCallbacks[1]) &&
+            ReferenceEquals(previewC, previewCallbacks[2]),
+            "preview callbacks retain registration order");
+        AssertFalse(previewQueue.TryComplete("scene-a|thumbnail", out Action<string>[] missingPreviewCallbacks),
+            "completed preview key is removed");
+        AssertEqual("0", missingPreviewCallbacks.Length.ToString(), "missing preview completion returns empty callbacks");
+        AssertTrue(previewQueue.TryEnqueue("scene-b|full", previewA), "different preview key starts independently");
+        AssertTrue(previewQueue.Cancel("scene-b|full"), "pending preview can be abandoned");
+        AssertFalse(previewQueue.Cancel("scene-b|full"), "cancelling absent preview is harmless");
+        AssertThrows<ArgumentException>(() => previewQueue.TryEnqueue(" ", previewA),
+            "preview key must be non-empty");
+        AssertThrows<ArgumentNullException>(() => previewQueue.TryEnqueue("scene-c", null!),
+            "preview callback must be non-null");
+
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks");
         return 0;
     }
 
