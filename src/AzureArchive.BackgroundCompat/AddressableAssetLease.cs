@@ -13,17 +13,25 @@ namespace AzureArchive.BackgroundCompat
     public sealed class AddressableAssetLease<THandle, TAsset> : IDisposable where TAsset : class
     {
         private readonly THandle handle;
+        private readonly TAsset asset;
         private readonly Action<THandle> releaseHandle;
         private int released;
 
         public AddressableAssetLease(THandle handle, TAsset asset, Action<THandle> releaseHandle)
         {
-            Asset = asset ?? throw new ArgumentNullException(nameof(asset));
+            this.asset = asset ?? throw new ArgumentNullException(nameof(asset));
             this.handle = handle;
             this.releaseHandle = releaseHandle ?? throw new ArgumentNullException(nameof(releaseHandle));
         }
 
-        public TAsset Asset { get; }
+        public TAsset Asset
+        {
+            get
+            {
+                ThrowIfReleased();
+                return asset;
+            }
+        }
 
         public THandle Handle
         {
