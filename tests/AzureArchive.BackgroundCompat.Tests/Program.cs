@@ -12,6 +12,36 @@ internal static class Program
         AssertEqual(expected, SafeResourcePath.ResolveUnderRoot(root, "images/scene.png"), "nested path");
         AssertEqual(expected, SafeResourcePath.ResolveUnderRoot(root, @"images\scene.png"), "Windows separators");
 
+
+        // Android 1.0 BackgroundResource model: enum values and FullPath semantics.
+        AssertEqual("1", ((int)BackgroundResourceKind.Image).ToString(), "image kind numeric value");
+        AssertEqual("3", ((int)BackgroundResourceKind.Spine).ToString(), "Spine kind numeric value");
+        AssertEqual("0", ((int)BackgroundResourceOrigin.Native).ToString(), "native origin numeric value");
+        AssertEqual("1", ((int)BackgroundResourceOrigin.GlobalCustom).ToString(), "global custom origin numeric value");
+        AssertEqual("2", ((int)BackgroundResourceOrigin.LocalCustom).ToString(), "local custom origin numeric value");
+        var nativeResource = new BackgroundResourceDescriptor(
+            7, "native-scene", BackgroundResourceKind.Image, BackgroundResourceOrigin.Native,
+            "Addressables/Backgrounds/scene.png", root, false);
+        AssertEqual("Addressables/Backgrounds/scene.png", nativeResource.FullPath, "native FullPath is unchanged");
+        var customResource = new BackgroundResourceDescriptor(
+            8, "custom-scene", BackgroundResourceKind.Image, BackgroundResourceOrigin.GlobalCustom,
+            "images/scene.png", root, false);
+        AssertEqual(expected, customResource.FullPath, "custom FullPath resolves beneath root");
+        var customSpine = new BackgroundResourceDescriptor(
+            9, "custom-spine", BackgroundResourceKind.Spine, BackgroundResourceOrigin.LocalCustom,
+            "spine/scene.skel", root, true);
+        AssertTrue(customSpine.IsCustomSpine, "Spine metadata marks custom Spine resource");
+        AssertEqual(Path.GetFullPath(Path.Combine(root, "spine", "scene.skel")),
+            customSpine.FullPath, "custom Spine path resolves beneath root");
+        var nativeSpine = new BackgroundResourceDescriptor(
+            10, "native-spine", BackgroundResourceKind.Spine, BackgroundResourceOrigin.Native,
+            "Addressables/Spine/scene.skel", root, false);
+        AssertFalse(nativeSpine.IsCustomSpine, "native Spine without override metadata is not custom Spine");
+        var unsafeCustom = new BackgroundResourceDescriptor(
+            11, "unsafe", BackgroundResourceKind.Image, BackgroundResourceOrigin.LocalCustom,
+            "../outside.png", root, false);
+        AssertThrows<InvalidDataException>(() => { var ignored = unsafeCustom.FullPath; },
+            "custom FullPath rejects root traversal");
         AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot("", "a.png"), "empty root");
         AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, " "), "empty relative");
         AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, "../outside.png"), "parent traversal");
