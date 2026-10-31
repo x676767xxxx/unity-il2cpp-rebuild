@@ -83,7 +83,7 @@ common_text = common.read_text(encoding="utf-8")
 required_includes = ["#include <sstream>", "#include <cstring>", "#include <cstdlib>", "#include <cstdio>", "#include <cmath>", "#include <iomanip>"]
 for include in required_includes:
     if include not in common_text:
-        common_text = common_text.replace('#include "SkeletonData.h"', '#include "SkeletonData.h"\\n' + include, 1)
+        common_text = common_text.replace('#include "SkeletonData.h"', '#include "SkeletonData.h"\n' + include, 1)
 common.write_text(common_text, encoding="utf-8")
 
 cmake_text = cmake.read_text(encoding="utf-8")
