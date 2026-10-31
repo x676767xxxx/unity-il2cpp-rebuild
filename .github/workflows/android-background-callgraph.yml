@@ -163,7 +163,7 @@ jobs:
           PY
           llvm-objdump -d --no-show-raw-insn --start-address=0x3270d7c --stop-address=0x3272474 work/bin/libil2cpp.so > work/out/preview-coroutine-movenext.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x2f2dc8c --stop-address=0x2f2dd10 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-2f2dc8c.txt
-          llvm-objdump -d --no-show-raw-insn --start-address=0x3261d74 --stop-address=0x3261e20 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-3261d74.txt
+          llvm-objdump -d --no-show-raw-insn --start-address=0x3261d74 --stop-address=0x3261e90 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-3261d74.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x5ad7ad8 --stop-address=0x5ad7b60 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-5ad7ad8.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x66b9ad8 --stop-address=0x66b9b60 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-66b9ad8.txt
           rm -f work/out/full-disassembly.txt
