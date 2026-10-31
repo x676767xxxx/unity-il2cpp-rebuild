@@ -89,3 +89,7 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 - Unity plugin artifact ID: `13035873997` (1,842,358 bytes); static-library artifact ID: `13035859101` (1,938,910 bytes).
 - Downloaded and inspected the plugin artifact ZIP. The nested Unity package contains the 8,195,192-byte static archive, iOS PluginImporter metadata, ABI header, managed bridge, README and upstream LICENSE. This confirms the packaging layout is present; it is not yet tested by importing into a Unity project.
 - A follow-up hardening check was added to verify the archive's ARM64 slice and three exported symbols before packaging. The first attempt exposed incorrect `lipo -verify_arch` argument order; corrected in commit `23fa33f`. The corrected run [41186109443](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186109443) was still in progress at this note.
+
+
+- Packaging hardening exposed two shell portability issues, both corrected in follow-up commits: `lipo` requires the input archive before `-verify_arch`; with `set -o pipefail`, piping `nm` directly into `grep -q` can fail from SIGPIPE. The packager now runs `nm` to a temporary file before checking the three symbols.
+- Corrected packaging workflow [41186251935](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186251935) is running; artifact creation remains unconfirmed until its upload step succeeds.
