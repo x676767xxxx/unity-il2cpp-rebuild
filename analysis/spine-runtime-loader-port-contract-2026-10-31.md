@@ -153,6 +153,20 @@ The asynchronous worker closure simply calls the synchronous file reader with th
 
 The HasConsumers getter is a strict references-greater-than-one check. The cache's own retained reference is the baseline; additional references indicate live consumers. The cleanup helper checks whether the Unity application is playing and chooses the matching deferred or immediate object-destruction path. Preserve that distinction in the eventual Unity adapter.
 
+## Refined RuntimeSpineLoader.Create call sequence (Android 1.0, 2026-10-31)
+
+The `RuntimeSpineLoader.Create` body at RVA `0x325F32C` was cross-checked against the Android 1.0 `dump.cs` method declarations, rather than assigning meaning to unknown native call targets by guesswork. The confirmed managed calls in the construction path include:
+
+- `RuntimeAtlasTexture.Load(RuntimeAtlasTexture.Source, string)` at RVA `0x325D080` for source page texture creation.
+- `SpineConverter.CastSkeletonDataToDstVersion(byte[], SpineVersion)` at RVA `0x5E360B0` for skeleton byte conversion.
+- `SkeletonDataAsset.CreateRuntimeInstance(byte[], string, AtlasAssetBase[], bool, float, bool)` at RVA `0x5E3ACAC` for runtime skeleton-data asset creation.
+- `SkeletonDataAsset.SetupRuntimeBlendModeMaterials(bool, BlendModeMaterials.TemplateMaterials)` at RVA `0x5E3ADDC` for blend-mode material setup.
+- `RuntimeSpineAsset.Own(UnityEngine.Object)` at RVA `0x325FC74` for ownership registration.
+
+The `Own` body first checks the Unity object through Unity's object-validity path and only then inserts it into the owned `HashSet<Object>`; null/destroyed objects are not registered. The `Create` body also uses the asset's primary material and the supplied blend templates while assembling the runtime asset. These signatures and addresses are confirmed in the Android dump/disassembly. The low-level helper targets whose managed identity is not established are intentionally not assigned guessed names.
+
+**Adapter consequence:** the iOS implementation must preserve the exact Spine conversion call before runtime SkeletonDataAsset creation, pass the created atlas assets as the atlas array, run blend-mode material setup, and register every Unity object that the runtime asset owns. It must not substitute a TextAsset-only overload or omit the runtime blend setup. This is a porting contract from Android static evidence, not a claim that the current iOS branch already performs these operations.
+
 ## Runtime asset construction ownership staging (verified Android disassembly, 2026-10-31)
 
 The corrected Android ARM64 extraction in [run 41204479601](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41204479601) includes the complete `RuntimeSpineLoader.Create` and `RuntimeSpineAsset.Own` method bodies. The observed Create path progressively registers the created page textures, page materials, runtime `SpineAtlasAsset`, and `SkeletonDataAsset` with `RuntimeSpineAsset.Own`. The Own method checks Unity-object validity and adds the object to the owned-object set. The final asset disposal enumerates that set and routes each object through `RuntimeSpineLoader.DestroyOwned`.
