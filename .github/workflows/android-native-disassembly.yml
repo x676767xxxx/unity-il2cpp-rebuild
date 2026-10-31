@@ -34,37 +34,32 @@ jobs:
               dump=candidates[0]
           text=dump.read_text(errors="ignore")
           binary="work/android/libil2cpp.so"
+          # RVAs below were verified against the exact method declaration in dump.cs.
           targets=[
-            ("ScenarioResourceManager.InitializeAuthoringResources","InitializeAuthoringResources(string databasePath"),
-            ("ScenarioResourceManager.ResolveBackground","ResolveBackground(uint id)"),
-            ("ScenarioResourceManager.GetBackgroundPreviewAsync","GetBackgroundPreviewAsync(BackgroundResource resource"),
-            ("ScenarioResourceManager.GetBackgroundTexture","GetBackgroundTexture(BackgroundResource resource"),
-            ("AuthoringResourceCatalog.Search","Search(string kind, string query"),
-            ("AuthoringResourceCatalog.Resolve","Resolve(string resourceId, string expectedKind"),
-            ("AuthoringResourceCatalog.Import","Import(ProjectData project, JObject request"),
-            ("AuthoringResourceCatalog.StageReferencedResources","StageReferencedResources(ProjectData project, string stagingResourcesDir, string expectedCatalogVersion)"),
+            ("ScenarioResourceManager.InitializeAuthoringResources","InitializeAuthoringResources(string databasePath",0x3264CA8),
+            ("ScenarioResourceManager.ResolveBackground","ResolveBackground(uint id)",0x3260EE0),
+            ("ScenarioResourceManager.GetBackgroundPreviewAsync","GetBackgroundPreviewAsync(BackgroundResource resource",0x3261EA0),
+            ("ScenarioResourceManager.GetBackgroundTexture(BackgroundResource)","GetBackgroundTexture(BackgroundResource resource)",0x326172C),
+            ("AuthoringResourceCatalog.Search","Search(string kind, string query",0x336A1F0),
+            ("AuthoringResourceCatalog.Resolve","Resolve(string resourceId, string expectedKind",0x336B5DC),
+            ("AuthoringResourceCatalog.Import","Import(ProjectData project, JObject request",0x3375FE8),
+            ("AuthoringResourceCatalog.StageReferencedResources","StageReferencedResources(ProjectData project, string stagingResourcesDir, string expectedCatalogVersion)",0x3372058),
           ]
           all_rvas=sorted({int(x,16) for x in re.findall(r'// RVA: 0x([0-9A-Fa-f]+)',text)})
           report=[]
-          for label,needle in targets:
-              pos=text.find(needle)
-              if pos<0:
-                  report.append(f"## {label}\nNOT FOUND: {needle}")
+          for label,needle,start in targets:
+              if needle not in text:
+                  report.append(f"## {label}\nDECLARATION NOT FOUND: {needle}")
                   continue
-              m=re.search(r'// RVA: 0x([0-9A-Fa-f]+)',text[max(0,pos-300):pos])
-              if not m:
-                  report.append(f"## {label}\nRVA NOT FOUND")
-                  continue
-              start=int(m.group(1),16)
               later=[x for x in all_rvas if x>start]
               end=min(later) if later else start+0x500
               end=min(end,start+0x1800)
               p=subprocess.run(["llvm-objdump","-d","--start-address="+hex(start),"--stop-address="+hex(end),binary],capture_output=True,text=True)
-              report.append(f"## {label}\nRVA={hex(start)} end={hex(end)} exit={p.returncode}\n{p.stdout}\n{p.stderr}")
+              report.append(f"## {label}\nVERIFIED_DECLARATION={needle}\nRVA={hex(start)} end={hex(end)} exit={p.returncode}\n{p.stdout}\n{p.stderr}")
           pathlib.Path("work/out/android-arm64-selected-disassembly.txt").write_text("\n".join(report))
           PY
       - name: Upload disassembly report
         uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-android-arm64-disassembly
+          name: azurearchive-android-arm64-disassembly-corrected
           path: work/out/
