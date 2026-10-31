@@ -107,6 +107,19 @@ internal static class Program
         AssertEqual("Native", resolvedNative.Origin.ToString(), "native fallback source");
         AssertEqual("Image", resolvedNative.Kind.ToString(), "native fallback background type");
         AssertEqual("1", scenarioLookups.ToString(), "native fallback performs one scenario lookup");
+        AssertTrue(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
+            resolvedLocal, out string? localOverridePath), "custom Image exposes override path");
+        AssertEqual(Path.GetFullPath(Path.Combine(root, "first.png")), localOverridePath,
+            "override path uses the resolved custom image FullPath");
+        AssertFalse(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
+            resolvedNative, out string? nativeOverridePath), "native Image does not expose custom override path");
+        AssertTrue(nativeOverridePath == null, "native override path output is null");
+        AssertFalse(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
+            spineDescriptor, out string? spineOverridePath), "custom Spine does not expose static image override path");
+        AssertTrue(spineOverridePath == null, "Spine override path output is null");
+        AssertFalse(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
+            null, out string? missingOverridePath), "missing resource has no override path");
+        AssertTrue(missingOverridePath == null, "missing override path output is null");
         var zeroId = ScenarioBackgroundResolver.Resolve(
             0u, null, null,
             requestedId => { scenarioLookups++; return nativeRow; });
@@ -337,7 +350,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 16 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 21 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
         return 0;
     }
 
