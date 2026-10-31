@@ -34,6 +34,25 @@ internal static class Program
         AssertFalse(BackgroundOverrideResolver.TryResolve(local, global, x => x == "missing", out selected), "no matching override");
         AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
 
+        const string catalogToken = AddressableInternalIdResolver.AddrLoadUrlToken;
+        AssertEqual("https://cdn.example/game/avatars_assets_all.bundle",
+            AddressableInternalIdResolver.Resolve(catalogToken + "/avatars_assets_all.bundle", "https://cdn.example/game/"),
+            "catalog token replaced with configured base URL");
+        AssertEqual("https://cdn.example/characters_assets_all.bundle",
+            AddressableInternalIdResolver.Resolve(catalogToken + "/characters_assets_all.bundle", "https://cdn.example///"),
+            "base URL trailing separators normalized");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve("", "https://cdn.example"), "empty catalog internal ID");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/a.bundle", ""), "empty AddrLoadUrl");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve("/a.bundle", "https://cdn.example"), "unrecognized catalog token");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/../escape.bundle", "https://cdn.example"), "catalog parent traversal");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/%2e%2e/escape.bundle", "https://cdn.example"), "encoded catalog traversal");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/a%2fb.bundle", "https://cdn.example"), "encoded catalog separator");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "//evil.example/a.bundle", "https://cdn.example"), "authority override");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/a.bundle", "file:///tmp"), "non-http base URL");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/a.bundle", "https://user:pass@cdn.example"), "base URL credentials");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/a.bundle", "https://cdn.example?x=1"), "base URL query");
+        AssertThrows<InvalidDataException>(() => AddressableInternalIdResolver.Resolve(catalogToken + "/a.bundle", "https://cdn.example#fragment"), "base URL fragment");
+
         var pages = SpineAtlasPageNames.Parse("page-one.png\nsize: 1024, 1024\nformat: RGBA8888\nfilter: Linear,Linear\nrepeat: none\n\nregion-one\n  rotate: false\n  xy: 0, 0\n  size: 64, 64\n\nnested/page-two.png\nsize: 512, 512\nformat: RGBA8888\n");
         AssertEqual("page-one.png", pages[0], "first Spine atlas page");
         AssertEqual("nested/page-two.png", pages[1], "second Spine atlas page");
@@ -114,7 +133,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
         return 0;
     }
 
