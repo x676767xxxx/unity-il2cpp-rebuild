@@ -115,9 +115,6 @@ internal static class Program
             resolvedNative, out string? nativeOverridePath), "native Image does not expose custom override path");
         AssertTrue(nativeOverridePath == null, "native override path output is null");
         AssertFalse(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
-            spineDescriptor, out string? spineOverridePath), "custom Spine does not expose static image override path");
-        AssertTrue(spineOverridePath == null, "Spine override path output is null");
-        AssertFalse(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
             null, out string? missingOverridePath), "missing resource has no override path");
         AssertTrue(missingOverridePath == null, "missing override path output is null");
         var zeroId = ScenarioBackgroundResolver.Resolve(
@@ -167,6 +164,9 @@ internal static class Program
         AssertEqual(Path.GetFullPath(Path.Combine(root, "spine", "night", "night.skel")),
             spineDescriptor.FullPath, "Spine FullPath resolves under basePath");
         AssertTrue(spineDescriptor.IsCustomSpine, "Spine descriptor carries custom Spine metadata");
+        AssertFalse(ScenarioBackgroundResolver.TryGetBackgroundOverridePath(
+            spineDescriptor, out string? spineOverridePath), "custom Spine does not expose static image override path");
+        AssertTrue(spineOverridePath == null, "Spine override path output is null");
         AssertTrue(spineDescriptor.SpineOverride != null, "Spine descriptor retains runtime settings");
         AssertEqual("Idle", spineDescriptor.SpineOverride!.Animation, "Spine animation retained");
         AssertEqual("Night", spineDescriptor.SpineOverride.Skin, "Spine skin retained");
@@ -350,7 +350,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 21 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
         return 0;
     }
 
