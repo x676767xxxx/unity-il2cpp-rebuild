@@ -1,0 +1,142 @@
+name: Compare Spine runtime APIs across iOS Android and Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/compare-spine-runtime-ios-android-windows.yml"
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file
+      - name: Download release packages and Il2CppDumper
+        run: |
+          set -euo pipefail
+          mkdir -p work/pkg/{ios,android,windows} work/tools work/out/{ios,android,windows}
+          curl -fsSL --retry 3 -o work/pkg/ios/base.ipa https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa
+          curl -fsSL --retry 3 -o work/pkg/android/base.apk https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk
+          curl -fsSL --retry 3 -o work/pkg/windows/base.zip https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip
+          unzip -q work/pkg/ios/base.ipa -d work/pkg/ios/unpacked
+          unzip -q work/pkg/android/base.apk -d work/pkg/android/unpacked
+          unzip -q work/pkg/windows/base.zip -d work/pkg/windows/unpacked
+          curl -fsSL --retry 3 -o work/tools/Il2CppDumper.zip https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net6-v6.7.46.zip
+          mkdir -p work/tools/dumper
+          unzip -q work/tools/Il2CppDumper.zip -d work/tools/dumper
+      - name: Locate binaries and configure dumper
+        run: |
+          set -euo pipefail
+          IOS=work/pkg/ios/unpacked/Payload/AzureArchive.app/Frameworks/UnityFramework.framework/UnityFramework
+          META_IOS=work/pkg/ios/unpacked/Payload/AzureArchive.app/Data/Managed/Metadata/global-metadata.dat
+          ANDROID=work/pkg/android/unpacked/lib/arm64-v8a/libil2cpp.so
+          META_ANDROID=$(find work/pkg/android/unpacked -type f -name global-metadata.dat | head -1)
+          WINDOWS=$(find work/pkg/windows/unpacked -type f -iname GameAssembly.dll | head -1)
+          META_WINDOWS=$(find work/pkg/windows/unpacked -type f -name global-metadata.dat | head -1)
+          test -f "$IOS"; test -f "$META_IOS"; test -f "$ANDROID"; test -f "$META_ANDROID"; test -n "$WINDOWS"; test -n "$META_WINDOWS"
+          llvm-lipo "$IOS" -thin arm64 -output work/pkg/ios/UnityFramework.arm64 || cp "$IOS" work/pkg/ios/UnityFramework.arm64
+          cp "$META_IOS" work/pkg/ios/global-metadata.dat
+          cp "$META_ANDROID" work/pkg/android/global-metadata.dat
+          cp "$META_WINDOWS" work/pkg/windows/global-metadata.dat
+          cp "$ANDROID" work/pkg/android/libil2cpp.so
+          cp "$WINDOWS" work/pkg/windows/GameAssembly.dll
+          cat > work/tools/dumper/config.json <<'JSON'
+          {
+            "DumpMethod": true, "DumpField": true, "DumpProperty": true,
+            "DumpAttribute": true, "DumpFieldOffset": true, "DumpMethodOffset": true,
+            "DumpTypeDefIndex": true, "GenerateDummyDll": false, "GenerateScript": true,
+            "DummyDllAddToken": true, "RequireAnyKey": false,
+            "ForceIl2CppVersion": false, "ForceVersion": 0,
+            "ForceDump": false, "NoRedirectedPointer": false
+          }
+          JSON
+      - name: Run metadata dump for all three platforms
+        continue-on-error: true
+        run: |
+          set +e
+          DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
+          dotnet "$DLL" "$PWD/work/pkg/ios/UnityFramework.arm64" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/ios" > work/out/ios-dumper.log 2>&1
+          echo "IOS_EXIT=$?" >> work/out/ios-dumper.log
+          dotnet "$DLL" "$PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/android/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
+          echo "ANDROID_EXIT=$?" >> work/out/android-dumper.log
+          dotnet "$DLL" "$PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/windows/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
+          echo "WINDOWS_EXIT=$?" >> work/out/windows-dumper.log
+          for p in ios android windows; do
+            test -s "work/out/$p/dump.cs" && echo "$p dump.cs $(wc -c < "work/out/$p/dump.cs") bytes" || echo "$p dump.cs MISSING"
+          done
+      - name: Compare exact Spine and runtime type declarations
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,hashlib
+          root=Path("work/out")
+          targets=[
+            ("Native.SpineConverter","Converter"),
+            ("Native.SpineConverter","SpineVersion"),
+            ("Spine","SkeletonBinary"),
+            ("Spine","SkeletonJson"),
+            ("Spine","Atlas"),
+            ("Spine","SkeletonData"),
+            ("Spine.Unity","SkeletonDataAsset"),
+            ("Spine.Unity","SpineAtlasAsset"),
+            ("Spine.Unity","NoOpTextureLoader"),
+            ("Spine.Unity","BlendModeMaterials"),
+            ("","RuntimeSpineLoader"),
+            ("","RuntimeSpineAsset"),
+            ("","RuntimeAtlasTexture"),
+            ("","BackgroundResource"),
+            ("","ScenarioResourceManager")
+          ]
+          report=["# Spine runtime API compatibility: iOS 0.7.9.2 vs Android 1.0 vs Windows 1.0.1","","Il2CppDumper metadata output. Declarations and signatures only: presence does not prove runtime implementation or successful loading. Missing classes/methods are stronger evidence of an API gap, but may still reflect stripping or build configuration.",""]
+          fence=chr(96)*3
+          for platform in ["ios","android","windows"]:
+            dump=root/platform/"dump.cs"
+            report += [f"## {platform}"]
+            if not dump.exists():
+              log=root/f"{platform}-dumper.log"
+              report.append("dump.cs missing")
+              if log.exists(): report += [fence+"text",*log.read_text(errors="replace").splitlines()[-35:],fence]
+              continue
+            data=dump.read_text(errors="replace")
+            report.append(f"dump.cs bytes: {dump.stat().st_size}; SHA256: {hashlib.sha256(dump.read_bytes()).hexdigest()}")
+            for ns,name in targets:
+              pattern=(r"// Namespace: "+re.escape(ns)+r"\s+" if ns else r"// Namespace:\s*")
+              found=None
+              for m in re.finditer(pattern+r"(?:.|\n){0,500}?\b(?:class|enum|struct)\s+"+re.escape(name)+r"\b",data):
+                found=m
+                break
+              if not found:
+                report.append(f"- {ns+'.' if ns else ''}{name}: NOT FOUND")
+                continue
+              start=found.start()
+              op=data.find("{",found.end())
+              if op<0:
+                block=data[start:found.end()+500]
+              else:
+                depth=0; end=op
+                for end in range(op,len(data)):
+                  if data[end]=="{": depth+=1
+                  elif data[end]=="}":
+                    depth-=1
+                    if depth==0: break
+                block=data[start:min(end+1,start+120000)]
+              lines=[x.strip() for x in block.splitlines() if re.search(r"\b(public|private|internal|protected)\b",x) and ("(" in x or ";" in x or "{" in x or "enum " in x or "class " in x)]
+              report.append(f"- {ns+'.' if ns else ''}{name}: FOUND")
+              report += ["  "+fence+"csharp",*lines[:100],"  "+fence]
+            report.append("")
+          report += ["## Key interpretation checks",
+            "- Compare Spine.SkeletonBinary and Spine.Unity.SkeletonDataAsset signatures, especially constructors, ReadSkeletonData and CreateRuntimeInstance.",
+            "- If Native.SpineConverter.Converter/SpineVersion is absent from old iOS, the new loader's converter call has no matching managed API in that build.",
+            "- The newer Android/Windows loader calls CastSkeletonDataToDstVersion with enum literal 6 before creating a runtime SkeletonDataAsset; do not assume that integer means a particular semantic version without the enum declaration.",
+            "- Unity 2023.2.20f1c1 (old iOS) vs 2023.2.22f1 (Android 1.0) is a patch-level engine difference, not evidence of binary compatibility.",
+            "- This is metadata analysis only. No Unity project build, native converter port, IPA or device test is produced."]
+          (root/"spine-runtime-api-compatibility.md").write_text("\n".join(report)+"\n")
+          PY
+      - name: Upload comparison report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-spine-runtime-api-compatibility
+          path: work/out/
