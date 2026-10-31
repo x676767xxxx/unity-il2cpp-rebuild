@@ -92,3 +92,45 @@ The actual three-platform `dump.cs` artifact from [run 41172721121](https://gith
 See the full declaration-by-declaration evidence in `analysis/ios-spine-api-gap-verified-2026-10-31.md`.
 
 **Consequence:** porting only the native converter or writing a small wrapper is insufficient. The old iOS Spine C# / Spine-Unity API surface also needs upgrading or replacing. A safe Spine 3.8 fallback is not proven because the new runtime uses Spine 4.2-era features.
+
+## Additional exact Android 1.0 lifecycle evidence (2026-10-31)
+
+The matching Android 1.0 dump.cs from cross-platform artifact run [41172721121](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41172721121) gives the following concrete layouts:
+
+### File-read payload
+RuntimeSpineLoader.Files contains:
+- BasePath at 0x10
+- AtlasText at 0x18
+- Skeleton byte array at 0x20
+- Pages dictionary (string -> RuntimeAtlasTexture.Source) at 0x28
+
+This confirms the asynchronous read result is a managed data container. It carries file bytes and page source records; it is not itself a Unity texture/material container.
+
+### Runtime asset ownership record
+RuntimeSpineAsset contains:
+- owned: HashSet<UnityEngine.Object> at 0x10
+- references: integer at 0x18
+- Asset backing field (SkeletonDataAsset) at 0x20
+
+Its public Retain() implementation increments the reference count only when the count is already positive; the zero-count path throws rather than resurrecting a released asset. Dispose() is reference-counted: it decrements a positive count and enters the cleanup path when the count reaches zero. The cleanup path traverses owned Unity objects and invokes the loader's DestroyOwned helper, while releasing associated Spine atlas/material resources and clearing the asset reference. The exact platform-specific destruction behavior must remain in the Unity adapter; do not replace this with a generic managed Dispose that merely drops references.
+
+### Cache limits and consumer semantics
+The manager declaration confirms:
+- background preview cache entry limit: 24;
+- background preview cache byte budget: 33,554,432 bytes (32 MiB);
+- background skeleton cache byte budget: 805,306,368 bytes (768 MiB);
+- backgroundSkeletons maps keys to RuntimeSpineAsset;
+- backgroundSkeletonAccess separately tracks access values;
+- RuntimeSpineAsset.HasConsumers and EstimatedTextureBytes are used by the manager's trimming logic.
+
+The previously implemented 32 MiB / 25-entry preview texture trim planner is not the skeleton cache policy. Keep these caches separate: preview textures use the 32 MiB / 24-entry cap, while retained Spine skeleton assets use a distinct 768 MiB budget and consumer/access tracking.
+
+### Adapter requirements refined
+1. Keep file I/O and atlas-page source parsing off the Unity main thread only where the recovered async worker does so.
+2. Perform Unity texture, material, Spine atlas and SkeletonDataAsset creation on the Unity main thread.
+3. Track every Unity object created by the loader in the asset's owned-object set.
+4. A retained asset cannot be resurrected after its reference count reaches zero.
+5. Evict only assets with no consumers; release the complete owned-object/atlas dependency graph once the final reference is released.
+6. Preserve the independent preview texture and skeleton-asset cache budgets above.
+
+These are Android 1.0 behavior findings. They do not provide iOS-compatible addresses or machine code.
