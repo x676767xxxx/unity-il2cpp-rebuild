@@ -94,7 +94,26 @@ internal static class Program
         independentB.Dispose();
         independentCache.Dispose();
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks");
+        int handleReleases = 0;
+        var addressableAsset = new object();
+        var addressableLease = new AddressableAssetLease<int, object>(
+            42, addressableAsset, handle => handleReleases++);
+        AssertTrue(ReferenceEquals(addressableAsset, addressableLease.Asset), "Addressables lease exposes loaded asset");
+        AssertEqual("42", addressableLease.Handle.ToString(), "Addressables lease preserves operation handle");
+        AssertFalse(addressableLease.IsReleased, "Addressables lease starts active");
+        addressableLease.Dispose();
+        addressableLease.Dispose();
+        AssertTrue(addressableLease.IsReleased, "Addressables lease records release");
+        AssertEqual("1", handleReleases.ToString(), "Addressables operation handle released exactly once");
+        AssertThrows<ObjectDisposedException>(() => { var ignored = addressableLease.Handle; }, "released Addressables handle cannot be reused");
+
+        var concurrentLease = new AddressableAssetLease<int, object>(7, new object(), handle => handleReleases++);
+        System.Threading.Tasks.Parallel.For(0, 32, _ => concurrentLease.Dispose());
+        AssertEqual("2", handleReleases.ToString(), "concurrent Addressables lease disposal releases once");
+        AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
+        AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
+
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
         return 0;
     }
 
