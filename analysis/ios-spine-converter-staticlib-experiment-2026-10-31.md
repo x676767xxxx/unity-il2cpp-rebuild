@@ -74,3 +74,12 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 - Wired the checker into `ios-spine-converter-staticlib.yml`, including path filters for the managed bridge and checker. A bridge/header change now triggers the iPhoneOS ARM64 workflow and checks managed/native symbol naming before the native build.
 - Checker step passed in run [41185690740](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185690740). At the latest poll the ARM64 library build and artifact upload were still running; no final workflow success or new artifact is claimed yet.
 - This is a static ABI drift check, not proof of iOS runtime linking or UnityFramework integration.
+
+
+## Importable Unity iOS plugin packaging (2026-10-31)
+
+- Added Unity PluginImporter metadata for an iPhoneOS ARM64-only static archive and metadata for the C ABI header.
+- Added `scripts/package-spine-unity-ios-plugin.sh`. It checks the archive exists, verifies the ARM64 architecture with `lipo`, verifies all three exported C symbols with `nm`, and packages the archive, header, managed bridge, third-party license and import instructions into a Unity Assets folder layout. It also emits a SHA-256 checksum manifest.
+- Added `azurearchive-spine-unity-ios-plugin` as a separate Actions artifact in the iOS ARM64 workflow. The packaging step is part of the same workflow after the host ABI smoke test.
+- Packaging workflow [41185979412](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185979412) was still running at this checkpoint; no plugin ZIP or artifact ID is claimed until upload completes.
+- The package is a reusable converter plugin only. It is not a full AzureArchive Unity project, does not supply the Spine 4.2 C# runtime or game assets, and cannot produce an IPA by itself.
