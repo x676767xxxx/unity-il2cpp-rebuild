@@ -11,76 +11,55 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Compare native binaries, metadata and catalogs
+      - name: Compare exact managed assemblies and Addressables catalogs
         run: |
           python3 - <<'PY'
-          import zipfile, pathlib, hashlib, json, struct, plistlib, re, collections
-          files = {
-            "iOS": "inspect/AzureArchive_IOS_0.7.9.2.ipa",
-            "Android": "inspect/base.apk",
-            "Windows": "inspect/AzureArchive_Win_1.0.1.zip"
-          }
+          import zipfile,pathlib,hashlib,json,collections
+          files={"iOS":"inspect/AzureArchive_IOS_0.7.9.2.ipa","Android":"inspect/base.apk","Windows":"inspect/AzureArchive_Win_1.0.1.zip"}
           zs={k:zipfile.ZipFile(v) for k,v in files.items()}
-          out=[]
-          def add(s=""): out.append(str(s))
-          def readmatch(z, suffix):
-            return next((n for n in z.namelist() if n.endswith(suffix)),None)
+          out=[]; catalogs={}; assemblies={}
+          def add(x=""): out.append(str(x))
           for platform,z in zs.items():
-            add("## "+platform)
-            names=z.namelist()
-            # Managed assembly inventory
-            sn=readmatch(z,"ScriptingAssemblies.json")
-            if sn:
-              d=json.loads(z.read(sn)); asm=d.get("names",[])
-              add(f"ScriptingAssemblies: {len(asm)} entries")
-              add("  "+", ".join(x for x in asm if x in ("Assembly-CSharp.dll","BestHTTP.dll","UniTask.dll","UniTask.Addressables.dll","spine-csharp.dll","spine-unity.dll","Unity.Addressables.dll","Unity.ResourceManager.dll")))
-              if platform=="iOS": ios_asm=set(asm)
-              elif platform=="Android": android_asm=set(asm)
-              else: windows_asm=set(asm)
-            # metadata headers
-            candidates=[n for n in names if n.endswith("global-metadata.dat")]
-            for n in candidates[:3]:
-              b=z.read(n); add(f"Metadata {n}: {len(b)} bytes sha256={hashlib.sha256(b).hexdigest()}")
-              if len(b)>=16 and struct.unpack_from("<I",b)[0]==0xFAB11BAF:
-                ver=struct.unpack_from("<I",b,4)[0]; add(f"  magic=FAB11BAF version={ver}")
-                pairs=[]
-                for i in range(31):
-                  off,cnt=struct.unpack_from("<II",b,8+i*8)
-                  pairs.append((off,cnt))
-                add("  31 offset/count pairs: "+repr(pairs))
-            # native binaries
+            names=z.namelist(); add("## "+platform)
+            # Exact hashes for important managed DLLs
+            wanted=("Assembly-CSharp.dll","Assembly-CSharp-firstpass.dll","Unity.Addressables.dll","Unity.ResourceManager.dll","BestHTTP.dll","spine-unity.dll","UniTask.dll","UniTask.Addressables.dll")
+            assemblies[platform]={}
             for n in names:
-              l=n.lower()
-              if l.endswith(("unityframework","gameassembly.dll","libil2cpp.so")) or (platform=="iOS" and l.endswith("/azurearchive")):
-                b=z.read(n); add(f"Native {n}: {len(b)} bytes sha256={hashlib.sha256(b).hexdigest()}")
-                if b[:4] in (b"\xce\xfa\xed\xfe",b"\xcf\xfa\xed\xfe",b"\xfe\xed\xfa\xce",b"\xfe\xed\xfa\xcf"):
-                  magic=b[:4].hex(); add(f"  Mach-O magic={magic}")
-                elif b[:4]==b"\x7fELF":
-                  cls=b[4]; machine=struct.unpack_from("<H",b,18)[0]; add(f"  ELF class={cls} machine={machine}")
-                elif b[:2]==b"MZ" and len(b)>0x40:
-                  pe=struct.unpack_from("<I",b,0x3c)[0]
-                  if pe+6<len(b): add(f"  PE machine=0x{struct.unpack_from('<H',b,pe+4)[0]:04x}")
-            # Addressables catalog summary
-            cn=next((n for n in names if n.endswith("/catalog.json") and ("/aa/" in n or "/StreamingAssets/aa/" in n)),None)
+              base=n.rsplit("/",1)[-1]
+              if base in wanted:
+                b=z.read(n); assemblies[platform][base]=hashlib.sha256(b).hexdigest()
+                add(f"ASSEMBLY {base} size={len(b)} sha256={assemblies[platform][base]} path={n}")
+            # catalog exact semantic hashes
+            cn=next((n for n in names if n.endswith("/catalog.json") and "/aa/" in n.lower()),None)
             if cn:
-              try:
-                c=json.loads(z.read(cn))
-                add(f"Catalog {cn}: {len(z.read(cn))} bytes; keys={list(c.keys())}")
-                for key in ("m_InternalIds","m_KeyDataString","m_BucketDataString","m_EntryDataString","m_ExtraDataString"):
-                  v=c.get(key)
-                  if isinstance(v,list): add(f"  {key}: list length={len(v)} sample={v[:4]}")
-                  elif isinstance(v,str): add(f"  {key}: string length={len(v)} sample={v[:180]!r}")
-                ids=c.get("m_InternalIds",[])
-                if isinstance(ids,list):
-                  hosts=collections.Counter(re.sub(r"^(https?://[^/]+).*",r"\1",str(x)) for x in ids)
-                  add("  InternalId count="+str(len(ids))+" prefixes="+repr(hosts.most_common(12)))
-              except Exception as e: add("Catalog parse error: "+repr(e))
-          add("## Assembly comparison")
-          for a,b,label in ((ios_asm,android_asm,"iOS vs Android"),(ios_asm,windows_asm,"iOS vs Windows"),(android_asm,windows_asm,"Android vs Windows")):
-            add(label+": common="+str(len(a&b))+" only-left="+repr(sorted(a-b))+" only-right="+repr(sorted(b-a)))
-          pathlib.Path("inspect/deep-report.txt").write_text("\n".join(out))
+              raw=z.read(cn); c=json.loads(raw); catalogs[platform]=c
+              add(f"CATALOG {cn} size={len(raw)} sha256={hashlib.sha256(raw).hexdigest()}")
+              add("BuildResultHash="+str(c.get("m_BuildResultHash")))
+              for k in ("m_InternalIds","m_KeyDataString","m_BucketDataString","m_EntryDataString","m_ExtraDataString"):
+                v=c.get(k)
+                if isinstance(v,list): add(f"{k}: count={len(v)} sha256={hashlib.sha256(json.dumps(v,separators=(',',':')).encode()).hexdigest()}")
+                elif isinstance(v,str): add(f"{k}: chars={len(v)} sha256={hashlib.sha256(v.encode()).hexdigest()}")
+          add("## Pairwise comparisons")
+          for a,b in (("iOS","Android"),("iOS","Windows"),("Android","Windows")):
+            if a in catalogs and b in catalogs:
+              ca,cb=catalogs[a],catalogs[b]
+              add(f"CATALOG {a} vs {b}:")
+              for k in ("m_BuildResultHash","m_InternalIds","m_KeyDataString","m_BucketDataString","m_EntryDataString","m_ExtraDataString"):
+                va,vb=ca.get(k),cb.get(k)
+                add(f"  {k}: equal={va==vb} left={len(va) if hasattr(va,'__len__') else va} right={len(vb) if hasattr(vb,'__len__') else vb}")
+              ia,ib=ca.get("m_InternalIds",[]),cb.get("m_InternalIds",[])
+              sa,sb=set(ia),set(ib)
+              add(f"  InternalIds intersection={len(sa&sb)} only_{a}={len(sa-sb)} only_{b}={len(sb-sa)}")
+              if sa-sb: add(f"  only_{a} sample={list(sorted(sa-sb))[:20]}")
+              if sb-sa: add(f"  only_{b} sample={list(sorted(sb-sa))[:20]}")
+            add(f"ASSEMBLIES {a} vs {b}:")
+            aa,bb=assemblies[a],assemblies[b]
+            for k in sorted(set(aa)|set(bb)):
+              if k in aa and k in bb: add(f"  {k}: equal={aa[k]==bb[k]} iOS/left={aa[k][:16]} right={bb[k][:16]}")
+              else: add(f"  {k}: missing from {a if k not in aa else b}")
+          pathlib.Path("inspect/exact-comparison.txt").write_text("\n".join(out))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-deep-native-metadata
-          path: inspect/deep-report.txt
+          name: azurearchive-exact-comparison
+          path: inspect/exact-comparison.txt
