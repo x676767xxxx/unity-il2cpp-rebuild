@@ -364,3 +364,39 @@ This is a tested coordination primitive, not a completed preview pipeline. It is
 1. Recover the remaining `CoLoadBackgroundPreview` iterator behavior and cache completion/eviction semantics without guessing from unresolved IL.
 2. Implement a Unity-side adapter only after the actual `ScenarioResourceManager` and Unity assemblies are available.
 3. Keep the project/Xcode source acquisition as the hard blocker for full app integration and IPA packaging.
+
+
+## Preview coroutine recovery and native-disassembly checkpoint — 2026-10-31
+
+### Newly recovered nested iterator metadata
+The Android 1.0 and Windows 1.0.1 compiler-generated nested type `ScenarioResourceManager.<CoLoadBackgroundPreview>d__28` was exported directly from both recovered assemblies. Android ILSpy output identifies these state fields:
+- `resource`, `ScenarioResourceManager` owner, `preferThumbnail`, and cache `key`;
+- `Texture texture`, `bool addressable`, and `string full`;
+- `AsyncOperationHandle<Texture> handle`;
+- `Task<byte[]> read`;
+- `Task<RuntimeSpineLoader.Files> read` (a second task field).
+
+This confirms the coroutine's state machine retains both an Addressables handle and asynchronous byte/Spine file reads. It does not, by itself, establish their ordering or success/failure cleanup.
+
+### Decompiler limitation confirmed
+The nested `MoveNext` method is present in both IL exports, but its recovered IL body is not usable as a behavioral reconstruction:
+- Android body is only 93 IL bytes and contains unresolved unmanaged-memory loads plus an unresolved indirect jump.
+- Windows body is only 101 IL bytes and contains the same unresolved indirect-jump pattern.
+- The generated `Dispose` method is empty; `Reset` also contains unresolved method references.
+Therefore no guessed C# coroutine was added. The exact remote/local fallback sequence, task await states, RenderTexture allocation, callback fan-out and handle/texture release remain unverified from this IL export.
+
+### Native follow-up
+The Android ARM64 dump identifies the compiler-generated iterator's actual native method RVA as `0x3270D7C` for `MoveNext` (distinct from the ILSpy IL RVA). The Android native disassembly workflow was extended to inspect this method and the adjacent preview-cache lifecycle methods:
+- `BackgroundPreviewCachePath` — `0x32627E4`
+- `SaveBackgroundPreview` — `0x3262840`
+- `ReleaseBackgroundPreview` — `0x3262C54`
+- `TrimBackgroundPreviews` — `0x3262DC4`
+- `DestroyBackgroundPreview` — `0x32631E8`
+- `LimitBackgroundPreviewSize` — `0x3263310`
+
+Workflow run [41200328434](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200328434) is running to generate this Android-only disassembly evidence. These RVAs are not iOS addresses and will not be copied into the iOS binary.
+
+### Validation boundary
+- Nested iterator type export completed for Android and Windows in run [41200220219](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200220219).
+- The first export attempt (run 41200200402) failed in the report regex; the extraction escaping was corrected and the subsequent run completed successfully.
+- The preview coalescer remains a standalone tested primitive, not a coroutine or RenderTexture implementation.
