@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using AzureArchive.BackgroundCompat;
 using UnityEngine;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -35,6 +36,35 @@ namespace AzureArchive.UnityCompat
         {
             this.correctNativePath = correctNativePath ??
                 throw new ArgumentNullException(nameof(correctNativePath));
+        }
+
+        /// <summary>
+        /// Creates the cache using the live game's instance CorrectPath(string) method.
+        /// This avoids copying the manifest path-correction rules into the port.
+        /// </summary>
+        public static BackgroundImageRuntimeCache CreateFromGameRuntime(object scenarioResourceManager)
+        {
+            if (scenarioResourceManager == null)
+                throw new ArgumentNullException(nameof(scenarioResourceManager));
+
+            MethodInfo? method = scenarioResourceManager.GetType().GetMethod(
+                "CorrectPath",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                null,
+                new[] { typeof(string) },
+                null);
+
+            if (method == null || method.ReturnType != typeof(string))
+                throw new InvalidOperationException(
+                    "ScenarioResourceManager must expose an instance string CorrectPath(string) method.");
+
+            var correctPath = Delegate.CreateDelegate(
+                typeof(Func<string, string>), scenarioResourceManager, method) as Func<string, string>;
+
+            if (correctPath == null)
+                throw new InvalidOperationException("Could not bind ScenarioResourceManager.CorrectPath(string).");
+
+            return new BackgroundImageRuntimeCache(correctPath);
         }
 
         public int CachedCustomCount => customTextures.Count;
