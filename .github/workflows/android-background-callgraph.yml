@@ -1,0 +1,127 @@
+name: Android background runtime call graph
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/android-background-callgraph.yml"
+jobs:
+  callgraph:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified cross-platform metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cross-platform-il2cpp-comparison
+          path: work/meta
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41172721121
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Android ARM64 binary
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y llvm unzip
+          mkdir -p work/bin work/out
+          curl -fL --retry 3 -o work/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -p work/base.apk lib/arm64-v8a/libil2cpp.so > work/bin/libil2cpp.so
+          test -s work/meta/android/dump.cs
+      - name: Build exact method call graph
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, bisect
+          dump=Path("work/meta/android/dump.cs").read_text(errors="replace")
+          binary="work/bin/libil2cpp.so"
+          out=Path("work/out")
+          lines=dump.splitlines()
+          rva_to_decl={}
+          for i,line in enumerate(lines):
+              m=re.search(r'// RVA: 0x([0-9a-fA-F]+)',line)
+              if not m: continue
+              addr=int(m.group(1),16)
+              decl=""
+              for j in range(i+1,min(i+8,len(lines))):
+                  x=lines[j].strip()
+                  if not x or x.startswith("//") or x.startswith("["): continue
+                  if "(" in x and (x.endswith("{ }") or x.endswith("{") or x.endswith(";")):
+                      decl=x[:260]; break
+                  if x.startswith("}") or x.startswith("{"): break
+              if decl: rva_to_decl[addr]=decl
+          def find_method(needle, class_name=None):
+              for i,line in enumerate(lines):
+                  if needle not in line or "(" not in line or line.strip().startswith("//"): continue
+                  if class_name:
+                      # Verify class scope by nearest preceding type declaration.
+                      scope=" ".join(lines[max(0,i-1000):i])
+                      if not re.search(r'\bclass\s+'+re.escape(class_name)+r'\b',scope): continue
+                  for j in range(i-1,max(-1,i-6),-1):
+                      m=re.search(r'// RVA: 0x([0-9a-fA-F]+)',lines[j])
+                      if m: return int(m.group(1),16),line.strip()
+              return None,None
+          requested=[
+            ("ResolveBackground","ScenarioResourceManager"),
+            ("EnumerateBackgrounds","ScenarioResourceManager"),
+            ("TryGetBackgroundOverridePath","ScenarioResourceManager"),
+            ("AcquireBackgroundSpine","ScenarioResourceManager"),
+            ("GetBackgroundTexture(BackgroundResource","ScenarioResourceManager"),
+            ("GetBackgroundPreviewAsync","ScenarioResourceManager"),
+            ("InitializeAuthoringResources","ScenarioResourceManager"),
+            ("GetCustomBgEffect","ScenarioResourceManager"),
+            ("GetBgEffectChoices","ScenarioResourceManager"),
+            ("BackgroundPreviewKey","ScenarioResourceManager"),
+            ("QueueBackgroundPreview","ScenarioResourceManager"),
+            ("DecodeBackgroundImage","ScenarioResourceManager"),
+            ("ResolveOverride","BackgroundResource"),
+            ("GetResourceOverrideRoot","ScenarioResourceManager"),
+            ("ReadOverrides","ScenarioResourceManager"),
+          ]
+          targets=[]
+          report=["# Android ARM64 background runtime call graph","",
+                  "Built from the Android 1.0 ARM64 libil2cpp.so and its matching IL2CPP dump.cs. Direct BL edges only; BLR, virtual dispatch, delegates and runtime registration may add edges.",""]
+          for needle,cls in requested:
+              addr,decl=find_method(needle,cls)
+              if addr is None:
+                  report.append(f"- NOT FOUND: {cls}.{needle}")
+              else:
+                  targets.append((addr,cls,needle,decl))
+                  report.append(f"- 0x{addr:x}: {cls}.{needle} — {decl}")
+          (out/"target-rvas.txt").write_text("\n".join(f"0x{a:x} {c}.{n} {d}" for a,c,n,d in targets))
+          # Full disassembly enables caller search by direct BL target.
+          dis=subprocess.check_output(["llvm-objdump","-d","--no-show-raw-insn",binary],text=True,errors="replace")
+          (out/"full-disassembly.txt").write_text(dis)
+          ins=[]
+          for line in dis.splitlines():
+              m=re.match(r'\s*([0-9a-fA-F]+):\s+.*?\bbl\s+0x([0-9a-fA-F]+)',line)
+              if m: ins.append((int(m.group(1),16),int(m.group(2),16),line.strip()))
+          known=sorted(rva_to_decl)
+          def owner(addr):
+              k=bisect.bisect_right(known,addr)-1
+              if k<0: return "unknown"
+              base=known[k]
+              if addr-base>0x20000: return "unknown-nearest"
+              return f"0x{base:x} {rva_to_decl[base]}"
+          for addr,cls,needle,decl in targets:
+              callers=[x for x in ins if x[1]==addr]
+              report += ["",f"## {cls}.{needle} @ 0x{addr:x}",f"Declaration: {decl}",f"Direct BL callers: {len(callers)}"]
+              for src,dst,line in callers[:100]:
+                  report.append(f"- caller 0x{src:x} ({owner(src)})")
+              # Disassemble this method up to the next known method RVA.
+              k=bisect.bisect_right(known,addr)
+              end=known[k] if k<len(known) else addr+0x1000
+              if end<=addr or end-addr>0x20000: end=addr+0x2000
+              segment=subprocess.check_output(["llvm-objdump","-d","--no-show-raw-insn",f"--start-address=0x{addr:x}",f"--stop-address=0x{end:x}",binary],text=True,errors="replace")
+              callees=[]
+              for line in segment.splitlines():
+                  m=re.search(r'\bbl\s+0x([0-9a-fA-F]+)',line)
+                  if m:
+                      dst=int(m.group(1),16)
+                      callees.append((dst,rva_to_decl.get(dst,"unresolved/native")))
+              for dst,name in callees:
+                  report.append(f"  - calls 0x{dst:x}: {name}")
+          (out/"android-background-callgraph.md").write_text("\n".join(report))
+          PY
+      - name: Upload call graph
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-android-background-callgraph
+          path: work/out/
