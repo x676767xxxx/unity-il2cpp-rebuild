@@ -101,7 +101,12 @@ Native helper disassembly verifies:
 - `ReleaseBackgroundPreview` finds the preview record for the supplied texture, updates the user count and last-use bookkeeping, and calls `TrimBackgroundPreviews(false)`.
 - The trim filter is exactly `Users == 0`.
 - The trim sort key is `LastUse`, supporting least-recently-used eviction among unused previews.
-- `TrimBackgroundPreviews` contains a 0x02000000 (32 MiB) size threshold and also tests a count threshold of 25; precise threshold/forced-trim branch behavior should be retained from the raw disassembly rather than simplified into a guessed policy.
+- `TrimBackgroundPreviews(bool allUnused)` branch conditions are now reconstructed from the raw ARM64 loop:
+  - candidates are the unused-preview sequence sorted by ascending `LastUse`;
+  - when `allUnused == true`, each candidate goes directly to destruction, bypassing both normal thresholds;
+  - otherwise, trimming continues while the current total preview bytes are **strictly greater than 0x02000000 (32 MiB)** OR the current cache entry count is **at least 25**;
+  - after each destruction, the returned size is subtracted from the running byte total and the cache count is re-read on the next iteration.
+- A pure `BackgroundPreviewTrimPlanner` now models those decision rules and takes already-LRU-ordered candidates with their runtime-reported byte sizes. It selects keys only; Unity/Addressables destruction remains the runtime adapter's responsibility. Boundary tests cover exactly 32 MiB, 32 MiB + 1 byte, 25 entries, and forced trim.
 - `DestroyBackgroundPreview` branches on the `Addressable` flag, using the Addressables release path for addressable textures and the Unity object-destruction path for owned textures.
 
 ### Implementation consequence
