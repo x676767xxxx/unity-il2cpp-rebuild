@@ -151,3 +151,15 @@ A second pass over the full `CoLoadBackgroundPreview.MoveNext` body resolves one
 - The exact cache registration ordering is partially visible: preview result/record construction occurs before the callback iteration, and the constructed record carries the texture, ownership/thumbnail metadata and cache-related fields. However, the full managed cache insertion point and its relationship to the callback collection's source object still require type-layout confirmation.
 
 **Porting consequence:** the Unity adapter must preserve multi-subscriber fan-out and isolate exceptions thrown by an individual subscriber so one callback cannot prevent later subscribers from being considered. Keep load-stage failure fan-out as an explicit unresolved contract; do not assume the success fan-out loop proves failure fan-out behavior.
+
+### Clarification after instruction-level re-review: exception landing pads are not yet semantically named
+
+The previous callback-exception paragraph was too specific about the purpose of the temporary stack collection. The disassembly does show catch handlers, exception-type checks, temporary storage of caught exception object/type-related pointers, and follow-up virtual/helper calls before control returns to the coroutine's main flow. However, the helper targets at 0x3261D74, 0x2F2DC8C, 0x5AD7AD8, and 0x66B9AD8 are not symbolized in this selected text. It is therefore not safe to label that stack area an exception collection or to claim that it aggregates subscriber callback failures.
+
+What is safe to state:
+- The iterator has multiple compiler-generated exception landing pads covering separate portions of the coroutine.
+- Some landing pads catch an exception, inspect its runtime type, store an exception-related pointer temporarily, then call further runtime/helper routines.
+- The delegate invocation loop and these exception handlers coexist in the same method, but the current artifact does not prove that every such handler belongs specifically to subscriber callbacks rather than await/continuation/runtime cleanup.
+- No production exception policy should be copied from these handlers until the helper symbols and managed type metadata are resolved.
+
+This clarification supersedes any stronger interpretation in the earlier Callback fan-out and callback-exception handling section. The confirmed callback loop remains evidence of callback iteration; the exception policy remains unresolved.
