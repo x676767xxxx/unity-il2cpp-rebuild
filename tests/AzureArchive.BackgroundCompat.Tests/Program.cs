@@ -106,6 +106,7 @@ internal static class Program
         AssertTrue(addressableLease.IsReleased, "Addressables lease records release");
         AssertEqual("1", handleReleases.ToString(), "Addressables operation handle released exactly once");
         AssertThrows<ObjectDisposedException>(() => { var ignored = addressableLease.Handle; }, "released Addressables handle cannot be reused");
+        AssertThrows<ObjectDisposedException>(() => { var ignored = addressableLease.Asset; }, "released Addressables asset cannot be reused");
 
         var concurrentLease = new AddressableAssetLease<int, object>(7, new object(), handle => handleReleases++);
         System.Threading.Tasks.Parallel.For(0, 32, _ => concurrentLease.Dispose());
