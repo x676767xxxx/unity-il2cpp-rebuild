@@ -90,15 +90,15 @@ internal static class Program
             "Addressables hook restores previous transform");
 
         Addressables.Reset();
-        ScenarioResourceManagerFixture.AddrLoadUrl = "https://runtime.example.org/mobile/";
+        ScenarioResourceManager.AddrLoadUrl = "https://runtime.example.org/mobile/";
         var runtimeHook = AddressablesInternalIdTransformHook.InstallFromRuntimeType(
-            typeof(ScenarioResourceManagerFixture));
+            typeof(ScenarioResourceManager));
         var runtimeLocation = new UnityEngine.ResourceManagement.ResourceLocations.TestResourceLocation(
             "{ScenarioResourceManager.AddrLoadUrl}/backgrounds/scene.bundle");
         Assert(Addressables.InternalIdTransformFunc!(runtimeLocation) ==
             "https://runtime.example.org/mobile/backgrounds/scene.bundle",
             "runtime hook reads the verified ScenarioResourceManager.AddrLoadUrl field");
-        ScenarioResourceManagerFixture.AddrLoadUrl = "https://runtime.example.org/updated/";
+        ScenarioResourceManager.AddrLoadUrl = "https://runtime.example.org/updated/";
         Assert(Addressables.InternalIdTransformFunc!(runtimeLocation) ==
             "https://runtime.example.org/updated/backgrounds/scene.bundle",
             "runtime hook reads AddrLoadUrl lazily after installation");
@@ -152,10 +152,22 @@ internal static class Program
         AssertThrows<InvalidOperationException>(() => callbackOperation.Complete(new object()), "consumer callback exception");
         Assert(Addressables.ReleaseCount == 1 && callbackOperation.Released, "consumer callback exception releases successful handle");
 
+        Addressables.Reset();
+        ScenarioResourceManager.AddrLoadUrl = "https://runtime.example.org/bootstrap/";
+        AddressablesTransformBootstrap.InstallNow();
+        var bootstrapTransform = Addressables.InternalIdTransformFunc;
+        Assert(bootstrapTransform != null, "startup bootstrap installs Addressables transform");
+        Assert(bootstrapTransform!(runtimeLocation) ==
+            "https://runtime.example.org/bootstrap/backgrounds/scene.bundle",
+            "startup bootstrap resolves the game runtime URL");
+        AddressablesTransformBootstrap.InstallNow();
+        Assert(ReferenceEquals(bootstrapTransform, Addressables.InternalIdTransformFunc),
+            "startup bootstrap installation is idempotent");
+
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>(null!, lease => { }), "null Addressables key");
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>("bundle://key", null!), "null Addressables success callback");
 
-        Console.WriteLine("PASS: Unity decoder and path checks; 4 Spine bridge argument checks; Addressables token hook and async ownership checks");
+        Console.WriteLine("PASS: Unity decoder and path checks; 4 Spine bridge argument checks; Addressables token hook, startup bootstrap and async ownership checks");
         return 0;
     }
 
@@ -173,7 +185,7 @@ internal static class Program
 }
 
 
-internal static class ScenarioResourceManagerFixture
+internal static class ScenarioResourceManager
 {
     public static string AddrLoadUrl = string.Empty;
 }
