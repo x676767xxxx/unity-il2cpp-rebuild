@@ -20,28 +20,26 @@ namespace AzureArchive.UnityCompat
             // Matches the recovered Android/Windows IL constructor arguments:
             // 2x2 initial size, TextureFormat enum value 4 (RGBA32), no mip chain.
             var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            texture.name = name ?? string.Empty;
-            texture.wrapMode = TextureWrapMode.Clamp;
-
-            bool loaded;
             try
             {
+                texture.name = name ?? string.Empty;
+                texture.wrapMode = TextureWrapMode.Clamp;
+
                 // The recovered game IL passes markNonReadable=true.
-                loaded = ImageConversion.LoadImage(texture, bytes, true);
+                bool loaded = ImageConversion.LoadImage(texture, bytes, true);
+                if (!loaded)
+                    throw new InvalidDataException("Cannot decode background image: " + (name ?? string.Empty));
+
+                return texture;
             }
             catch
             {
-                UnityEngine.Object.Destroy(texture);
+                // Cover failures from texture setup as well as image decoding.
+                // Unity calls must be made on the main thread.
+                try { UnityEngine.Object.Destroy(texture); }
+                catch { /* Preserve the original decode/setup exception. */ }
                 throw;
             }
-
-            if (!loaded)
-            {
-                UnityEngine.Object.Destroy(texture);
-                throw new InvalidDataException("Cannot decode background image: " + (name ?? string.Empty));
-            }
-
-            return texture;
         }
     }
 }
