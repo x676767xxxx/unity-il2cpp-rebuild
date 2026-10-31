@@ -62,6 +62,7 @@ namespace AzureArchive.UnityCompat
             Action<Texture2D> onLoaded,
             Action<Exception>? onFailed)
         {
+            Texture2D texture;
             try
             {
                 string fullPath = resource.FullPath ??
@@ -69,19 +70,26 @@ namespace AzureArchive.UnityCompat
 
                 if (customTextures.TryGetValue(fullPath, out Texture2D? cached) && cached != null)
                 {
-                    onLoaded(cached);
-                    return;
+                    texture = cached;
                 }
-
-                Texture2D decoded = BackgroundImageDecoder.DecodeCustomResource(resource);
-                customTextures[fullPath] = decoded;
-                onLoaded(decoded);
+                else
+                {
+                    texture = BackgroundImageDecoder.DecodeCustomResource(resource);
+                    customTextures[fullPath] = texture;
+                }
             }
             catch (Exception exception)
             {
-                if (onFailed != null) onFailed(exception);
-                else throw;
+                if (onFailed != null)
+                {
+                    onFailed(exception);
+                    return;
+                }
+                throw;
             }
+
+            // Keep consumer callback failures distinct from file/decoder failures.
+            onLoaded(texture);
         }
 
         private void LoadNative(
