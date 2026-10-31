@@ -65,6 +65,10 @@ jobs:
             "AddressableFlatBufferLoader",
             "LoadGlobalResourceOverrides",
             "GetResourceOverrideRoot",
+            "TryGetBackgroundOverridePath",
+            "GetBackgroundTexture",
+            "GetBackgroundTextureAsync",
+            "GetBackgroundType",
             "UpdateAddressable",
             "UserSettings",
           ]
@@ -78,7 +82,7 @@ jobs:
           selected=[]
           lines=dump.splitlines()
           for i,line in enumerate(lines):
-              if any(k in line for k in ["CheckForUpdate", "OnUpdateComplete", "AddressableFlatBufferLoader", "LoadGlobalResourceOverrides", "GetResourceOverrideRoot", "UpdateAddressable"]):
+              if any(k in line for k in ["CheckForUpdate", "OnUpdateComplete", "AddressableFlatBufferLoader", "LoadGlobalResourceOverrides", "GetResourceOverrideRoot", "TryGetBackgroundOverridePath", "GetBackgroundTexture", "GetBackgroundTextureAsync", "GetBackgroundType", "UpdateAddressable"]):
                   context="\n".join(lines[max(0,i-2):min(len(lines),i+3)])
                   if "RVA:" in context:
                       selected.append(context)
@@ -126,6 +130,10 @@ jobs:
               "OnUpdateComplete.MoveNext": (0x3D776C0, 0x3D77BE4),
               "ScenarioResourceManager.Awake": (0x3D693C8, 0x3D69690),
               "ScenarioResourceManager.Initialize": (0x3D69690, 0x3D699A4),
+              "ScenarioResourceManager.TryGetBackgroundOverridePath": (0x3D69A54, 0x3D69C50),
+              "ScenarioResourceManager.GetBackgroundTexture": (0x3D69D1C, 0x3D6A1F4),
+              "ScenarioResourceManager.GetBackgroundTextureAsync": (0x3D6A1F4, 0x3D6A908),
+              "ScenarioResourceManager.GetBackgroundType": (0x3D6A908, 0x3D6AA50),
           }
           results = []
           for name, (rva, end_rva) in method_ranges.items():
