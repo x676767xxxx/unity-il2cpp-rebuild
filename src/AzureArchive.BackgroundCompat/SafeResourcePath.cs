@@ -24,7 +24,7 @@ namespace AzureArchive.BackgroundCompat
                 throw new InvalidDataException("Background paths must be relative to the resource directory.");
             }
 
-            if (normalized.IndexOf('\\0') >= 0 || normalized.Any(char.IsControl))
+            if (normalized.IndexOf('\0') >= 0 || normalized.Any(char.IsControl))
                 throw new InvalidDataException("Background paths cannot contain null or control characters.");
 
             string[] segments = normalized.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
