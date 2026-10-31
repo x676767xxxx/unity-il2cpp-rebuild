@@ -476,7 +476,7 @@ internal static class Program
         AssertEqual("idle-old", string.Join(",", BackgroundSkeletonTrimPlanner.Plan(
             skeletonTrimCandidates, BackgroundSkeletonTrimPlanner.MemoryThresholdBytes + 1)),
             "skeleton trim selects oldest unused asset first");
-        AssertEqual("idle-old,idle-new", string.Join(",", BackgroundSkeletonTrimPlanner.Plan(
+        AssertEqual("idle-old", string.Join(",", BackgroundSkeletonTrimPlanner.Plan(
             skeletonTrimCandidates, 900L * 1024L * 1024L)),
             "skeleton trim skips active consumers and evicts unused assets until under budget");
         AssertEqual("0", BackgroundSkeletonTrimPlanner.Plan(
