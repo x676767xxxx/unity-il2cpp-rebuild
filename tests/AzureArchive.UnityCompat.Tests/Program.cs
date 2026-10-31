@@ -9,6 +9,30 @@ internal static class Program
 {
     private static int Main()
     {
+        // Spine owned-object cleanup follows the Android Destroy/DestroyImmediate split.
+        Application.isPlaying = true;
+        var playModeObject = new UnityEngine.Object();
+        SpineOwnedObjectCleanup.DestroyOwned(playModeObject);
+        Assert(playModeObject.Destroyed && !playModeObject.DestroyImmediateCalled,
+            "Spine cleanup uses deferred Destroy while playing");
+
+        Application.isPlaying = false;
+        var editModeObject = new UnityEngine.Object();
+        SpineOwnedObjectCleanup.DestroyOwned(editModeObject);
+        Assert(editModeObject.Destroyed && editModeObject.DestroyImmediateCalled,
+            "Spine cleanup uses DestroyImmediate outside play mode");
+
+        SpineOwnedObjectCleanup.DestroyOwned(null!);
+        var rollbackPlayObject = new UnityEngine.Object();
+        var rollbackEditObject = new UnityEngine.Object();
+        SpineOwnedObjectCleanup.Rollback(new UnityEngine.Object[] { rollbackPlayObject, null!, rollbackEditObject });
+        Assert(rollbackPlayObject.Destroyed && rollbackPlayObject.DestroyImmediateCalled,
+            "Spine rollback destroys first edit-mode object");
+        Assert(rollbackEditObject.Destroyed && rollbackEditObject.DestroyImmediateCalled,
+            "Spine rollback continues through null entries");
+        AssertThrows<ArgumentNullException>(() => SpineOwnedObjectCleanup.Rollback(null!),
+            "Spine rollback rejects null collection");
+
         ImageConversion.Reset();
         Texture2D decoded = BackgroundImageDecoder.Decode(new byte[] { 1, 2, 3 }, "scene");
         Assert(decoded.Width == 2 && decoded.Height == 2, "initial dimensions");
@@ -269,7 +293,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>(null!, lease => { }), "null Addressables key");
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>("bundle://key", null!), "null Addressables success callback");
 
-        Console.WriteLine("PASS: Unity decoder and path checks; 4 Spine bridge argument checks; Addressables token hook, startup bootstrap and async ownership checks");
+        Console.WriteLine("PASS: Unity decoder and path checks; 4 Spine bridge argument checks; 6 Spine cleanup checks; Addressables token hook, startup bootstrap and async ownership checks");
         return 0;
     }
 
