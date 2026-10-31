@@ -47,7 +47,9 @@ namespace AzureArchive.BackgroundCompat
                     throw new InvalidDataException("Duplicate Spine atlas page name: " + candidate);
 
                 pages.Add(candidate);
-                i = next - 1;
+                i = next;
+                while (i < lines.Length && IsPageMetadata(lines[i]))
+                    i++;
             }
 
             if (pages.Count == 0)
