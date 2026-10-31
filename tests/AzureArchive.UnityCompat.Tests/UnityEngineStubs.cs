@@ -81,6 +81,7 @@ namespace UnityEngine.AddressableAssets
     {
         public static Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string>? InternalIdTransformFunc { get; set; }
         public static object? LastOperation { get; private set; }
+        public static object? LastKey { get; private set; }
         public static int ReleaseCount { get; private set; }
         public static bool ThrowOnLoad { get; set; }
 
@@ -89,6 +90,7 @@ namespace UnityEngine.AddressableAssets
             if (ThrowOnLoad) throw new InvalidOperationException("synthetic Addressables start failure");
             var operation = new AsyncOperationHandle<T>();
             LastOperation = operation;
+            LastKey = key;
             return operation;
         }
 
@@ -101,6 +103,7 @@ namespace UnityEngine.AddressableAssets
         public static void Reset()
         {
             LastOperation = null;
+            LastKey = null;
             ReleaseCount = 0;
             ThrowOnLoad = false;
             InternalIdTransformFunc = null;
