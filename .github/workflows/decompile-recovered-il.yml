@@ -6,10 +6,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Cpp2IL recovery artifact
-        run: |
-          mkdir -p work/in work/out
-          curl -fL --retry 3 -o work/in/recovery.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41169615291/artifacts/13030995280"
-          unzip -q work/in/recovery.zip -d work/in/recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/in/recovery
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169615291
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install ILSpy command line
         run: |
           dotnet tool install ilspycmd --tool-path work/tools
@@ -23,7 +26,7 @@ jobs:
       - name: Compare target source files
         run: |
           python3 - <<'PY'
-          import pathlib,re,difflib
+          import pathlib,re
           root=pathlib.Path("work/out")
           targets=["ScenarioResourceManager","AuthoringResourceCatalog","CharacterManager","Character"]
           report=[]
