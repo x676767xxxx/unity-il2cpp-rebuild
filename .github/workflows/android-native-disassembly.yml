@@ -1,0 +1,70 @@
+name: Android native method disassembly
+on:
+  workflow_dispatch:
+jobs:
+  disassemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download IL2CPP dump artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-ios-il2cpp-comparison
+          path: work/in/dump
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169040171
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Android 1.0 APK
+        run: |
+          mkdir -p work/android work/out
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -p work/android/base.apk lib/arm64-v8a/libil2cpp.so > work/android/libil2cpp.so
+          file work/android/libil2cpp.so
+      - name: Install LLVM disassembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm
+      - name: Disassemble selected 1.0 ARM64 methods
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,subprocess
+          dump=pathlib.Path("work/in/dump/dump-android-arm64/dump.cs")
+          if not dump.exists():
+              candidates=list(pathlib.Path("work/in/dump").rglob("dump.cs"))
+              if not candidates: raise SystemExit("dump.cs missing in downloaded artifact")
+              dump=candidates[0]
+          text=dump.read_text(errors="ignore")
+          binary="work/android/libil2cpp.so"
+          targets=[
+            ("ScenarioResourceManager.InitializeAuthoringResources","InitializeAuthoringResources(string databasePath"),
+            ("ScenarioResourceManager.ResolveBackground","ResolveBackground(uint id)"),
+            ("ScenarioResourceManager.GetBackgroundPreviewAsync","GetBackgroundPreviewAsync(BackgroundResource resource"),
+            ("ScenarioResourceManager.GetBackgroundTexture","GetBackgroundTexture(BackgroundResource resource"),
+            ("AuthoringResourceCatalog.Search","Search(string kind, string query"),
+            ("AuthoringResourceCatalog.Resolve","Resolve(string resourceId, string expectedKind"),
+            ("AuthoringResourceCatalog.Import","Import(ProjectData project, JObject request"),
+            ("AuthoringResourceCatalog.StageReferencedResources","StageReferencedResources(ProjectData project, string stagingResourcesDir, string expectedCatalogVersion)"),
+          ]
+          all_rvas=sorted({int(x,16) for x in re.findall(r'// RVA: 0x([0-9A-Fa-f]+)',text)})
+          report=[]
+          for label,needle in targets:
+              pos=text.find(needle)
+              if pos<0:
+                  report.append(f"## {label}\nNOT FOUND: {needle}")
+                  continue
+              m=re.search(r'// RVA: 0x([0-9A-Fa-f]+)',text[max(0,pos-300):pos])
+              if not m:
+                  report.append(f"## {label}\nRVA NOT FOUND")
+                  continue
+              start=int(m.group(1),16)
+              later=[x for x in all_rvas if x>start]
+              end=min(later) if later else start+0x500
+              end=min(end,start+0x1800)
+              p=subprocess.run(["llvm-objdump","-d","--start-address="+hex(start),"--stop-address="+hex(end),binary],capture_output=True,text=True)
+              report.append(f"## {label}\nRVA={hex(start)} end={hex(end)} exit={p.returncode}\n{p.stdout}\n{p.stderr}")
+          pathlib.Path("work/out/android-arm64-selected-disassembly.txt").write_text("\n".join(report))
+          PY
+      - name: Upload disassembly report
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-android-arm64-disassembly
+          path: work/out/
