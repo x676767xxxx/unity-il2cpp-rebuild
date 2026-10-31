@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using AzureArchive.UnityCompat;
+using AzureArchive.BackgroundCompat;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 internal static class Program
 {
@@ -47,7 +49,47 @@ internal static class Program
         AssertThrows<ArgumentException>(() => SpineConverterNative.JsonToSpine42Binary(Array.Empty<byte>()), "empty Spine JSON");
         AssertThrows<ArgumentNullException>(() => SpineConverterNative.ConvertToSpine42Binary(null!), "null Spine skeleton");
         AssertThrows<ArgumentException>(() => SpineConverterNative.ConvertToSpine42Binary(Array.Empty<byte>()), "empty Spine skeleton");
-        Console.WriteLine("PASS: 10 Unity decoder contract checks; 4 Spine iOS bridge argument checks");
+
+        Addressables.Reset();
+        AddressableAssetLease<UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle<object>, object>? loadedLease = null;
+        Exception? loadError = null;
+        AddressablesRuntimeAdapter.Load<object>("bundle://scene", lease => loadedLease = lease, error => loadError = error);
+        var successOperation = Addressables.Last<object>();
+        Assert(loadedLease == null && loadError == null && Addressables.ReleaseCount == 0, "Addressables waits for async completion");
+        var loadedAsset = new object();
+        successOperation.Complete(loadedAsset);
+        Assert(loadedLease != null && ReferenceEquals(loadedAsset, loadedLease.Asset), "Addressables returns loaded asset lease");
+        Assert(loadError == null && Addressables.ReleaseCount == 0, "successful Addressables handle remains owned");
+        loadedLease!.Dispose();
+        loadedLease.Dispose();
+        Assert(Addressables.ReleaseCount == 1 && successOperation.Released, "successful Addressables handle released once");
+
+        Addressables.Reset();
+        Exception? failedError = null;
+        AddressablesRuntimeAdapter.Load<object>("bundle://missing", lease => throw new Exception("unexpected success"), error => failedError = error);
+        var failedOperation = Addressables.Last<object>();
+        var expectedFailure = new InvalidOperationException("synthetic missing key");
+        failedOperation.Fail(expectedFailure);
+        Assert(ReferenceEquals(expectedFailure, failedError), "Addressables failure reaches error callback");
+        Assert(Addressables.ReleaseCount == 1 && failedOperation.Released, "failed Addressables handle released");
+
+        Addressables.Reset();
+        Exception? startError = null;
+        Addressables.ThrowOnLoad = true;
+        AddressablesRuntimeAdapter.Load<object>("bundle://throw", lease => throw new Exception("unexpected success"), error => startError = error);
+        Assert(startError is InvalidOperationException && Addressables.ReleaseCount == 0, "synchronous Addressables start failure reported");
+
+        Addressables.Reset();
+        AddressableAssetLease<UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle<object>, object>? callbackLease = null;
+        AddressablesRuntimeAdapter.Load<object>("bundle://callback", lease => { callbackLease = lease; throw new InvalidOperationException("consumer callback"); });
+        var callbackOperation = Addressables.Last<object>();
+        AssertThrows<InvalidOperationException>(() => callbackOperation.Complete(new object()), "consumer callback exception");
+        Assert(Addressables.ReleaseCount == 1 && callbackOperation.Released, "consumer callback exception releases successful handle");
+
+        AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>(null!, lease => { }), "null Addressables key");
+        AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>("bundle://key", null!), "null Addressables success callback");
+
+        Console.WriteLine("PASS: 10 Unity decoder checks; 4 Spine bridge argument checks; 10 Addressables async adapter checks");
         return 0;
     }
 
