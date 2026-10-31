@@ -76,3 +76,13 @@ No upstream Spine runtime source has been copied into this project. Before integ
 - Added `SpineAtlasPageResourceResolver.ResolveResourceKeys`, a callback-based contract mapping atlas page names to caller-owned resource keys. It reuses path-safety validation and rejects missing mappings.
 - Added tests for two page mappings, missing resource mappings, and unsafe page names. CI run [41185065041](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185065041) was queued/in progress at the time of this note.
 - This does not load textures, decode skeleton binaries, create Spine materials, or play animations. The resolver is not connected to Unity Addressables or the actual game resource manager.
+
+
+## Texture page ownership/cache work
+
+- Added `SpineAtlasPageCache<TTexture>`: keyed page texture reuse with reference-counted leases; the injected loader/releaser are intended to be implemented by a Unity main-thread adapter.
+- Cache disposal prevents new acquisitions and defers release of textures that still have active leases until the final lease is disposed.
+- Added lifecycle tests for same-key sharing, one-time load, release after final lease, deferred release after cache disposal, acquisition after disposal, and null loader result.
+- CI run [41185134531](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185134531) was in progress at this checkpoint. Do not treat this cache as Unity Texture2D integration until CI passes and a Unity main-thread adapter is implemented.
+- The prior page-name mapping tests passed in [41185065041](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185065041); artifact ID `13036557879`, size 11,337 bytes.
+- Remaining for this stage: actual page resource source mapping, texture decode/load adapter, material construction and teardown tests using the real Unity/Spine runtime.
