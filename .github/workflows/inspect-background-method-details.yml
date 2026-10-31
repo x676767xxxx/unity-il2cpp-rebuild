@@ -1,0 +1,90 @@
+name: Inspect exact background resource and preview methods
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/inspect-background-method-details.yml"
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Download Cpp2IL recovery outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/in/recovery
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169615291
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+      - name: Install ILSpy
+        run: dotnet tool install ilspycmd --tool-path work/tools
+      - name: Export exact managed types
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/out/{android,windows}
+          for platform in android windows; do
+            root="work/in/recovery/cpp2il-$platform"
+            for type in BackgroundResource ScenarioResourceManager; do
+              work/tools/ilspycmd --ilcode --type "$type" "$root/Assembly-CSharp.dll" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log"
+            done
+          done
+      - name: Extract method-level evidence and commit report
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, hashlib
+          targets = [
+            ("BackgroundResource", ["ResolveOverride", "ResolvePath", "Overrides", "FullPath", "get_FullPath"]),
+            ("ScenarioResourceManager", ["ResolveBackground", "GetBackgroundTexture", "DecodeBackgroundImage", "GetBackgroundPreviewAsync", "QueueBackgroundPreview", "BackgroundPreviewKey", "AcquireBackgroundSpine"])
+          ]
+          out=Path("work/out")
+          report=["# Exact background method IL evidence (2026-10-31)","","Inputs: Cpp2IL recovered Android 1.0 and Windows 1.0.1 assemblies; ILSpy IL output. This report contains method-level excerpts, not original C# source. Decompiler gaps are preserved; no guessed behavior is filled in.",""]
+          for typ,names in targets:
+            report.append("## "+typ)
+            for platform in ["android","windows"]:
+              p=out/platform/f"{typ}.il"
+              s=p.read_text(errors="replace")
+              lines=s.splitlines()
+              report += [f"### {platform} (SHA256 {hashlib.sha256(p.read_bytes()).hexdigest()})"]
+              hits=[]
+              for i,line in enumerate(lines):
+                if ".method" in line and any(re.search(r"\b"+re.escape(n)+r"\b",line) for n in names):
+                  hits.append(i)
+              if not hits:
+                report.append("No method declarations matched the requested names; inspect raw artifact.")
+              for i in hits:
+                start=i
+                end=len(lines)
+                for j in range(i+1,len(lines)):
+                  if ".method" in lines[j] or ".property" in lines[j] or ".event" in lines[j] or lines[j].strip().startswith("} // end of class"):
+                    end=j
+                    break
+                excerpt=lines[start:min(end,start+260)]
+                fence=chr(96)*3
+                report += ["#### "+lines[i].strip(),fence+"il",*excerpt,fence]
+              report.append("")
+          report += ["## Guardrails",
+            "- A recovered IL call is evidence of the call in that recovered method body, not proof that every runtime path succeeds.",
+            "- If the IL contains NoteDecompilerIssue/invalid instruction/unmanaged memory load, treat affected branches as unresolved.",
+            "- Android and Windows are used as cross-checks; disagreement must not be silently merged.",
+            "- No C# compatibility code or IPA is built by this workflow."]
+          Path("analysis/exact-background-method-il-evidence-2026-10-31.md").write_text("\n".join(report)+"\n")
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add analysis/exact-background-method-il-evidence-2026-10-31.md
+          git commit -m "Add exact background method IL evidence" || echo "No report changes"
+          git push
+      - name: Upload raw IL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-exact-background-method-il
+          path: work/out/
