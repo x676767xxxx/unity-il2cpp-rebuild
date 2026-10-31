@@ -269,3 +269,14 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - The database query itself remains injected through `findByNameId`; the current portable library does not yet parse the SQLite/FlatBuffers files or instantiate the Unity database service.
 - Added regression cases for local/global override short-circuit, native fallback mapping, ID zero, missing/mismatched row and missing lookup callback.
 - CI run [41197624016](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197624016) passed for the implementation/test commit before the latest disassembly workflow update. The latest branch revision is undergoing a new run.
+
+
+## Image override path-to-ID projection checkpoint
+
+- Added `BackgroundResourceIdHash` and `BackgroundImageOverrideFactory` to the existing portable compatibility library.
+- Native Android iterator evidence confirms image override path normalization (`\\` to `/`), filename-stem extraction, ID hash call, and construction as Image/source/path/basePath/no-Spine.
+- `BgSpineOverrideData.get_Id` loads `Identifier` and branches to the same `Util.CalculateHash` function; full Spine descriptor construction remains separate and is not yet implemented.
+- Hash implementation currently covers the normal short-string path as UTF-8 + xxHash32 seed 0, with known-vector tests. Android's separate >256-character path and exact encoding identity are still verification gates; do not treat all edge cases as byte-for-byte proven.
+- Native `ResolveOverride` calls local source 2 before global source 1. Local ID predicate is directly confirmed; the symbol-labeled global predicate disassembly is anomalous, so its exact filtering remains an explicit open item.
+- Full evidence and limitations: `analysis/android-background-override-enumeration-native-findings-2026-10-31.md`.
+- GitHub Actions run [41197855495](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197855495) passed the current code build and regression suite.
