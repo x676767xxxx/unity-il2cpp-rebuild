@@ -302,6 +302,8 @@ internal static class Program
         AssertEqual("1", textureReleases.ToString(), "cache dispose defers active texture release");
         deferredLease.Dispose();
         AssertEqual("2", textureReleases.ToString(), "active texture released after cache disposal and final lease");
+        pageCache.Dispose();
+        AssertEqual("2", textureReleases.ToString(), "repeated cache disposal does not release texture twice");
         AssertThrows<ObjectDisposedException>(() => pageCache.Acquire("atlas/after-dispose.png"), "acquire after cache disposal");
         using (var nullPageCache = new SpineAtlasPageCache<object>(key => null!, texture => { }))
             AssertThrows<InvalidOperationException>(() => nullPageCache.Acquire("atlas/missing.png"), "null texture load");
