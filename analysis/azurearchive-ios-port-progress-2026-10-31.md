@@ -426,3 +426,22 @@ The Android disassembly confirms a 32 MiB threshold and a 25-entry check in `Tri
 The first workflow [41200672989](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200672989) caught a test setup issue: the test entry began with one pre-existing user plus one acquired lease, but released only once before asserting the entry was idle. The test was corrected to return both leases; no production ledger behavior was changed for this failure.
 
 The corrected workflow [41200720295](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200720295), commit `f2d85e74e07c97db1cc33e203a1860fd6d58106b`, completed successfully. Source include preflight, .NET Standard 2.1 build, all BackgroundCompat tests, Unity decoder stub tests and artifact upload passed. Artifact: `azurearchive-background-path-compat-library`, ID `13041989399`, 22,984 bytes.
+
+
+## Repository-wide project-source audit and current gate — 2026-10-31
+
+- Re-fetched the complete recursive Git tree at branch head `7158022f7137d13af3f8c064951adc691e8ce8dc`. GitHub reports `truncated=false` and 136 tracked paths.
+- Exact path audit found none of: `Assets/`, `Packages/`, `ProjectSettings/`, `Library/`, `Temp/`, `Builds/`, `.xcodeproj`, `.xcworkspace`, `.sln`, `.asmdef`, `Packages/manifest.json`, `.unitypackage`, or `.gitmodules`. There is no hidden Unity project, Xcode workspace, submodule declaration, or Unity package manifest in the current branch tree.
+- The repository does contain the existing Addressables token resolver/bootstrap, static image decoder/cache adapters, Spine page/cache primitives, native converter bridge, and isolated tests. These remain integration candidates; they have not been compiled against the actual AzureArchive Unity/Addressables/Spine assemblies.
+- Rechecked the latest workflow [41205687909](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41205687909): all 17 job steps completed successfully, including explicit C# source include uniqueness/path checks, Unity-compatible library build, path safety checks, isolated Unity API stub compilation/tests, and artifact upload.
+- Latest run is documentation-only and does not add a Unity/Xcode build target. The successful CI is not an app build or IPA.
+
+### Current hard gates, in execution order
+1. Recover the matching Unity project/source export or a complete reproducible Xcode/UnityFramework project, including game scenes/assets and package manifest. This is still the first hard blocker; the full repository tree contains none of those project roots.
+2. Confirm valid Spine Editor runtime integration rights before importing the Spine 4.2 runtime candidate. The public source candidate's noncommercial license does not grant rights to integrate/distribute Spine runtime code; no third-party source was copied into this repository.
+3. Obtain representative Android 1.0 background image, Addressables, and Spine skeleton/atlas/page fixtures. Test the existing adapters against actual resources rather than invented stubs.
+4. Integrate and compile the static-image/Addressables path against the exact Unity and Addressables assemblies; wire it to the real game bootstrap and resource lifecycle.
+5. Integrate the matching Spine runtime and custom loader only after license and project gates pass; validate animation features against actual game fixtures.
+6. Build the complete iOS app, install and test on a physical iPhone, then produce and inspect a signed IPA.
+
+No duplicate source file was added by this audit. The next code change must wait for a real project/dependency surface or be limited to a narrowly testable engine-independent behavior; adding fake Unity/Spine APIs would not move the app toward a valid build.
