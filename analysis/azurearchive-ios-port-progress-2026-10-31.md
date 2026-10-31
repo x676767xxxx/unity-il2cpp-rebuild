@@ -249,3 +249,13 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 1. Recover the exact Android override enumeration iterator and ID predicate; then extend the existing resolver only where the source-specific behavior is proven.
 2. Reuse the old iOS 0.7.9.2 texture/Addressables path for native resources where the method-body diff supports it.
 3. Add the resource descriptor adapter to the actual iOS integration point only after a buildable Unity/Xcode base is established.
+
+
+## ID-based background override resolver checkpoint
+
+- Added an overload to the existing `BackgroundOverrideResolver.TryResolve` that accepts the requested `uint32` background ID and `BackgroundResourceDescriptor` sequences.
+- Evidence: Android 1.0 `BackgroundResource.ResolveOverride(uint32 id, ResourceOverrideData local, ResourceOverrideData global)` calls `Overrides(local, ResourceType=2)`, applies `FirstOrDefault` with a captured-ID predicate, returns immediately on a local match, and only then calls `Overrides(global, ResourceType=1)` and applies the same predicate. Windows IL corroborates the two-stage local/global sequence.
+- The resolver overload intentionally accepts already source-separated override sequences. The recovered `Overrides` iterator body contains unresolved Cpp2IL decompiler markers, so the underlying ResourceOverrideData-to-descriptor enumeration is not claimed as implemented.
+- Regression cases cover first matching local ID, local-over-global precedence, global fallback, and missing/null override sequences.
+- Validation before the latest predicate-only cleanup: [Actions run 41197384423](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197384423) succeeded on commit `33c3f777ade7bd9d3b5afbc8e2496f6f345cb29b`. A follow-up run for the current source is tracked separately.
+- Remaining gap in this slice: recover/implement the `Overrides` iterator that reads actual local/global override records, then connect `ResolveBackground(uint)` to scenario Excel metadata for the no-override fallback. No Unity runtime integration is claimed.
