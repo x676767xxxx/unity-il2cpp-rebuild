@@ -62,3 +62,7 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 - Added four pre-native argument-validation tests: null/empty JSON and null/empty skeleton input. These tests deliberately do not call the unavailable `__Internal` native symbols on Linux.
 - The resulting workflow run [41185474591](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185474591) was in progress at the time of this note; no pass is claimed yet.
 - This checks C# compilation and managed argument validation only. It does not prove the iOS static archive is linked into UnityFramework, that symbol resolution works in Xcode, or that the native calls work on device.
+
+
+- Final result: managed bridge CI [41185474591](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185474591) completed successfully. The project compiled with `UNITY_IOS` defined, all existing Unity decoder checks passed, and the four Spine bridge argument checks passed. Artifact ID `13036883377`, size 13,136 bytes.
+- The workflow's successful result is limited to compilation against .NET and isolated Unity API stubs. Native iOS link/runtime validation remains outstanding.
