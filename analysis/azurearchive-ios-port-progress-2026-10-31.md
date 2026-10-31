@@ -280,3 +280,12 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - Native `ResolveOverride` calls local source 2 before global source 1. Local ID predicate is directly confirmed; the symbol-labeled global predicate disassembly is anomalous, so its exact filtering remains an explicit open item.
 - Full evidence and limitations: `analysis/android-background-override-enumeration-native-findings-2026-10-31.md`.
 - GitHub Actions run [41197855495](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197855495) passed the current code build and regression suite.
+
+
+## Unity static custom-image decoder connection checkpoint
+
+- Extended the existing `BackgroundImageDecoder.Unity.cs` with `DecodeCustomResource(BackgroundResourceDescriptor)`.
+- It only accepts custom Image resources, uses the descriptor's `FullPath`, and explicitly refuses Native resources (Addressables path) and Spine resources (separate runtime). This connects the newly reconstructed descriptor to the existing Unity Texture2D/ImageConversion decoder without creating a second loader.
+- Extended the Unity compatibility test project to compile the descriptor source and test successful descriptor-driven decoding, Native rejection and Spine rejection.
+- GitHub Actions run [41198025689](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41198025689) passed: compatibility library build/tests and Unity API-stub compile/runtime tests. Artifact ID: `13041850514`.
+- Validation boundary: tests use isolated Unity API stubs, not the real Unity 2023.2.20f1c1 player. The adapter is not yet wired into a complete game scene or the original ScenarioResourceManager.
