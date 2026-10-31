@@ -36,17 +36,17 @@ jobs:
               work/tools/ilspycmd --ilcode --type "$type" "$root/Assembly-CSharp.dll" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log"
             done
           done
-      - name: Extract method-level evidence and commit report
+      - name: Extract full exact method bodies and commit report
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re, hashlib
           targets = [
-            ("BackgroundResource", ["ResolveOverride", "ResolvePath", "Overrides", "FullPath"]),
-            ("ScenarioResourceManager", ["ResolveBackground", "GetBackgroundTexture", "DecodeBackgroundImage", "GetBackgroundPreviewAsync", "QueueBackgroundPreview", "BackgroundPreviewKey", "AcquireBackgroundSpine"])
+            ("BackgroundResource", ["ResolveOverride", "Overrides", "ResolvePath", "get_FullPath", "get_CacheKey"]),
+            ("ScenarioResourceManager", ["ResolveBackground", "GetBackgroundTexture", "GetBackgroundTextureAsync", "DecodeBackgroundImage", "GetBackgroundPreviewAsync", "QueueBackgroundPreview", "BackgroundPreviewKey", "AcquireBackgroundSpine"])
           ]
           out=Path("work/out")
-          report=["# Exact background method IL evidence (2026-10-31)","","Inputs: Cpp2IL recovered Android 1.0 and Windows 1.0.1 assemblies; ILSpy IL output. The ILSpy formatter wraps method declarations across multiple lines, so this report extracts bounded contexts around every exact symbol occurrence rather than assuming the name is on the .method line. This is recovered IL, not original C# source.",""]
+          report=["# Full exact background method IL (2026-10-31)","","Inputs: Cpp2IL recovered Android 1.0 and Windows 1.0.1 assemblies; ILSpy IL output. Method declaration lines can wrap across lines. This exporter selects exact declaration lines, then captures through the matching end-of-method marker. This is recovered IL, not original C# source.",""]
           for typ,names in targets:
             report.append("## "+typ)
             for platform in ["android","windows"]:
@@ -55,26 +55,43 @@ jobs:
               lines=s.splitlines()
               report += [f"### {platform} (SHA256 {hashlib.sha256(p.read_bytes()).hexdigest()})"]
               for name in names:
-                hits=[i for i,line in enumerate(lines) if name in line]
-                report.append(f"#### {name}: {len(hits)} occurrences")
+                pattern=re.compile(r"\b"+re.escape(name)+r"\s*\(")
+                hits=[i for i,line in enumerate(lines) if pattern.search(line) and ".method" not in line]
+                report.append(f"#### {name}: {len(hits)} declarations")
                 if not hits:
-                  report.append("No textual occurrence found.")
-                for i in hits[:8]:
-                  lo=max(0,i-8); hi=min(len(lines),i+100)
+                  report.append("No exact method declaration found.")
+                for i in hits[:6]:
+                  start=i
+                  while start>0 and i-start<10 and ".method" not in lines[start]:
+                    start-=1
+                  if ".method" not in lines[start]:
+                    report.append("Could not locate .method header for line "+str(i+1))
+                    continue
+                  # Resolve method name from its end marker. Use the next end-of-method marker belonging to the target type.
+                  end=None
+                  for j in range(i+1,len(lines)):
+                    if "} // end of method "+typ+"::"+name in lines[j]:
+                      end=j
+                      break
+                    if "} // end of class" in lines[j]:
+                      break
+                  if end is None:
+                    report.append("No matching end-of-method marker after declaration at line "+str(i+1))
+                    continue
                   fence=chr(96)*3
-                  report += [f"Context at line {i+1}:",fence+"il",*lines[lo:hi],fence]
+                  report += [f"Source lines {start+1}-{end+1}:",fence+"il",*lines[start:end+1],fence]
               report.append("")
           report += ["## Guardrails",
-            "- A recovered IL call is evidence of the call in that recovered method body, not proof that every runtime path succeeds.",
-            "- If the IL contains NoteDecompilerIssue/invalid instruction/unmanaged memory load, treat affected branches as unresolved.",
-            "- Android and Windows are used as cross-checks; disagreement must not be silently merged.",
-            "- No C# compatibility code or IPA is built by this workflow."]
-          Path("analysis/exact-background-method-il-evidence-2026-10-31.md").write_text("\n".join(report)+"\n")
+            "- Recovered IL may contain NoteDecompilerIssue, invalid-instruction, or unmanaged-memory placeholders. Such regions are not reliable control flow.",
+            "- Android and Windows bodies are compared independently; do not merge platform-specific differences.",
+            "- The method declaration and call sites are evidence, but do not establish successful runtime behavior on old iOS.",
+            "- No C# compatibility code, Unity build, signing, or IPA is produced."]
+          Path("analysis/full-exact-background-method-il-2026-10-31.md").write_text("\n".join(report)+"\n")
           PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add analysis/exact-background-method-il-evidence-2026-10-31.md
-          git commit -m "Add exact background method IL evidence" || echo "No report changes"
+          git add analysis/full-exact-background-method-il-2026-10-31.md
+          git commit -m "Add full exact background method IL" || echo "No report changes"
           git push
       - name: Upload raw IL
         if: always()
