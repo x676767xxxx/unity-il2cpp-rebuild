@@ -30,3 +30,39 @@ The first disassembly pass does not show a direct `AddrLoadUrl` field write in t
 Do not inject the authoring CLI fallback into iOS. The iOS port needs to initialize the URL provider before the mobile `CheckForUpdate` / catalog load path runs, but the provider's value and precedence still need to be recovered from the coroutine/native calls or runtime configuration. Once proven, install the Addressables transform at the earliest safe point in this mobile bootstrap path.
 
 No Unity project, iOS UnityFramework integration, iOS archive, or IPA has been produced.
+
+## Follow-up: recovered managed IL and Addressables consumer path
+
+The full recovered Android ScenarioResourceManager.il was inspected directly from artifact azurearchive-raw-il-ios-port-fixed (Run 41191415958).
+
+### Startup and cache setup
+
+- <InitializeAfterSplash>d__89.MoveNext (managed IL RVA 0x688598) waits for the startup splash condition, then calls ScenarioResourceManager.Initialize().
+- Initialize() (native ARM64 RVA 0x3264A00) performs a cache-path branch using UserSettings.CachePath. When a configured cache directory exists, it checks/adds a Unity Cache and sets it as the current writing cache; otherwise it starts CheckForUpdate() as a coroutine.
+- CheckForUpdate() (native ARM64 RVA 0x32646B0) creates/schedules the update coroutine. Its recovered managed MoveNext is heavily damaged by an unresolved indirect jump, so the full catalog/hash URL construction is not recoverable from the IL export alone.
+
+### Post-update Addressables asset consumers
+
+The <OnUpdateComplete>d__93.MoveNext recovered body establishes a post-update consumer sequence:
+- constructs AddressableFlatBufferLoader instances for static FlatBuffer/TextAsset data, including FlatData/bgmadditionalinfoexceltable.bytes;
+- calls AddressableFlatBufferLoader.LoadAll(callback);
+- after the loader stage it calls ScenarioResourceManager.LoadGlobalResourceOverrides().
+
+Exact loader declarations in Android dump.cs:
+- AddressableFlatBufferLoader.Load(): RVA 0x326D3A8.
+- AddressableFlatBufferLoader.LoadAll(Action): RVA 0x326D520.
+- ScenarioResourceManager.LoadGlobalResourceOverrides(): RVA 0x326A4F8.
+- ScenarioResourceManager.GetResourceOverrideRoot(): RVA 0x3265028.
+- ScenarioResourceManager.<OnUpdateComplete>b__93_1(AsyncOperationHandle<TextAsset>): RVA 0x326BE84.
+
+Recovered IL for AddressableFlatBufferLoader.Load() references the Unity.Addressables.Addressables type and registers an AsyncOperationHandle<TextAsset>.Completed callback. This confirms that the app's post-update static-data path consumes Addressables TextAssets; it does not yet reveal the URL provider used by the catalog.
+
+### Local override manifest is a separate path
+
+LoadGlobalResourceOverrides() begins by invalidating the global authoring catalog, calls GetResourceOverrideRoot(), combines that root with manifest.json, checks for the file, and reads/deserializes it into ResourceOverrideData. This is a local override manifest path, not evidence for the remote Addressables CDN base URL.
+
+### Current inference and remaining gap
+
+The integration point for an iOS resource loader is now more concrete: preserve the mobile startup order, initialize the Addressables URL transform before the update/catalog coroutine begins, and retain the later TextAsset/FlatBuffer and local override stages. However, the exact runtime URL assignment and catalog-update call chain remain unproven because the key CheckForUpdate coroutine contains unresolved native/indirect operations in the managed IL export.
+
+The next native disassembly pass adds the Addressables loader and local override methods to distinguish remote catalog setup from local override processing. No production CDN is hard-coded and no IPA has been produced.
