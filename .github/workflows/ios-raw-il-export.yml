@@ -51,7 +51,7 @@ jobs:
               for p in sorted((out/platform).glob("*.il")):
                   txt=p.read_text(errors="ignore")
                   for name in names:
-                  hits=[x.strip() for x in txt.splitlines() if name in x and "(" in x]
+                      hits=[x.strip() for x in txt.splitlines() if name in x and "(" in x]
                       if hits:
                           report.append(f"- {p.name}: {name} ({len(hits)} declaration/call lines)")
                           report.extend("  "+x[:240] for x in hits[:12])
