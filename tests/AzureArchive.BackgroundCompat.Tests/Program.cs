@@ -24,8 +24,28 @@ internal static class Program
         AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, "images/\0scene.png"), "null character");
         AssertThrows<InvalidDataException>(() => SafeResourcePath.ResolveUnderRoot(root, "images/\nscene.png"), "control character");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks");
+        var local = new[] { "local-other", "local-match", "local-second-match" };
+        var global = new[] { "global-match" };
+        AssertTrue(BackgroundOverrideResolver.TryResolve(local, global, x => x.EndsWith("match", StringComparison.Ordinal), out string selected), "local override found");
+        AssertEqual("local-match", selected, "local override precedes global");
+        AssertTrue(BackgroundOverrideResolver.TryResolve(Array.Empty<string>(), global, x => x == "global-match", out selected), "global fallback");
+        AssertEqual("global-match", selected, "global override selected");
+        AssertFalse(BackgroundOverrideResolver.TryResolve<string>(null, null, x => true, out selected), "null lists have no result");
+        AssertFalse(BackgroundOverrideResolver.TryResolve(local, global, x => x == "missing", out selected), "no matching override");
+        AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
+
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks");
         return 0;
+    }
+
+    private static void AssertTrue(bool value, string name)
+    {
+        if (!value) throw new Exception(name);
+    }
+
+    private static void AssertFalse(bool value, string name)
+    {
+        if (value) throw new Exception(name);
     }
 
     private static void AssertEqual(string expected, string actual, string name)
