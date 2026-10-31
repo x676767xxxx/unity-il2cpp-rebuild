@@ -400,3 +400,12 @@ Workflow run [41200328434](https://github.com/x676767xxxx/unity-il2cpp-rebuild/a
 - Nested iterator type export completed for Android and Windows in run [41200220219](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200220219).
 - The first export attempt (run 41200200402) failed in the report regex; the extraction escaping was corrected and the subsequent run completed successfully.
 - The preview coalescer remains a standalone tested primitive, not a coroutine or RenderTexture implementation.
+
+
+## Android native preview/cache recovery — 2026-10-31
+
+- Workflow [41200328434](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200328434) successfully disassembled the coroutine `MoveNext` at Android ARM64 RVA `0x3270D7C` and its core cache helpers.
+- Follow-up workflow [41200411309](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200411309) also disassembled the cache filter/sort closures.
+- The native call graph confirms static image async file reads and decode, a distinct Spine preview path through `RuntimeSpineLoader.ReadAsync/Create` and `SpineBackgroundVisual.RenderPreview(..., 1024)`, Addressables handle state, RenderTexture blit/save, 1024 size limiting, and cleanup/error helpers.
+- Preview records track `Users` and `LastUse`; native eviction filters `Users == 0` and sorts by `LastUse`. The trim body contains a 32 MiB threshold and a 25-entry check. Destroy chooses Addressables release vs Unity destruction using the record's Addressable flag.
+- No replacement coroutine was guessed. The next implementation task is to write a Unity-side preview runtime adapter against these exact behaviors, but this is blocked from real integration/testing until the target Unity project, Unity/Addressables assemblies and matching Spine 4.2 runtime are available.
