@@ -14,6 +14,22 @@ internal static class Program
         Assert(decoded.wrapMode == TextureWrapMode.Clamp && decoded.name == "scene", "texture metadata");
         Assert(!decoded.Destroyed, "successful texture remains alive");
 
+        string tempPath = Path.Combine(Path.GetTempPath(), "azurearchive-background-decoder-test.png");
+        try
+        {
+            File.WriteAllBytes(tempPath, new byte[] { 9, 8, 7, 6 });
+            ImageConversion.Reset();
+            Texture2D fileDecoded = BackgroundImageDecoder.DecodeFile(tempPath);
+            Assert(fileDecoded.name == "azurearchive-background-decoder-test.png", "file decode uses filename");
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+
+        AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(""), "empty file path");
+        AssertThrows<FileNotFoundException>(() => BackgroundImageDecoder.DecodeFile(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".png")), "missing file");
+
         ImageConversion.Reset();
         ImageConversion.ReturnValue = false;
         AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.Decode(new byte[] { 1 }, "bad"), "false decoder result");
@@ -31,7 +47,7 @@ internal static class Program
         AssertThrows<ArgumentException>(() => SpineConverterNative.JsonToSpine42Binary(Array.Empty<byte>()), "empty Spine JSON");
         AssertThrows<ArgumentNullException>(() => SpineConverterNative.ConvertToSpine42Binary(null!), "null Spine skeleton");
         AssertThrows<ArgumentException>(() => SpineConverterNative.ConvertToSpine42Binary(Array.Empty<byte>()), "empty Spine skeleton");
-        Console.WriteLine("PASS: 7 Unity decoder contract checks; 4 Spine iOS bridge argument checks");
+        Console.WriteLine("PASS: 10 Unity decoder contract checks; 4 Spine iOS bridge argument checks");
         return 0;
     }
 
