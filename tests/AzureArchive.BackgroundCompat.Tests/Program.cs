@@ -177,7 +177,7 @@ internal static class Program
         if (value) throw new Exception(name);
     }
 
-    private static void AssertEqual(string expected, string actual, string name)
+    private static void AssertEqual(string? expected, string? actual, string name)
     {
         if (!string.Equals(expected, actual, StringComparison.Ordinal))
             throw new Exception(name + ": expected '" + expected + "', got '" + actual + "'");
