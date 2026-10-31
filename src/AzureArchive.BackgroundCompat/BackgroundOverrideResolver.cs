@@ -25,7 +25,8 @@ namespace AzureArchive.BackgroundCompat
             return TryResolve(
                 localOverrides,
                 globalOverrides,
-                candidate => candidate != null && candidate.Id == requestedId,
+                candidate => candidate != null &&
+                    candidate.Id == requestedId,
                 out result);
         }
 
