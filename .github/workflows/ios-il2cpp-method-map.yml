@@ -1,0 +1,84 @@
+name: Map iOS IL2CPP methods from the actual IPA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ios-il2cpp-method-map.yml'
+permissions:
+  contents: read
+jobs:
+  map-ios:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download iOS release IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/ios work/dumper work/out
+          curl -fL --retry 3 -o work/ios/AzureArchive_IOS_0.7.9.2.ipa 'https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa'
+          unzip -q work/ios/AzureArchive_IOS_0.7.9.2.ipa -d work/ios/extracted
+          BIN="$(find work/ios/extracted/Payload -type f -path '*/UnityFramework.framework/UnityFramework' -print -quit)"
+          META="$(find work/ios/extracted/Payload -type f -name global-metadata.dat -print -quit)"
+          test -n "$BIN" || { echo 'UnityFramework missing'; exit 1; }
+          test -n "$META" || { echo 'global-metadata.dat missing in IPA'; find work/ios/extracted/Payload -maxdepth 8 -type f | head -150; exit 1; }
+          cp "$BIN" work/ios/UnityFramework
+          cp "$META" work/ios/global-metadata.dat
+          file work/ios/UnityFramework work/ios/global-metadata.dat | tee work/out/input-info.txt
+          ls -lh work/ios/UnityFramework work/ios/global-metadata.dat | tee -a work/out/input-info.txt
+      - name: Install .NET runtime
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - name: Run Il2CppDumper on the iOS Mach-O binary and matching metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o work/dumper.zip 'https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net6-v6.7.46.zip'
+          unzip -q work/dumper.zip -d work/dumper
+          find work/dumper -maxdepth 2 -type f | sort | head -40
+          DLL="$(find work/dumper -maxdepth 3 -type f -name Il2CppDumper.dll -print -quit)"
+          test -n "$DLL" || { echo 'Il2CppDumper.dll not found'; exit 1; }
+          dotnet "$DLL" work/ios/UnityFramework work/ios/global-metadata.dat work/out/ios-dump
+          test -s work/out/ios-dump/dump.cs
+          cp work/out/ios-dump/dump.cs work/out/ios-dump.cs
+      - name: Extract actual iOS method RVAs and bounded disassembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib,re,subprocess
+          dump=pathlib.Path("work/out/ios-dump.cs").read_text(errors="replace")
+          names=[
+            "ScenarioResourceManager",
+            "CheckForUpdate",
+            "Initialize",
+            "Awake",
+            "OnUpdateComplete",
+            "AddressableFlatBufferLoader",
+            "LoadGlobalResourceOverrides",
+            "GetResourceOverrideRoot",
+            "UpdateAddressable",
+            "UserSettings",
+          ]
+          hits=[]
+          for i,line in enumerate(dump.splitlines()):
+              if any(n in line for n in names) and ("RVA:" in line or "Offset:" in line or "ScenarioResourceManager" in line):
+                  hits.append(line)
+          pathlib.Path("work/out/ios-method-search.txt").write_text("\n".join(hits),encoding="utf-8")
+          # Il2CppDumper's dump.cs records the iOS-specific method RVAs.
+          # Keep the method map as the source of truth; never reuse Android RVAs.
+          selected=[]
+          lines=dump.splitlines()
+          for i,line in enumerate(lines):
+              if any(k in line for k in ["CheckForUpdate", "OnUpdateComplete", "AddressableFlatBufferLoader", "LoadGlobalResourceOverrides", "GetResourceOverrideRoot", "UpdateAddressable"]):
+                  context="\n".join(lines[max(0,i-2):min(len(lines),i+3)])
+                  if "RVA:" in context:
+                      selected.append(context)
+          pathlib.Path("work/out/ios-selected-method-map.txt").write_text("\n\n".join(selected),encoding="utf-8")
+          print("iOS-specific IL2CPP dump generated. Method map excerpts:")
+          print("\n\n".join(selected[:30]))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-ios-il2cpp-method-map
+          path: work/out/
