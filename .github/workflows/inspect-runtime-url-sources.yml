@@ -1,0 +1,63 @@
+name: Inspect runtime URL source literals
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-runtime-url-sources.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/in work/out
+          curl -fL --retry 3 -o work/in/ios.ipa 'https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa'
+          curl -fL --retry 3 -o work/in/android.apk 'https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk'
+          curl -fL --retry 3 -o work/in/windows.zip 'https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip'
+      - name: Scan metadata and runtime configuration strings
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, pathlib, re
+          root=pathlib.Path('work/in')
+          output=[]
+          terms=[b'filev2.foxxlight.top',b'AddrLoadUrl',b'ScenarioResourceManager',b'输入源地址',b'留空默认',b'aares/']
+          for label,archive in [('iOS',root/'ios.ipa'),('Android',root/'android.apk'),('Windows',root/'windows.zip')]:
+              output += ['', '## '+label]
+              with zipfile.ZipFile(archive) as z:
+                  candidates=[]
+                  for name in z.namelist():
+                      low=name.lower()
+                      base=low.rsplit('/',1)[-1]
+                      if base in ('global-metadata.dat','libil2cpp.so','gameassembly.dll','settings.json') or 'assembly-csharp' in base:
+                          candidates.append(name)
+                  output.append('Candidate files: '+str(candidates[:60]))
+                  for name in candidates:
+                      try: data=z.read(name)
+                      except Exception as e: output.append('READ ERROR '+name+' '+str(e)); continue
+                      found=[]
+                      for term in terms:
+                          pos=0
+                          while True:
+                              i=data.find(term,pos)
+                              if i<0: break
+                              frag=data[max(0,i-180):min(len(data),i+420)]
+                              found.append((term.decode('utf-8','replace'),i,frag.decode('utf-8','replace').replace(chr(0),' ')))
+                              pos=i+len(term)
+                              if len(found)>=80: break
+                          if len(found)>=80: break
+                      if found:
+                          output.append('### '+name+' ('+str(len(data))+' bytes)')
+                          for term,offset,fragment in found:
+                              output.append(term+' @ '+str(offset)+': '+fragment[:700])
+          pathlib.Path('work/out/runtime-url-source-report.txt').write_text('\n'.join(output),encoding='utf-8')
+          print('\n'.join(output)[:14000])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-runtime-url-source-report
+          path: work/out/runtime-url-source-report.txt
