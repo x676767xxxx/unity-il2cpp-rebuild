@@ -18,5 +18,6 @@
     <Compile Include="../../src/AzureArchive.UnityCompat/BackgroundImageDecoder.Unity.cs" Link="BackgroundImageDecoder.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/BackgroundImageRuntimeCache.Unity.cs" Link="BackgroundImageRuntimeCache.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs" Link="SpineConverterNative.Unity.cs" />
+    <Compile Include="../../src/AzureArchive.UnityCompat/SpineOwnedObjectCleanup.Unity.cs" Link="SpineOwnedObjectCleanup.Unity.cs" />
   </ItemGroup>
 </Project>
