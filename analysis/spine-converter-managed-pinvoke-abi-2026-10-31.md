@@ -556,3 +556,16 @@ No P/Invoke marker found in exported excerpt.
 - The iOS 0.7.9.2 app inventory did not include a standalone Spine converter file, and its UnityFramework string scan did not find these converter identifiers. This is absence-of-evidence only; static linking/stripping remains possible.
 - The field name DLL_NAME_WIN_LNX_MAC_ANDROID is a clue about the target platforms named by the managed wrapper, but not conclusive proof that no iOS-specific implementation exists. Do not implement a DllImport declaration for iOS until an arm64-apple-ios implementation and actual ABI are independently verified.
 - No iOS converter, Unity assembly, or IPA is produced by this workflow.
+
+
+## Cross-check against original IL2CPP metadata dump.cs
+The actual Android/Windows metadata dumps (not the BepInEx interop proxy) independently show these managed extern declarations:
+- `private static extern int CastSkeletonDataToDstVersionNative(byte[] inBuf, int inLen, int dstVersion, out IntPtr outPtr, out int outLen)`
+- `private static extern void FreeBufferNative(IntPtr p)`
+- `private static extern int CastJsonSkeletonToBinary(string input, out IntPtr outPtr, out int outLen)`
+- `DLL_NAME_WIN_LNX_MAC_ANDROID = "SpineSkeletonDataConverterLib"`
+- `SpineVersion.Version42 = 6`
+
+The exact metadata source is the three-platform dump artifact from [run 41172721121](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41172721121); the verified iOS absence is documented in `analysis/ios-spine-api-gap-verified-2026-10-31.md`.
+
+The managed `extern` declarations confirm the managed-to-native boundary and the out-pointer/out-length ownership protocol. They still do not reveal the complete C ABI details (calling convention, string encoding, allocator contract, error-code meanings) or provide source code. Those must be verified from the native implementation or tested ABI harness before writing an iOS replacement.
