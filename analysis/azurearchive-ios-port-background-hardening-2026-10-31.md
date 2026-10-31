@@ -32,3 +32,11 @@ Date: 2026-10-31
 2. Add a dedicated Unity stub compile/test target or build against the actual matching Unity/Spine assemblies when available.
 3. Recover actual game Spine assets and validate all atlas page mappings and unsupported timeline/attachment features.
 4. Recover the complete Unity project or a legitimate 1.0 iOS Xcode export before attempting a full app build.
+
+
+## Filesystem-backed static image decode entry point (2026-10-31)
+
+- Added `BackgroundImageDecoder.DecodeFile(path)`: validates the path, reads the custom image bytes from the app filesystem, and delegates to the existing recovered-behavior decoder. Texture creation remains explicitly main-thread-only.
+- Added isolated tests for file-backed decode, filename propagation, empty path and missing-file behavior.
+- CI [41186565889](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186565889) completed successfully: Unity-compatible library build, path-safety checks and Unity decoder/Spine bridge stub tests all passed. Artifact `13037190870` (`azurearchive-background-path-compat-library`, 13,125 bytes).
+- This remains a standalone adapter/test, not connected to AzureArchive's runtime resource manager or Addressables. No actual game bundle, Unity project, iOS player or IPA was built.
