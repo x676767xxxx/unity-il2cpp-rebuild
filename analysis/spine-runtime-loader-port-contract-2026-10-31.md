@@ -52,6 +52,14 @@ Several branches in this method contain unresolved Cpp2IL decompiler markers. Th
 ### 5. Ownership and cleanup
 `RuntimeSpineAsset` tracks owned Unity objects and provides retain/dispose behavior. Its disposal path disposes the Spine atlas and destroys owned objects through `RuntimeSpineLoader.DestroyOwned`. The recovered disposal IL has unresolved indirect calls, so exact reference-count transitions and all object-destruction ordering still require validation.
 
+## Skeleton cache access-order evidence (verified 2026-10-31)
+
+The corrected Android ARM64 call-graph extraction now targets `ScenarioResourceManager.<TrimBackgroundSkeletonCache>b__34_2` on its actual declaring type. The successful extraction is [run 41204479601](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41204479601), artifact SHA-256 `fc4fbc0e05a4bbbcdc31daf9d1f0030df898d70a5dbd0673cd865a1465901ec3`.
+
+The dump declares `backgroundSkeletonAccess` as `Dictionary<string, int>` at `ScenarioResourceManager` offset `0x30`. The recovered selector `<TrimBackgroundSkeletonCache>b__34_2(KeyValuePair<string, RuntimeSpineAsset>)` reads that dictionary and returns the mapped `int` access score. The Trim method's generic call sites resolve in the matching dump to `Enumerable.Where<KeyValuePair<object, object>>`, then `Enumerable.OrderBy<KeyValuePair<object, object>, int>`, followed by `Enumerable.ToArray`. This confirms ascending integer access-score ordering, not a wall-clock timestamp. The cache planner's `int LastAccess` field and ascending sort therefore match the recovered ordering model; equal scores remain stable by original input order in the compatibility planner.
+
+This is still static Android 1.0 evidence. It does not prove that a future iOS Unity adapter has been wired to the same live access map or that Unity object cleanup has been exercised on-device.
+
 ## Converter dependency and iOS gap
 
 - Android package contains `lib/arm64-v8a/libSpineSkeletonDataConverterLib.so` (ELF AArch64).
