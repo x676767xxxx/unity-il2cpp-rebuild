@@ -1,0 +1,78 @@
+name: Inspect iOS Mach-O load commands and framework surface
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/inspect-ios-mach-o-surface.yml"
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file llvm
+      - name: Download and unpack old iOS IPA
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          curl -fsSL --retry 3 -o work/old.ipa https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa
+          unzip -q work/old.ipa -d work/app
+      - name: Inspect app metadata, Mach-O dependencies and symbols
+        run: |
+          set -euo pipefail
+          APP=$(find work/app/Payload -maxdepth 1 -type d -name '*.app' | head -1)
+          FW=$(find "$APP/Frameworks" -type f -name UnityFramework | head -1)
+          mkdir -p work/out
+          python3 - "$APP" > work/out/app-metadata.txt <<'PY'
+          import plistlib,sys,pathlib
+          app=pathlib.Path(sys.argv[1])
+          p=app/'Info.plist'
+          if p.exists():
+              d=plistlib.loads(p.read_bytes())
+              for k in ['CFBundleIdentifier','CFBundleExecutable','CFBundleShortVersionString','CFBundleVersion','MinimumOSVersion','DTPlatformName','DTSDKName','DTXcode','DTXcodeBuild','LSRequiresIPhoneOS']:
+                  print(f'{k}: {d.get(k)}')
+          else: print('Info.plist missing')
+          print('\nFrameworks:')
+          f=app/'Frameworks'
+          if f.exists():
+              for x in sorted(f.iterdir()): print(x.name, 'dir' if x.is_dir() else 'file')
+          print('\nEmbedded frameworks/dylibs:')
+          for x in sorted(app.rglob('*')):
+              if x.is_file() and (x.suffix in ('.dylib','.framework','.bundle') or x.name.endswith('.framework')): print(x.relative_to(app))
+          PY
+          {
+            echo "## UnityFramework file"
+            file "$FW"
+            echo "## Mach-O load commands"
+            llvm-objdump --macho --private-headers "$FW" | grep -E 'cmd LC_|name |compatibility version|current version|platform |minos |sdk ' | head -500 || true
+            echo "## Dylibs used"
+            llvm-objdump --macho --dylibs-used "$FW" || true
+            echo "## Exported symbols relevant to Unity/Spine/image/Addressables"
+            llvm-nm --extern-only "$FW" 2>/dev/null | c++filt | grep -Ei 'UnityFramework|UnitySendMessage|Texture2D|ImageConversion|LoadImage|Spine|Skeleton|Addressables|AssetBundle|ScenarioResourceManager|BackgroundResource' | head -500 || true
+            echo "## Framework binary inventory"
+            find "$APP/Frameworks" -type f -maxdepth 5 -exec file {} \; 2>/dev/null | head -300
+          } > work/out/macho-surface.txt
+          cat work/out/app-metadata.txt
+          cat work/out/macho-surface.txt
+      - name: Commit verified report
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path('work/out/app-metadata.txt').read_text(errors='replace')
+          b=Path('work/out/macho-surface.txt').read_text(errors='replace')
+          p=Path('analysis/ios-macho-load-commands-and-framework-surface-2026-10-31.md')
+          p.parent.mkdir(parents=True,exist_ok=True)
+          p.write_text('# iOS 0.7.9.2 Mach-O dependencies and framework surface\n\nSource: XR1 release IPA; Actions workflow inspect-ios-mach-o-surface.\n\nThis is static binary metadata. A symbol/string is not proof of a usable managed API or runtime compatibility.\n\n## App metadata and framework inventory\n\x60\x60\x60text\n'+a+'\n\x60\x60\x60\n\n## UnityFramework Mach-O inspection\n\x60\x60\x60text\n'+b+'\n\x60\x60\x60\n\n## Interpretation limits\n- LC_LOAD_DYLIB records show linked dynamic dependencies, not all statically linked code.\n- Exported symbols are only the native symbol surface; IL2CPP managed methods are usually not exported under their C# names.\n- This does not prove the iOS 1.0 game can run in the old UnityFramework.\n- No compatibility code or IPA is built by this inspection.\n')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add analysis/ios-macho-load-commands-and-framework-surface-2026-10-31.md
+          git commit -m "Add iOS Mach-O dependency and framework report" || echo "No report changes"
+          git push
+      - name: Upload raw inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-ios-macho-surface
+          path: work/out/
