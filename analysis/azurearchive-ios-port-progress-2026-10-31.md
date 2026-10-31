@@ -300,3 +300,14 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - Caveat: generated iterator and constructor IL contain unresolved/type-inconsistent Cpp2IL output around the final Spine object parameter. Do not claim the original runtime's exact Spine attachment semantics as proven until native method/callsite verification.
 - Detailed evidence: `analysis/android-spine-background-override-record-findings-2026-10-31.md`.
 - Pre-preview-path CI run [41198701750](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41198701750) passed. A new run is triggered for the latest preview-path tests and report.
+
+
+## Static Image runtime adapter checkpoint
+
+- Recovered Android `ScenarioResourceManager.GetBackgroundTexture(BackgroundResource)`: custom Image uses `FullPath` + a path-keyed Texture2D cache + `File.ReadAllBytes`; Native Image uses `CorrectPath(Path)` + Addressables and retains the resulting Unity object.
+- Recovered decode arguments: Texture2D 2x2 RGBA32/no mipmaps, name, Clamp wrap mode, ImageConversion.LoadImage(markNonReadable:true).
+- Added `BackgroundImageRuntimeCache.Unity.cs`: custom texture cache with explicit destroy ownership; native Addressables cache with caller-supplied CorrectPath function, in-flight request deduplication, and idempotent handle leases. It rejects non-Image resources.
+- Unity adapter stub tests cover custom cache reuse/disposal, native key correction, concurrent native request sharing, retained handle release, and failed-load release.
+- CI [41199007745](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41199007745) passed the full compatibility and Unity adapter stub tests before the latest callback error-handling cleanup; the newest revision is in a follow-up run.
+- Still not integrated into the game's actual `ScenarioResourceManager` or presenter. The correct `CorrectPath` delegate and scene lifecycle hookup must be provided by the recovered game runtime; the repo has no full Unity project.
+- Detailed evidence: `analysis/android-static-background-image-runtime-path-2026-10-31.md`.
