@@ -1,0 +1,69 @@
+name: Inspect old iOS runtime baseline
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/ios-runtime-baseline-inspect.yml"
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file binutils
+      - name: Download and unpack iOS IPA
+        run: |
+          set -euo pipefail
+          mkdir -p work/ipa work/out
+          curl -fL --retry 3 -o work/ipa/old.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          unzip -q work/ipa/old.ipa -d work/ipa/unpacked
+          APP=$(find work/ipa/unpacked/Payload -maxdepth 1 -type d -name '*.app' | head -1)
+          test -n "$APP"
+          echo "$APP" > work/out/app-path.txt
+          find "$APP" -type f -printf '%P\t%s bytes\n' | sort > work/out/file-inventory.tsv
+          find "$APP/Frameworks" -maxdepth 4 -type f -print 2>/dev/null | sort > work/out/framework-files.txt || true
+          find "$APP" -type d \( -iname '*spine*' -o -iname '*skeleton*' -o -iname '*addressable*' \) -print | sort > work/out/special-directories.txt
+          find "$APP" -type f \( -iname '*spine*' -o -iname '*skeleton*' -o -iname '*.skel' -o -iname '*.atlas' -o -iname '*.bytes' -o -iname '*.asset' \) -printf '%P\t%s bytes\n' | sort > work/out/spine-and-asset-files.txt
+          find "$APP" -type f \( -name '*.dylib' -o -name '*.framework' -o -name '*.bundle' \) -print | sort > work/out/native-components.txt
+      - name: Inspect Unity runtime and metadata
+        run: |
+          set -euo pipefail
+          APP=$(cat work/out/app-path.txt)
+          UNITY=$(find "$APP/Frameworks" -type f -name UnityFramework | head -1)
+          META=$(find "$APP" -type f -name global-metadata.dat | head -1)
+          test -f "$UNITY"; test -f "$META"
+          file "$UNITY" "$META" > work/out/core-file-types.txt
+          sha256sum "$UNITY" "$META" > work/out/core-sha256.txt
+          strings -a "$UNITY" | grep -Ei 'Unity version|202[0-9]\.[0-9]+\.[0-9]+f[0-9]+|Spine|SkeletonData|RuntimeSpineAsset|ImageConversion|LoadImage|Texture2D' | sort -u | head -500 > work/out/unity-spine-strings.txt || true
+          strings -a "$META" | grep -Ei 'Spine|SkeletonData|RuntimeSpineAsset|ScenarioResourceManager|BackgroundResource|ApplyDisplayRank|AuthoringResourceCatalog' | sort -u > work/out/metadata-target-strings.txt || true
+          if [ -f "$APP/Info.plist" ]; then plutil -p "$APP/Info.plist" > work/out/info-plist.txt 2>&1 || true; fi
+          if [ -f "$APP/embedded.mobileprovision" ]; then echo 'embedded.mobileprovision present' > work/out/provisioning.txt; else echo 'embedded.mobileprovision absent' > work/out/provisioning.txt; fi
+      - name: Write runtime baseline report
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          out=Path('work/out')
+          report=['# iOS 0.7.9.2 runtime baseline inspection','', 'Inventory and string evidence only. Presence of a string does not prove a callable API or compatible runtime implementation.','']
+          for name in ['core-file-types.txt','core-sha256.txt','special-directories.txt','native-components.txt','spine-and-asset-files.txt','unity-spine-strings.txt','metadata-target-strings.txt','provisioning.txt']:
+              p=out/name
+              report += [f'## {name}', '```text']
+              if p.exists(): report += p.read_text(errors='replace').splitlines()[:500]
+              else: report += ['NOT GENERATED']
+              report += ['```','']
+          inv=out/'file-inventory.tsv'
+          if inv.exists():
+              report += ['## Top 100 largest app files','```text']
+              rows=[]
+              for line in inv.read_text(errors='replace').splitlines():
+                  try: rows.append((int(line.rsplit(' ',2)[-2]),line))
+                  except: pass
+              report += [x[1] for x in sorted(rows,reverse=True)[:100]]
+              report += ['```']
+          (out/'ios-runtime-baseline.md').write_text('\n'.join(report))
+          PY
+      - name: Upload iOS runtime inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-ios-runtime-baseline
+          path: work/out/
