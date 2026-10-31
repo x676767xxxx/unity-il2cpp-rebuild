@@ -1,6 +1,6 @@
-# Spine converter managed P/Invoke ABI (2026-10-31)
+# Spine converter managed wrapper surface (2026-10-31)
 
-Input: Cpp2IL recovered Android 1.0 and Windows 1.0.1 spine-unity assemblies, inspected with ILSpy. This report records managed declarations and native library names only; it is not a substitute for the original converter source or an iOS build.
+Input: Cpp2IL recovered Android 1.0 and Windows 1.0.1 spine-unity assemblies, inspected with ILSpy. The input is the Windows release's BepInEx IL2CPP interop assembly. ILSpy shows proxy methods that use Il2CppInterop.Runtime.il2cpp_runtime_invoke; these are NOT direct DllImport/PInvoke declarations and must not be treated as the native C ABI. The report records the managed wrapper surface only.
 
 ## windows
 ### Converter (SHA256 a4a924cf78aea978702d10b0786ff633c22dd8248246485e299b18fd1122f64a)
@@ -550,9 +550,9 @@ IL_0022: ldsfld native int Native.SpineConverter.Converter::NativeMethodInfoPtr_
 No P/Invoke marker found in exported excerpt.
 
 ## Interpretation
-- Compare module names, entry points, calling convention, argument/return types, byte-buffer ownership and FreeBuffer pairing across Android and Windows.
+- The managed wrapper exposes CastSkeletonDataToDstVersionNative(byte[] inBuf, int inLen, int dstVersion, out IntPtr outPtr, out int outLen), FreeBufferNative(IntPtr p), and CastJsonSkeletonToBinary(string input, out IntPtr outPtr, out int outLen), plus higher-level managed byte[] wrappers. These are IL2CPP wrapper signatures, not proof of the underlying native C ABI.
 - The native exports observed in the separate binary inspection are CastJsonSkeletonToBinary, CastSkeletonDataToDstVersion and FreeBuffer. Do not assume their ABI from export names alone.
-- The Windows and Android native libraries are different architectures and toolchains. Neither binary can be embedded into iOS.
+- The Android ELF and Windows PE native converter binaries are different architectures and toolchains. Neither binary can be embedded into iOS.
 - The iOS 0.7.9.2 app inventory did not include a standalone Spine converter file, and its UnityFramework string scan did not find these converter identifiers. This is absence-of-evidence only; static linking/stripping remains possible.
-- Do not implement a DllImport declaration for iOS until a matching arm64-apple-ios implementation and verified ABI are available.
+- The field name DLL_NAME_WIN_LNX_MAC_ANDROID is a clue about the target platforms named by the managed wrapper, but not conclusive proof that no iOS-specific implementation exists. Do not implement a DllImport declaration for iOS until an arm64-apple-ios implementation and actual ABI are independently verified.
 - No iOS converter, Unity assembly, or IPA is produced by this workflow.
