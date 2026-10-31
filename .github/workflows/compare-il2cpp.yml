@@ -22,21 +22,14 @@ jobs:
           out=[]
           for platform, root in roots.items():
               out.append("## "+platform)
-              files=list(root.rglob("*"))
-              for p in files:
+              for p in root.rglob("*"):
                   if not p.is_file(): continue
-                  n=p.name.lower()
-                  if n in {"unityframework","gameassembly.dll","libil2cpp.so","global-metadata.dat"}:
+                  if p.name.lower() in {"unityframework","gameassembly.dll","libil2cpp.so","global-metadata.dat"}:
                       b=p.read_bytes()
-                      sha=hashlib.sha256(b).hexdigest()
-                      desc=subprocess.run(["file",str(p)],capture_output=True,text=True).stdout.strip()
-                      out.append(f"{p} | bytes={len(b)} | sha256={sha} | {desc}")
-              for p in files:
-                  if p.is_file() and p.name in {"Info.plist","globalgamemanagers","boot.config"}:
-                      out.append(f"SUPPORT {p} bytes={p.stat().st_size}")
+                      out.append(f"{p} | bytes={len(b)} | sha256={hashlib.sha256(b).hexdigest()} | "+subprocess.run(["file",str(p)],capture_output=True,text=True).stdout.strip())
           pathlib.Path("work/out/native-inventory.txt").write_text("\n".join(out))
           PY
-      - name: Upload inventory even if later analysis fails
+      - name: Upload inventory
         uses: actions/upload-artifact@v4
         with:
           name: azurearchive-native-inventory
@@ -49,33 +42,66 @@ jobs:
         run: |
           curl -fL --retry 3 -o work/tools/dumper.zip https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net7-v6.7.46.zip
           unzip -q work/tools/dumper.zip -d work/tools/dumper
-          find work/tools/dumper -maxdepth 2 -type f | sort > work/out/dumper-package-files.txt
-      - name: Attempt IL2CPP metadata and code analysis
-        continue-on-error: true
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path("work/tools/dumper/config.json")
+          c=json.loads(p.read_text())
+          c["RequireAnyKey"]=False
+          p.write_text(json.dumps(c))
+          PY
+      - name: Dump iOS ARM64 Mach-O
         run: |
-          set +e
-          DUMPER=$(find work/tools/dumper -iname 'Il2CppDumper.dll' -type f | head -1)
-          echo "DUMPER_DLL=$DUMPER" > work/out/dumper.log
-          find work/ios/extracted work/android/extracted work/windows/extracted -type f -name global-metadata.dat > work/out/metadata-files.txt
-          while IFS= read -r meta; do
-            case "$meta" in
-              work/ios/*) plat=ios; bin=$(find work/ios/extracted -type f -name UnityFramework | head -1) ;;
-              work/android/*) plat=android; bin=$(find work/android/extracted -type f -name libil2cpp.so | head -1) ;;
-              work/windows/*) plat=windows; bin=$(find work/windows/extracted -type f -name GameAssembly.dll | head -1) ;;
-              *) continue ;;
-            esac
-            if [ -n "$DUMPER" ] && [ -n "$bin" ] && [ -f "$bin" ]; then
-              mkdir -p "work/out/dump-$plat"
-              echo "DUMP $plat binary=$bin metadata=$meta" >> work/out/dumper.log
-              dotnet "$DUMPER" "$bin" "$meta" "work/out/dump-$plat" >> work/out/dumper.log 2>&1
-              echo "EXIT_CODE=$?" >> work/out/dumper.log
-            else
-              echo "MISSING_DUMPER_OR_BINARY $plat metadata=$meta bin=$bin" >> work/out/dumper.log
-            fi
-          done < work/out/metadata-files.txt
-          find work/out -maxdepth 3 -type f -printf '%p %s bytes\n' > work/out/output-files.txt
+          DUMPER="$PWD/work/tools/dumper/Il2CppDumper.dll"
+          BIN=$(find work/ios/extracted -type f -name UnityFramework | head -1)
+          META=$(find work/ios/extracted -type f -name global-metadata.dat | head -1)
+          mkdir -p work/out/dump-ios
+          echo "iOS binary=$BIN metadata=$META" > work/out/ios-dumper.log
+          printf '1' | script -q -c "dotnet '$DUMPER' '$BIN' '$META' '$PWD/work/out/dump-ios'" /dev/null >> work/out/ios-dumper.log 2>&1
+          find work/out/dump-ios -maxdepth 2 -type f -printf '%p %s bytes\n' >> work/out/ios-dumper.log
+      - name: Dump Android ARM64 and Windows x64
+        run: |
+          DUMPER="$PWD/work/tools/dumper/Il2CppDumper.dll"
+          ANDROID_BIN=$(find work/android/extracted/lib/arm64-v8a -type f -name libil2cpp.so | head -1)
+          ANDROID_META=$(find work/android/extracted -type f -name global-metadata.dat | head -1)
+          WINDOWS_BIN=$(find work/windows/extracted -type f -name GameAssembly.dll | head -1)
+          WINDOWS_META=$(find work/windows/extracted -type f -name global-metadata.dat | head -1)
+          mkdir -p work/out/dump-android-arm64 work/out/dump-windows
+          dotnet "$DUMPER" "$ANDROID_BIN" "$ANDROID_META" "$PWD/work/out/dump-android-arm64" > work/out/android-dumper.log 2>&1 || true
+          dotnet "$DUMPER" "$WINDOWS_BIN" "$WINDOWS_META" "$PWD/work/out/dump-windows" > work/out/windows-dumper.log 2>&1 || true
+      - name: Compare application types and methods
+        run: |
+          python3 - <<'PY'
+          import pathlib,re
+          root=pathlib.Path("work/out")
+          def parse(path):
+              s=path.read_text(errors="ignore")
+              ns=""; types=set()
+              for line in s.splitlines():
+                  m=re.match(r'// Namespace:\\s*(.*)',line)
+                  if m: ns=m.group(1).strip()
+                  m=re.search(r'\\b(class|struct|enum|interface)\\s+([^ :{]+)',line)
+                  if m:
+                      name=m.group(2); types.add((ns+"." if ns else "")+name)
+              return types
+          paths={k:root/f"dump-{k}"/"dump.cs" for k in ["ios","android-arm64","windows"]}
+          report=[]
+          sets={}
+          for k,p in paths.items():
+              if p.exists():
+                  sets[k]=parse(p)
+                  report.append(f"{k}: extracted type declarations={len(sets[k])}")
+              else: report.append(f"{k}: dump.cs NOT FOUND")
+          for a,b in [("ios","android-arm64"),("ios","windows"),("android-arm64","windows")]:
+              if a in sets and b in sets:
+                  aa,bb=sets[a],sets[b]
+                  report.append(f"\n{a} only ({len(aa-bb)}):")
+                  report.extend(sorted(aa-bb)[:250])
+                  report.append(f"\n{b} only ({len(bb-aa)}):")
+                  report.extend(sorted(bb-aa)[:250])
+          (root/"type-comparison.txt").write_text("\n".join(report))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: azurearchive-il2cpp-comparison
+          name: azurearchive-ios-il2cpp-comparison
           path: work/out/
