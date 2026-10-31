@@ -1,0 +1,39 @@
+name: Inspect AzureArchive release assets
+on:
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        run: |
+          mkdir -p inspect
+          curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+          curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+      - name: Verify hashes and inventory
+        run: |
+          sha256sum inspect/*
+          python3 - <<'PY'
+          import zipfile, pathlib
+          out=[]
+          for p in pathlib.Path("inspect").iterdir():
+              out.append(f"## {p.name} ({p.stat().st_size} bytes)")
+              try:
+                  with zipfile.ZipFile(p) as z:
+                      names=z.namelist()
+                      out.append(f"Entries: {len(names)}")
+                      for n in names:
+                          if any(k in n.lower() for k in ("global-metadata.dat","libil2cpp.so","gameassembly.dll","unityframework","data/managed","il2cpp")):
+                              info=z.getinfo(n)
+                              out.append(f"{n} [{info.file_size} bytes]")
+                              if n.lower().endswith("global-metadata.dat"):
+                                  out.append(f"metadata header: {z.read(n)[:32].hex()}")
+              except Exception as e:
+                  out.append(f"ZIP inspection error: {e}")
+          pathlib.Path("inspect/report.txt").write_text("\n".join(out))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-inspection
+          path: inspect/report.txt
