@@ -5,6 +5,8 @@ on:
     paths:
       - "src/AzureArchive.BackgroundCompat/**"
       - "tests/AzureArchive.BackgroundCompat.Tests/**"
+      - "src/AzureArchive.UnityCompat/**"
+      - "tests/AzureArchive.UnityCompat.Tests/**"
       - ".github/workflows/build-background-path-compat.yml"
 permissions:
   contents: read
@@ -20,6 +22,8 @@ jobs:
         run: dotnet build src/AzureArchive.BackgroundCompat/AzureArchive.BackgroundCompat.csproj --configuration Release
       - name: Run path safety checks
         run: dotnet run --project tests/AzureArchive.BackgroundCompat.Tests/AzureArchive.BackgroundCompat.Tests.csproj --configuration Release
+      - name: Compile and test Unity decoder against isolated API stubs
+        run: dotnet run --project tests/AzureArchive.UnityCompat.Tests/AzureArchive.UnityCompat.Tests.csproj --configuration Release
       - name: Upload library output
         uses: actions/upload-artifact@v4
         with:
