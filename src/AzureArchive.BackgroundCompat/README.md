@@ -13,6 +13,7 @@ This project contains standalone, testable C# primitives recovered or derived fr
 - `BackgroundPreviewRequestCoalescer`: joins callbacks for an already-running preview key so only the first request starts the load.
 - `BackgroundPreviewCallbackDispatcher`: invokes coalesced callbacks in registration order, routes each callback exception to the supplied error reporter, and continues with later callbacks, matching the verified Android 1.0 callback loop.
 - `BackgroundPreviewCacheLedger`: records preview texture ownership metadata, user counts and last-use frames; exposes unused entries in LastUse order. It deliberately leaves the exact trim trigger and Unity/Addressables destruction to the runtime adapter.
+- `BackgroundSkeletonTrimPlanner`: applies the separate Android 1.0 768 MiB retained-Spine-asset budget, selecting least-recently-accessed entries without consumers; it returns keys only and never disposes Unity objects. This is intentionally separate from the 32 MiB / 24-entry preview texture cache.
 - `SpineAtlasPageNames` / `SpineAtlasPageResourceResolver`: extracts atlas page names and maps them to caller-provided resource keys.
 - `SpineAtlasPageCache`: tracks texture ownership across active leases and defers release until the final lease is returned.
 
