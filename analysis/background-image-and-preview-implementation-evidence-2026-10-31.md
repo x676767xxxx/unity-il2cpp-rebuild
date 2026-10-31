@@ -210,3 +210,9 @@ The previous caution that the exception landing pads could not be tied to subscr
 
 This establishes per-invocation callback exception catching, routing through `ReportBackgroundError`, and continuation of the callback loop. It does not yet prove that the helper itself calls `Debug.LogException`; that detail is deliberately left open until its complete body is inspected. It does **not** establish that every possible exception in the entire coroutine is handled the same way: separate await/load exception landing pads remain distinct and route through additional reporting/rethrow paths, including `ScenarioResourceManager.ReportBackgroundError(Exception)` at `0x3261D74`.
 
+
+### Callback dispatcher compatibility primitive added
+
+`BackgroundPreviewCallbackDispatcher` now encodes the verified per-callback exception policy without depending on Unity assemblies: it invokes callbacks in sequence, catches each callback's `Exception`, passes it to the supplied error reporter, then proceeds to the next callback. Tests verify that callbacks before and after a throwing callback both execute, that exactly one original exception is reported, and that required arguments are validated. The Unity-facing adapter still needs to bind this reporter to `ScenarioResourceManager.ReportBackgroundError`.
+
+The callback exception landing pad does not directly call `UnityEngine.Debug.LogException` at the catch site. The managed dump maps the call at `0x3261D74` to `ScenarioResourceManager.ReportBackgroundError(Exception)`. Its native body is now extracted over a larger range (`0x3261D74`–`0x3261E90`) so the final logging API can be identified before making a stronger statement.
