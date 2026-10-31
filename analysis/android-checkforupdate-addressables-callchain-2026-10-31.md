@@ -63,3 +63,22 @@ The exact value and assignment site of the normal mobile `ScenarioResourceManage
 ## Porting status
 
 The Android resource-update flow is now substantially mapped. The URL provider is not yet proven, and no complete iOS UnityFramework, archive, or IPA has been produced.
+
+
+## Follow-up native verification: offline startup URL gate
+
+Run 41192985832 completed successfully and added native disassembly for:
+- `AuthoringOfflineResources.TryGetStartupUrl(out string)` at RVA `0x33C5E00`.
+- `AuthoringOfflineResources.get_IsActive()` at RVA `0x33C5D68`.
+- `AuthoringOfflineResources.ValidateDirectory(...)` at RVA `0x33C6320`.
+- `AuthoringCliHost.Bootstrap()` at RVA `0x33838E4`.
+- `UserSettings.ReadUserSettings.MoveNext()` at RVA `0x3289908`.
+- `UIPatchDownload.CoChangeSource.MoveNext()` at RVA `0x3285C5C`.
+
+The native `get_IsActive()` body reads the static `AuthoringOfflineResources.IsActive` backing flag. `CheckForUpdate.MoveNext()` calls `TryGetStartupUrl` before continuing through the regular update state machine; this is an authoring-offline startup hook, not proof of the ordinary mobile CDN value. The managed implementation of `TryGetStartupUrl` is heavily damaged by unresolved native/indirect operations, so its exact URL source and activation conditions remain under investigation.
+
+The `AuthoringCliHost.Bootstrap()` managed IL confirms the CLI branch uses `UserSettings.SettingData.customSource`, falls back to `https://filev2.foxxlight.top/aares/` only when blank, trims a trailing slash on custom input, and prepares the local `cli-resources` files before calling `InitializeAuthoringResources(...)`. That remains authoring-specific evidence.
+
+The `UserSettings.ReadUserSettings.MoveNext()` and `UIPatchDownload.CoChangeSource.MoveNext()` native bodies are now available for further inspection. Their presence alone does not establish an assignment to `ScenarioResourceManager.AddrLoadUrl`; no such assignment has yet been demonstrated.
+
+Updated disassembly artifact: Run 41192985832, artifact `azurearchive-android-arm64-disassembly-corrected`.
