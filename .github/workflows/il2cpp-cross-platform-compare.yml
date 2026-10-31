@@ -75,14 +75,14 @@ jobs:
         run: |
           set +e
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
-          dotnet "$DLL" $PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/android/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
+          dotnet "$DLL" "$PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/android/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/android-dumper.log
       - name: Run Windows metadata dump
         continue-on-error: true
         run: |
           set +e
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
-          dotnet "$DLL" $PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/windows/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
+          dotnet "$DLL" "$PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/windows/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/windows-dumper.log
       - name: Compare target type and method names
         if: always()
