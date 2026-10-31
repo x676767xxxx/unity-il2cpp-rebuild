@@ -47,3 +47,10 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 - Added `src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs`: an iOS-only `DllImport("__Internal")` bridge for the custom ABI. It copies native buffers to managed byte arrays and releases them through the matching native free function.
 - The wrapper is not yet linked into a Unity iOS project and has not been compiled by Unity/Xcode. The static library still needs to be added to the Unity-generated Xcode target, with symbol visibility and linker flags verified.
 - No full Unity project, UnityFramework integration, actual AzureArchive skeleton fixture, app signing, or IPA exists in this stage.
+
+
+## Integration readiness check
+
+- Scanned the current port branch tree: no Unity `Assets/`, `ProjectSettings/`, `.xcodeproj` or `.xcworkspace` exists. Therefore this repository currently has no Unity project into which the archive can be integrated and no project settings/build target to produce an IPA.
+- Added the guarded C# iOS P/Invoke bridge, but it is only source scaffolding until the native archive is linked into a Unity-generated Xcode target. It has not been compiled by Unity/Xcode.
+- Next required input is a matching Unity project/source tree (or a reproducible project export), including the existing iOS plugin layout and app entry scene. Without it, attempting an IPA build here would be fabricated.
