@@ -139,3 +139,15 @@ The complete selected-disassembly text was re-opened and checked directly, rathe
 - The state machine contains native exception landing pads and cleanup branches. Their presence is confirmed, but the exception object mapping, exact task-await exception propagation, and whether every failure path fans out the same exception to all queued callbacks are not established by this disassembly alone.
 
 **Implementation consequence:** the static-file decode ordering and 512/1024 sizing choice can now be treated as evidence-backed. Do not yet implement a single shared failure callback path or assert exact Addressables-vs-file fallback order; those require the jump-table bytes plus symbolized helper/type metadata or a controlled runtime trace.
+
+
+### Callback fan-out and callback-exception handling — additional control-flow evidence
+
+A second pass over the full `CoLoadBackgroundPreview.MoveNext` body resolves one previously open item:
+
+- After the preview result has been prepared, the success path walks a linked collection of callback/delegate records. Each record's callable target is loaded and invoked indirectly; the loop advances through the collection until its end. This is direct machine-code evidence of callback fan-out, not merely the presence of a callback-list field.
+- The delegate invocation is enclosed by native exception landing-pad paths. A callback-thrown exception is caught, placed into a temporary exception collection, and a separate exception-processing call is made before the loop continues. Therefore callback invocation errors are not simply allowed to unwind immediately through the whole fan-out loop.
+- The coroutine also has distinct exception landing pads around earlier asynchronous/load stages. These paths include exception-object construction/throw and calls into helper routines, but the selected disassembly does not identify the semantic names or complete contract of those helpers. It does not yet prove whether every load-stage failure is delivered to every queued callback, whether a null preview is delivered, or whether a failed operation is silently removed from the pending map.
+- The exact cache registration ordering is partially visible: preview result/record construction occurs before the callback iteration, and the constructed record carries the texture, ownership/thumbnail metadata and cache-related fields. However, the full managed cache insertion point and its relationship to the callback collection's source object still require type-layout confirmation.
+
+**Porting consequence:** the Unity adapter must preserve multi-subscriber fan-out and isolate exceptions thrown by an individual subscriber so one callback cannot prevent later subscribers from being considered. Keep load-stage failure fan-out as an explicit unresolved contract; do not assume the success fan-out loop proves failure fan-out behavior.
