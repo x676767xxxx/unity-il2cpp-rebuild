@@ -1,0 +1,62 @@
+name: Spine converter Linux smoke test
+on:
+  push:
+    paths:
+      - ".github/workflows/spine-converter-linux-smoke.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout analysis repository
+        uses: actions/checkout@v4
+      - name: Checkout reviewed converter source
+        uses: actions/checkout@v4
+        with:
+          repository: wang606/SpineSkeletonDataConverter
+          ref: 5ecb2139b0a1af266974f95abeec6bb8562d1249
+          path: external/SpineSkeletonDataConverter
+      - name: Install CMake and compiler
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ python3
+      - name: Configure and build
+        run: |
+          set -euxo pipefail
+          cmake -S external/SpineSkeletonDataConverter -B build/spine -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/spine --config Release --parallel 2
+      - name: Verify converter CLI
+        run: |
+          set -euxo pipefail
+          test -x build/spine/SpineSkeletonDataConverter
+          build/spine/SpineSkeletonDataConverter --help
+      - name: Run a Spine 4.2 JSON to SKEL to JSON smoke test
+        run: |
+          set -euxo pipefail
+          ROOT="$PWD/external/SpineSkeletonDataConverter"
+          BIN="$PWD/build/spine/SpineSkeletonDataConverter"
+          TMP="$RUNNER_TEMP/spine-smoke"
+          mkdir -p "$TMP"
+          cp "$ROOT/data/42/alien/export/alien-ess.json" "$TMP/input.json"
+          "$BIN" "$TMP/input.json" "$TMP/output.skel"
+          test -s "$TMP/output.skel"
+          "$BIN" "$TMP/output.skel" "$TMP/roundtrip.json"
+          test -s "$TMP/roundtrip.json"
+          python3 - "$TMP/roundtrip.json" <<'PY'
+          import json,sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              obj=json.load(f)
+          assert isinstance(obj, dict) and obj, "round-trip JSON is empty or not an object"
+          print("Spine 4.2 JSON -> SKEL -> JSON smoke test passed")
+          PY
+      - name: Upload binaries and source license
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-converter-linux-smoke
+          path: |
+            build/spine/SpineSkeletonDataConverter
+            build/spine/SpineAtlasDowngrade
+            external/SpineSkeletonDataConverter/LICENSE
+          if-no-files-found: warn
