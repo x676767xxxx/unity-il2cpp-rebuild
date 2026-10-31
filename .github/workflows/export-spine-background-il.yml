@@ -1,0 +1,87 @@
+name: Export targeted Spine and background runtime IL
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/export-spine-background-il.yml"
+permissions:
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Download verified Cpp2IL recovery artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/in/recovery
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169615291
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install ILSpy
+        run: dotnet tool install ilspycmd --tool-path work/tools
+      - name: Export targeted types for Android and Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/out/{android,windows}
+          for platform in android windows; do
+            root="work/in/recovery/cpp2il-$platform"
+            asm="$root/Assembly-CSharp.dll"
+            test -f "$asm"
+            for type in RuntimeSpineLoader RuntimeSpineAsset RuntimeAtlasTexture BackgroundResource ScenarioResourceManager CharacterManager; do
+              work/tools/ilspycmd --ilcode --type "$type" "$asm" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log" || true
+            done
+            for pair in "spine-csharp.dll:Spine.SkeletonBinary" "spine-csharp.dll:Spine.Atlas" "spine-unity.dll:Spine.Unity.SkeletonDataAsset" "spine-unity.dll:Spine.Unity.BlendModeMaterials"; do
+              dll="${pair%%:*}"; type="${pair#*:}"
+              if [ -f "$root/$dll" ]; then
+                safe=$(echo "$type" | tr '.+' '__')
+                work/tools/ilspycmd --ilcode --type "$type" "$root/$dll" > "work/out/$platform/$safe.il" 2> "work/out/$platform/$safe.log" || true
+              fi
+            done
+          done
+      - name: Build evidence report and commit
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, hashlib
+          root=Path("work/out")
+          report=["# Targeted Android/Windows Spine and background runtime IL inspection","","Source: Cpp2IL recovery artifact from run 41169615291; ILSpy raw IL export. This is recovered IL, not original source or a compilable Unity project.",""]
+          names=["RuntimeSpineLoader","RuntimeSpineAsset","RuntimeAtlasTexture","BackgroundResource","ScenarioResourceManager","CharacterManager","Spine__SkeletonBinary","Spine__Atlas","Spine__Unity__SkeletonDataAsset","Spine__Unity__BlendModeMaterials"]
+          for name in names:
+              report += [f"## {name}"]
+              for platform in ["android","windows"]:
+                  p=root/platform/f"{name}.il"
+                  if not p.exists():
+                      report += [f"- {platform}: export file absent"]
+                      continue
+                  s=p.read_text(errors="replace")
+                  methods=re.findall(r"end of method ([^\\n]+)",s)
+                  issues=len(re.findall(r"Cpp2ILHelpers::NoteDecompilerIssue|Not implemented instruction|Invalid instruction|Unmanaged memory load",s))
+                  report += [f"- {platform}: {len(s)} chars; {len(methods)} method terminators; {issues} decompiler-warning markers; SHA256 {hashlib.sha256(p.read_bytes()).hexdigest()}"]
+                  if methods:
+                      report += ["  - Method list: "+", ".join(methods[:100])]
+              report.append("")
+          report += ["## Interpretation and next steps",
+          "- RuntimeSpineLoader/RuntimeSpineAsset/RuntimeAtlasTexture and BackgroundResource IL should be reviewed together: they define file loading, atlas page textures, cache/retain/dispose and Unity object ownership.",
+          "- Android and Windows recovered IL are cross-checks, not independent source truth; both may share IL2CPP-generated behavior and both can contain decompiler gaps.",
+          "- Any NoteDecompilerIssue, invalid/unmanaged load marker, or missing method body must be verified against native disassembly and call sites before porting.",
+          "- The old iOS 0.7.9.2 metadata lacks the new BackgroundResource/RuntimeSpine additions described in the platform declaration report. No iOS implementation can be assumed from a matching string or assembly name.",
+          "- This workflow exports IL only. It does not compile C#, build Unity, sign an IPA, or validate on iPhone."]
+          Path("analysis/targeted-spine-background-il-inspection-2026-10-31.md").write_text("\\n".join(report)+"\\n")
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add analysis/targeted-spine-background-il-inspection-2026-10-31.md
+          git commit -m "Add targeted Spine and background IL inspection report" || echo "No report changes"
+          git push
+      - name: Upload raw targeted IL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-targeted-spine-background-il
+          path: work/out/
