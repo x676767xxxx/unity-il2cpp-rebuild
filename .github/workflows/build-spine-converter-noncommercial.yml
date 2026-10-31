@@ -8,11 +8,8 @@ permissions:
   contents: read
 jobs:
   build-and-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-14]
-    runs-on: \${{ matrix.os }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout AzureArchive analysis repository
         uses: actions/checkout@v4
@@ -48,7 +45,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: spine-converter-build-\${{ matrix.os }}
+          name: spine-converter-build-ubuntu
           path: |
             external/SpineSkeletonDataConverter/build/SpineSkeletonDataConverter
             external/SpineSkeletonDataConverter/build/SpineAtlasDowngrade
