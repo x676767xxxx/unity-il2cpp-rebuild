@@ -153,6 +153,19 @@ The asynchronous worker closure simply calls the synchronous file reader with th
 
 The HasConsumers getter is a strict references-greater-than-one check. The cache's own retained reference is the baseline; additional references indicate live consumers. The cleanup helper checks whether the Unity application is playing and chooses the matching deferred or immediate object-destruction path. Preserve that distinction in the eventual Unity adapter.
 
+## Runtime asset construction ownership staging (verified Android disassembly, 2026-10-31)
+
+The corrected Android ARM64 extraction in [run 41204479601](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41204479601) includes the complete `RuntimeSpineLoader.Create` and `RuntimeSpineAsset.Own` method bodies. The observed Create path progressively registers the created page textures, page materials, runtime `SpineAtlasAsset`, and `SkeletonDataAsset` with `RuntimeSpineAsset.Own`. The Own method checks Unity-object validity and adds the object to the owned-object set. The final asset disposal enumerates that set and routes each object through `RuntimeSpineLoader.DestroyOwned`.
+
+For a new iOS adapter, construction is therefore a multi-stage ownership operation: a failure after some Unity objects have been created must not lose the partial ownership set. Added `SpineAssetConstructionLedger<TObject>` as an engine-independent staging primitive:
+- register each non-null object once using a caller-supplied comparer;
+- commit transfers the unique snapshot to the completed runtime asset;
+- abort returns the partial snapshot for caller-managed cleanup;
+- terminal states reject later registration/commit and repeated abort returns no objects;
+- it does not call Unity APIs or destroy objects. The adapter must use the target Unity equality semantics and perform rollback/destruction on the Unity main thread.
+
+Fifteen deterministic tests cover null handling, deduplication, object identity, successful ownership transfer, partial rollback, and terminal-state behavior. This is a tested ownership primitive, not yet the actual Unity `RuntimeSpineLoader.Create` implementation. The recovered native exception paths are not fully decompiled; this ledger is a defensive adapter design and must not be represented as proof of the original game's exception cleanup behavior.
+
 ## Reference-count compatibility primitive added (2026-10-31)
 
 `src/AzureArchive.BackgroundCompat/SpineAssetReferenceLedger.cs` now isolates the confirmed reference-count rules without pretending to own Unity objects:
