@@ -139,6 +139,79 @@ internal static class Program
             imageOverride.FullPath, "image override FullPath remains root-relative");
         AssertThrows<ArgumentOutOfRangeException>(() => BackgroundImageOverrideFactory.Create(
             "scene.png", root, BackgroundResourceOrigin.Native), "image override rejects native origin");
+
+        var spineRecord = new SpineBackgroundOverrideRecord(
+            "scene-spine", @"spine\\night\\night.skel", "Idle", false, "Night",
+            @"preview\\night.png", 2.5f, 1.25f, -12f, 8f);
+        var spineDescriptor = SpineBackgroundOverrideFactory.Create(
+            spineRecord, root, BackgroundResourceOrigin.LocalCustom);
+        AssertEqual(BackgroundResourceIdHash.Calculate("scene-spine").ToString(), spineDescriptor.Id.ToString(),
+            "Spine override ID hashes Identifier");
+        AssertEqual("scene-spine", spineDescriptor.Name, "Spine override name is Identifier");
+        AssertEqual("Spine", spineDescriptor.Kind.ToString(), "Spine override kind");
+        AssertEqual("LocalCustom", spineDescriptor.Origin.ToString(), "Spine override source");
+        AssertEqual("spine/night/night.skel", spineDescriptor.Path, "Spine path separators normalized");
+        AssertEqual(Path.GetFullPath(Path.Combine(root, "spine", "night", "night.skel")),
+            spineDescriptor.FullPath, "Spine FullPath resolves under basePath");
+        AssertTrue(spineDescriptor.IsCustomSpine, "Spine descriptor carries custom Spine metadata");
+        AssertTrue(spineDescriptor.SpineOverride != null, "Spine descriptor retains runtime settings");
+        AssertEqual("Idle", spineDescriptor.SpineOverride!.Animation, "Spine animation retained");
+        AssertEqual("Night", spineDescriptor.SpineOverride.Skin, "Spine skin retained");
+        AssertEqual("preview/night.png", spineDescriptor.SpineOverride.PreviewPath, "preview path normalized and retained");
+        AssertEqual("False", spineDescriptor.SpineOverride.Loop.ToString(), "Spine loop setting retained");
+        AssertEqual("1.25", spineDescriptor.SpineOverride.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "Spine scale retained");
+        AssertEqual("-12", spineDescriptor.SpineOverride.OffsetX.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "Spine X offset retained");
+        AssertEqual("8", spineDescriptor.SpineOverride.OffsetY.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "Spine Y offset retained");
+        var defaultSpine = new SpineBackgroundOverrideRecord("default", "default.skel");
+        AssertTrue(defaultSpine.Loop, "Spine default loop is true");
+        AssertEqual("1", defaultSpine.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "Spine default scale is one");
+        AssertEqual("0", defaultSpine.PreviewTime.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "Spine default preview time is zero");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord(" ", "scene.skel"), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine requires identifier");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("no-path", " "), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine requires skeleton path");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("bad-scale", "scene.skel", scale: 0f), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine scale must be positive");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("bad-offset", "scene.skel", offsetX: float.NaN), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine offset must be finite");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("bad-preview", "scene.skel", previewTime: -1f), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine preview time must be nonnegative");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("bad-infinity", "scene.skel", offsetY: float.PositiveInfinity), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine framing must reject infinity");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("zero-hash", null), root, BackgroundResourceOrigin.LocalCustom),
+            "Spine zero hash / missing path rejected");
+        AssertThrows<ArgumentOutOfRangeException>(() => SpineBackgroundOverrideFactory.Create(
+            defaultSpine, root, BackgroundResourceOrigin.Native), "Spine factory rejects native origin");
+        AssertThrows<InvalidDataException>(() => SpineBackgroundOverrideFactory.CreateMany(
+            new[] { defaultSpine, defaultSpine }, root, BackgroundResourceOrigin.LocalCustom),
+            "duplicate Spine IDs rejected");
+        var mixedOverrides = BackgroundOverrideSetFactory.Create(
+            new[] { "image.png" },
+            new[] { defaultSpine },
+            root,
+            BackgroundResourceOrigin.GlobalCustom);
+        AssertEqual("2", mixedOverrides.Count.ToString(), "mixed override set includes image and Spine");
+        AssertEqual("Image", mixedOverrides[0].Kind.ToString(), "image overrides enumerate before Spine");
+        AssertEqual("Spine", mixedOverrides[1].Kind.ToString(), "Spine overrides follow image overrides");
+        AssertEqual("GlobalCustom", mixedOverrides[1].Origin.ToString(), "mixed override source preserved");
+        AssertTrue(BackgroundOverrideResolver.TryResolve(
+            42u,
+            new[] { spineDescriptor },
+            Array.Empty<BackgroundResourceDescriptor>(),
+            out var spineSelected) && spineSelected.Kind == BackgroundResourceKind.Spine,
+            "ID resolver selects Spine override descriptor");
         AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
 
         const string catalogToken = AddressableInternalIdResolver.AddrLoadUrlToken;
