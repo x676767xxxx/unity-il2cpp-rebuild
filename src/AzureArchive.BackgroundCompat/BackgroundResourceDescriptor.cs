@@ -38,7 +38,8 @@ namespace AzureArchive.BackgroundCompat
             BackgroundResourceOrigin origin,
             string? path,
             string? root,
-            bool hasSpineOverrideData)
+            bool hasSpineOverrideData,
+            SpineBackgroundOverrideRecord? spineOverride = null)
         {
             Id = id;
             Name = name;
@@ -46,7 +47,8 @@ namespace AzureArchive.BackgroundCompat
             Origin = origin;
             Path = path;
             Root = root;
-            HasSpineOverrideData = hasSpineOverrideData;
+            SpineOverride = spineOverride;
+            HasSpineOverrideData = hasSpineOverrideData || spineOverride != null;
         }
 
         public uint Id { get; }
@@ -56,6 +58,7 @@ namespace AzureArchive.BackgroundCompat
         public string? Path { get; }
         public string? Root { get; }
         public bool HasSpineOverrideData { get; }
+        public SpineBackgroundOverrideRecord? SpineOverride { get; }
 
         /// <summary>
         /// Mirrors Android 1.0 FullPath: Native resources return Path unchanged;
