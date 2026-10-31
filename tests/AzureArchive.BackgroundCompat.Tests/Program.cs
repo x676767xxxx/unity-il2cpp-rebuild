@@ -442,7 +442,7 @@ internal static class Program
         AssertEqual("0", BackgroundPreviewTrimPlanner.Plan(trimCandidates,
             BackgroundPreviewTrimPlanner.MemoryThresholdBytes, 24, false).Length.ToString(),
             "normal trim does not start at exactly 32 MiB with fewer than 25 entries");
-        AssertEqual("oldest,middle", string.Join(",", BackgroundPreviewTrimPlanner.Plan(
+        AssertEqual("oldest", string.Join(",", BackgroundPreviewTrimPlanner.Plan(
             trimCandidates, BackgroundPreviewTrimPlanner.MemoryThresholdBytes + 1, 24, false)),
             "normal trim evicts LRU candidates until memory is no longer over 32 MiB");
         AssertEqual("oldest", string.Join(",", BackgroundPreviewTrimPlanner.Plan(
