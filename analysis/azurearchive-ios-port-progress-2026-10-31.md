@@ -259,3 +259,13 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - Regression cases cover first matching local ID, local-over-global precedence, global fallback, and missing/null override sequences.
 - Validation before the latest predicate-only cleanup: [Actions run 41197384423](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197384423) succeeded on commit `33c3f777ade7bd9d3b5afbc8e2496f6f345cb29b`. A follow-up run for the current source is tracked separately.
 - Remaining gap in this slice: recover/implement the `Overrides` iterator that reads actual local/global override records, then connect `ResolveBackground(uint)` to scenario Excel metadata for the no-override fallback. No Unity runtime integration is claimed.
+
+
+## Scenario background native fallback implementation checkpoint
+
+- Added `ScenarioBackgroundRecord` as a minimal projection of Android 1.0 `ScenarioBGNameExcel`: `Name` (uint key), `BGFileName`, and `BGType`.
+- Added `ScenarioBackgroundResolver.Resolve`: returns null for ID 0; resolves local then global override first; only on no override calls the supplied database lookup; rejects a mismatched returned key; maps a row to a Native descriptor with `Path=BGFileName`, `Name=Path.GetFileNameWithoutExtension(BGFileName)`, `Kind=BGType`, `Root=null`, and no Spine override data.
+- Evidence: Android 1.0 `ResolveBackground(uint)` checks ID zero, calls `BackgroundResource.ResolveOverride`, and only on no override queries `ScenarioBgNameQuery`. The query schema's indexed key is `ScenarioBgNameDbSchema.Name` (uint), while the decoded FlatBuffer row exposes `ScenarioBGNameExcel.BGFileName` and `BGType`. The recovered method explicitly calls `GetExcel()`, `get_BGFileName()`, `Path.GetFileNameWithoutExtension()`, and `get_BGType()`, then constructs a Native resource with the original filename path.
+- The database query itself remains injected through `findByNameId`; the current portable library does not yet parse the SQLite/FlatBuffers files or instantiate the Unity database service.
+- Added regression cases for local/global override short-circuit, native fallback mapping, ID zero, missing/mismatched row and missing lookup callback.
+- CI run [41197624016](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197624016) passed for the implementation/test commit before the latest disassembly workflow update. The latest branch revision is undergoing a new run.
