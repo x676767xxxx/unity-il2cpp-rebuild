@@ -122,6 +122,23 @@ internal static class Program
         AssertTrue(missingRow == null, "scenario resolver returns null when Excel row is absent");
         AssertThrows<ArgumentNullException>(() => ScenarioBackgroundResolver.Resolve(
             42u, null, null, null!), "scenario resolver requires lookup delegate");
+
+        AssertEqual("0", BackgroundResourceIdHash.Calculate(null).ToString(), "null resource ID hash");
+        AssertEqual("2CC5D05", BackgroundResourceIdHash.Calculate("").ToString("X"), "xxHash32 empty UTF-8 vector");
+        AssertEqual("550D7456", BackgroundResourceIdHash.Calculate("a").ToString("X"), "xxHash32 single-byte UTF-8 vector");
+        AssertEqual("32D153FF", BackgroundResourceIdHash.Calculate("abc").ToString("X"), "xxHash32 abc UTF-8 vector");
+        AssertThrows<ArgumentOutOfRangeException>(() => BackgroundResourceIdHash.Calculate(new string('x', 257)),
+            "long resource ID uses unported Android branch");
+        var imageOverride = BackgroundImageOverrideFactory.Create(
+            @"scenes\night.bg.png", root, BackgroundResourceOrigin.LocalCustom);
+        AssertEqual("scenes/night.bg.png", imageOverride.Path, "image override normalizes Windows separators");
+        AssertEqual("night.bg", imageOverride.Name, "image override name uses filename stem");
+        AssertEqual(BackgroundResourceIdHash.Calculate("night.bg").ToString(), imageOverride.Id.ToString(),
+            "image override ID hashes filename stem");
+        AssertEqual(expected = Path.GetFullPath(Path.Combine(root, "scenes", "night.bg.png")),
+            imageOverride.FullPath, "image override FullPath remains root-relative");
+        AssertThrows<ArgumentOutOfRangeException>(() => BackgroundImageOverrideFactory.Create(
+            "scene.png", root, BackgroundResourceOrigin.Native), "image override rejects native origin");
         AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
 
         const string catalogToken = AddressableInternalIdResolver.AddrLoadUrlToken;
@@ -223,7 +240,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, null!, handle => { }), "null Addressables asset");
         AssertThrows<ArgumentNullException>(() => new AddressableAssetLease<int, object>(1, new object(), null!), "null Addressables release callback");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 16 ScenarioBackgroundResolver checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 16 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks");
         return 0;
     }
 
