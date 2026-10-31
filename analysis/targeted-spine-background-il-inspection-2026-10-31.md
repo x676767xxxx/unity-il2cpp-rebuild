@@ -124,7 +124,217 @@
 		.method private fi, '<Overrides>d__29'::MoveNext
 
 		.method private hidebysig 
-			i, '<Overrides>d__29'::'<>m__Fi, '<Overrides>d__29'::'<>m__Fi, '<Overrides>d__29'::'System.Collectio, '<Overrides>d__29'::System.Collectio, '<Overrides>d__29'::System.Collectio, '<Overrides>d__29'::'System.Collectio, '<Overrides>d__29'::System.Collectio, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou\n\n## ScenarioResourceManager\n- android: 1468977 chars; 281 method terminators; 3102 decompiler-warning markers; SHA256 4a3fdf5a82e7759430e211d09d1a4808381ab940b02e0b05dd8dd2978b99679c\n  - Method list: Backgrou, '<>c'::.cctor
+			i, '<Overrides>d__29'::'<>m__Fi, '<Overrides>d__29'::'<>m__Fi, '<Overrides>d__29'::'System.Collectio, '<Overrides>d__29'::System.Collectio, '<Overrides>d__29'::System.Collectio, '<Overrides>d__29'::'System.Collectio, '<Overrides>d__29'::System.Collectio, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou, Backgrou\n\n## ResourceOverrideData\n- android: 156868 chars; 106 method terminators; 247 decompiler-warning markers; SHA256 27d42730056556d69a3ae865cc8d8e22e3d32c88d303c67432aa5e917e523d1e\n  - Method list: BgEffectOverrideData::get_Ide, BgEffectOverrideData::set_Ide, BgEffectOverrideData::get_Bu, BgEffectOverrideData::set_Bu, BgEffectOverrideData::get_PrefabName
+
+		.method public hidebysig special, BgEffectOverrideData::set_PrefabName
+
+		.method public hidebysig special, BgEffectOverrideData::get_Id
+
+		.method public hidebysig special, BgEffectOverrideData::.ctor
+
+		// Properties
+		.property i, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgmOverrideData::get_Id
+
+		.method public hidebysig special, BgmOverrideData::get__path
+
+		.method public hidebysig special, BgmOverrideData::set__path
+
+		.method public hidebysig special, BgmOverrideData::get__loopStartTime
+
+		.method public hidebysig special, BgmOverrideData::set__loopStartTime
+
+		.method public hidebysig special, BgmOverrideData::get__loopE, BgmOverrideData::set__loopE, BgmOverrideData::get__loopTra, BgmOverrideData::set__loopTra, BgmOverrideData::get__loopOffsetTime
+
+		.method public hidebysig special, BgmOverrideData::set__loopOffsetTime
+
+		.method public hidebysig special, BgmOverrideData::get__volume
+
+		.method public hidebysig special, BgmOverrideData::set__volume
+
+		.method public fi, BgmOverrideData::Path
+
+		.method public fi, BgmOverrideData::LoopStartTime
+
+		.method public fi, BgmOverrideData::LoopE, BgmOverrideData::LoopTra, BgmOverrideData::LoopOffsetTime
+
+		.method public fi, BgmOverrideData::Volume
+
+		.method public hidebysig 
+			i, BgmOverrideData::Path
+
+		.method public hidebysig special, BgmOverrideData::.ctor
+
+		// Properties
+		.property i, CharacterOverrideData::get_Ide, CharacterOverrideData::set_Ide, CharacterOverrideData::get_Name
+
+		.method public hidebysig special, CharacterOverrideData::set_Name
+
+		.method public hidebysig special, CharacterOverrideData::get_Nick, CharacterOverrideData::set_Nick, CharacterOverrideData::get_CharacterRefere, CharacterOverrideData::set_CharacterRefere, CharacterOverrideData::get_Origi, CharacterOverrideData::set_Origi, CharacterOverrideData::get_Spi, CharacterOverrideData::set_Spi, CharacterOverrideData::get_SmallPortraitPath
+
+		.method public hidebysig special, CharacterOverrideData::set_SmallPortraitPath
+
+		.method public fi, CharacterOverrideData::get_NameTW
+
+		.method public fi, CharacterOverrideData::get_NameJP
+
+		.method public fi, CharacterOverrideData::get_NameTH
+
+		.method public fi, CharacterOverrideData::get_NameKR
+
+		.method public fi, CharacterOverrideData::get_NameEN
+
+		.method public fi, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Shape
+
+		.method public hidebysig 
+			i, CharacterOverrideData::GetSkeleto, CharacterOverrideData::GetSpi, CharacterOverrideData::GetSmallPortrait
+
+		.method public hidebysig special, CharacterOverrideData::.ctor
+
+		// Properties
+		.property i, '<>c'::.cctor
+
+		.method public hidebysig special, '<>c'::.ctor
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__38_0'
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__38_1'
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__38_2'
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__38_3'
+
+	} // e, ResourceOverrideData::get_CharacterOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_CharacterOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_VoiceOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_VoiceOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_PopupOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_PopupOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_Sou, ResourceOverrideData::set_Sou, ResourceOverrideData::get_BgOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_BgOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_BgEffectOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_BgEffectOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_BgSpi, ResourceOverrideData::set_BgSpi\n- windows: 121940 chars; 108 method terminators; 23 decompiler-warning markers; SHA256 3fa7dfb820fdab4559e67b454618e70625867c7fa00986630af42676b2915905\n  - Method list: BgEffectOverrideData::get_Ide, BgEffectOverrideData::set_Ide, BgEffectOverrideData::get_Bu, BgEffectOverrideData::set_Bu, BgEffectOverrideData::get_PrefabName
+
+		.method public hidebysig special, BgEffectOverrideData::set_PrefabName
+
+		.method public hidebysig special, BgEffectOverrideData::get_Id
+
+		.method public hidebysig special, BgEffectOverrideData::.ctor
+
+		// Properties
+		.property i, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgSpi, BgmOverrideData::get_Id
+
+		.method public hidebysig special, BgmOverrideData::get__path
+
+		.method public hidebysig special, BgmOverrideData::set__path
+
+		.method public hidebysig special, BgmOverrideData::get__loopStartTime
+
+		.method public hidebysig special, BgmOverrideData::set__loopStartTime
+
+		.method public hidebysig special, BgmOverrideData::get__loopE, BgmOverrideData::set__loopE, BgmOverrideData::get__loopTra, BgmOverrideData::set__loopTra, BgmOverrideData::get__loopOffsetTime
+
+		.method public hidebysig special, BgmOverrideData::set__loopOffsetTime
+
+		.method public hidebysig special, BgmOverrideData::get__volume
+
+		.method public hidebysig special, BgmOverrideData::set__volume
+
+		.method public fi, BgmOverrideData::Path
+
+		.method public fi, BgmOverrideData::LoopStartTime
+
+		.method public fi, BgmOverrideData::LoopE, BgmOverrideData::LoopTra, BgmOverrideData::LoopOffsetTime
+
+		.method public fi, BgmOverrideData::Volume
+
+		.method public hidebysig 
+			i, BgmOverrideData::Path
+
+		.method public hidebysig special, BgmOverrideData::.ctor
+
+		// Properties
+		.property i, CharacterOverrideData::get_Ide, CharacterOverrideData::set_Ide, CharacterOverrideData::get_Name
+
+		.method public hidebysig special, CharacterOverrideData::set_Name
+
+		.method public hidebysig special, CharacterOverrideData::get_Nick, CharacterOverrideData::set_Nick, CharacterOverrideData::get_CharacterRefere, CharacterOverrideData::set_CharacterRefere, CharacterOverrideData::get_Origi, CharacterOverrideData::set_Origi, CharacterOverrideData::get_Spi, CharacterOverrideData::set_Spi, CharacterOverrideData::get_SmallPortraitPath
+
+		.method public hidebysig special, CharacterOverrideData::set_SmallPortraitPath
+
+		.method public fi, CharacterOverrideData::get_NameTW
+
+		.method public fi, CharacterOverrideData::get_NameJP
+
+		.method public fi, CharacterOverrideData::get_NameTH
+
+		.method public fi, CharacterOverrideData::get_NameKR
+
+		.method public fi, CharacterOverrideData::get_NameEN
+
+		.method public fi, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Nick, CharacterOverrideData::get_Shape
+
+		.method public hidebysig 
+			i, CharacterOverrideData::GetSkeleto, CharacterOverrideData::GetSpi, CharacterOverrideData::GetSmallPortrait
+
+		.method public hidebysig special, CharacterOverrideData::.ctor
+
+		// Properties
+		.property i, '<>c'::.cctor
+
+		.method public hidebysig special, '<>c'::.ctor
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__42_0'
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__42_1'
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__42_2'
+
+		.method assembly hidebysig 
+			i, '<>c'::'<AdaptPathSeparator>b__42_3'
+
+	} // e, ResourceOverrideData::get_Custom
+
+	.method public hidebysig special, ResourceOverrideData::set_Custom
+
+	.method public hidebysig special, ResourceOverrideData::get_CharacterOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_CharacterOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_VoiceOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_VoiceOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_PopupOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_PopupOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_Sou, ResourceOverrideData::set_Sou, ResourceOverrideData::get_BgOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_BgOverrides
+
+	.method public hidebysig special, ResourceOverrideData::get_BgEffectOverrides
+
+	.method public hidebysig special, ResourceOverrideData::set_BgEffectOverrides
+
+	.method public hidebysig special\n\n## SpineBackgroundVisual\n- android: 216436 chars; 13 method terminators; 684 decompiler-warning markers; SHA256 b522d50d62d0f0bcdc821f8d62e4f626b0446eea925ac4a8742063dd57cf8a98\n  - Method list: Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi\n- windows: 103548 chars; 13 method terminators; 86 decompiler-warning markers; SHA256 2bc99107972b6641a608f2a6f5c68ca027c53dd4f365d31f6b0dfedb43a4e5f4\n  - Method list: Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi, Spi\n\n## ScenarioResourceManager\n- android: 1468977 chars; 281 method terminators; 3102 decompiler-warning markers; SHA256 4a3fdf5a82e7759430e211d09d1a4808381ab940b02e0b05dd8dd2978b99679c\n  - Method list: Backgrou, '<>c'::.cctor
 
 			.method public hidebysig special, '<>c'::.ctor
 
