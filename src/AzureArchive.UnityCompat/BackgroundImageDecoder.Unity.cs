@@ -14,11 +14,8 @@ namespace AzureArchive.UnityCompat
     public static class BackgroundImageDecoder
     {
         /// <summary>
-        /// Reads a custom background image from the app's filesystem and decodes it.
-        /// Invoke on Unity's main thread; Unity texture creation/destruction is not worker-thread safe.
-        /// </summary>
-        /// <summary>
         /// Decodes a custom Image descriptor using its recovered FullPath semantics.
+        /// Unity texture creation/destruction must run on Unity's main thread.
         /// Native Addressables resources and Spine resources must use their own runtime paths.
         /// </summary>
         public static Texture2D DecodeCustomResource(BackgroundResourceDescriptor resource)
