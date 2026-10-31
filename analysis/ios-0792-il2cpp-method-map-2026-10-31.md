@@ -46,3 +46,41 @@ The iOS addresses must be treated independently from Android. Android's previous
 ## Delivery status
 
 This is a verified analysis milestone, not a completed port. No Android 1.0 iOS binary has been built, packaged, or tested on a device yet.
+
+
+## Background loader ARM64 disassembly checkpoint — run 41195591074
+
+A follow-up workflow completed successfully against the same release IPA and matching metadata:
+- Run: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41195591074
+- Commit analyzed: `06c28401dabbdf5a55813abc1c7a3f77efef94c5`
+- Artifact: `azurearchive-ios-il2cpp-method-map`, ID `13040971233`, 30,340,597 bytes.
+- The workflow verified the four selected method byte ranges map into the Mach-O `__TEXT` segment and disassembled them as ARM64 instructions.
+
+| Method | iOS RVA / file offset | End boundary used |
+|---|---:|---:|
+| `TryGetBackgroundOverridePath(uint,out string)` | `0x3D69A54` | `0x3D69C50` |
+| `GetBackgroundTexture(uint)` | `0x3D69D1C` | `0x3D6A1F4` |
+| `GetBackgroundTextureAsync(uint,bool,Action<Texture>)` | `0x3D6A1F4` | `0x3D6A908` |
+| `GetBackgroundType(uint)` | `0x3D6A908` | `0x3D6AA50` |
+
+### Direct native call evidence
+
+- `GetBackgroundTexture` contains a direct branch-and-link to `0x3D69A54` at instruction `0x3D69E64`.
+- `GetBackgroundTextureAsync` contains a direct branch-and-link to `0x3D69A54` at instruction `0x3D6A3A4`.
+- Thus both synchronous and asynchronous texture paths call the same iOS override-path method before branching into their subsequent load paths.
+- The disassembly also shows both functions have substantial independent bodies; they should not be replaced with one simplistic synchronous wrapper.
+- This native disassembly is evidence of method existence, boundaries and call edges. Indirect call targets and object-field semantics still require symbol/metadata correlation or runtime tracing; do not infer all behavior from anonymous native call addresses.
+
+### Next implementation decision
+
+Do not create another background loader. First compare the four iOS method bodies and the recovered Android 1.0 IL for:
+1. override source selection and root/path resolution;
+2. native Addressables key selection and fallback behavior;
+3. synchronous wait/completion and async callback semantics;
+4. image/Spine type dispatch and cache/handle ownership.
+
+Only implement a behavior delta that is demonstrated by that comparison. Preserve the existing compatibility adapters as testable components; do not patch old iOS RVAs into a new binary.
+
+### Artifact scope
+
+The 30.34 MB artifact contains the iOS IL2CPP dump, metadata-derived method map and bounded ARM64 disassembly. It is a reverse-engineering artifact, not an IPA or a buildable Unity project. The Unity project/Xcode source tree is still absent from the repository.
