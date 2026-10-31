@@ -11,47 +11,41 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Deep inventory and compare metadata
+      - name: Compare Unity content and addressables
         run: |
-          sha256sum inspect/* > inspect/sha256.txt
           python3 - <<'PY'
-          import zipfile, pathlib, hashlib, struct, re, plistlib
+          import zipfile, pathlib, hashlib, json, re
           out=[]
-          archives={}
-          keys=('global-metadata.dat','libil2cpp.so','gameassembly.dll','unityframework','globalgamemanagers','globalgamemanagers.assets','resources.assets','data.unity3d','boot.config','manifest.json','assets/')
           for p in pathlib.Path("inspect").iterdir():
               if p.suffix.lower() not in ('.ipa','.apk','.zip'): continue
-              z=zipfile.ZipFile(p); names=z.namelist(); archives[p.name]=(z,names)
-              out.append(f"## {p.name}: {p.stat().st_size} bytes; {len(names)} entries")
-              for n in names:
-                  if any(k in n.lower() for k in keys) or n.lower().endswith(('.bundle','.assetbundle')):
-                      i=z.getinfo(n); out.append(f"{n} | {i.file_size} bytes")
-                  if n.lower().endswith('global-metadata.dat'):
-                      b=z.read(n); magic,ver=struct.unpack_from('<II',b,0)
-                      out.append(f"METADATA {n}: size={len(b)}, magic=0x{magic:08X}, version={ver}, sha256={hashlib.sha256(b).hexdigest()}")
-                      pairs=[struct.unpack_from('<II',b,8+i*8) for i in range(31)]
-                      out.append("Metadata header offset/count pairs: "+", ".join(f"{a:x}/{c:x}" for a,c in pairs))
-                  if n.endswith('Info.plist'):
-                      try:
-                          d=plistlib.loads(z.read(n)); out.append("PLIST "+str({k:d.get(k) for k in ('CFBundleIdentifier','CFBundleExecutable','CFBundleVersion','CFBundleShortVersionString','MinimumOSVersion')}))
-                      except Exception as e: out.append("plist parse: "+str(e))
-              # Search Unity version strings in likely global settings files.
+              z=zipfile.ZipFile(p); names=z.namelist()
+              out.append(f"## {p.name}")
               for n in names:
                   low=n.lower()
-                  if any(s in low for s in ('globalgamemanagers','boot.config','data.unity3d')) and z.getinfo(n).file_size < 20_000_000:
-                      raw=z.read(n)
-                      hits=sorted(set(x.decode('ascii','ignore') for x in re.findall(rb'\d{4}\.\d+\.\d+[abfp]?\d*',raw)))
-                      if hits: out.append(f"VERSION STRINGS {n}: {hits[:20]}")
-          # Cross-platform metadata summary
-          out.append("## Cross-platform metadata comparison")
-          for fn,(z,names) in archives.items():
+                  if low.endswith(('boot.config','build_info','unity_app_guid','assets/aa/catalog.json','streamingassets/aa/catalog.json','assets/aa/settings.json','streamingassets/aa/settings.json','scriptingassemblies.json')):
+                      b=z.read(n)
+                      out.append(f"### {n} ({len(b)} bytes) sha256={hashlib.sha256(b).hexdigest()}")
+                      if len(b)<200000: out.append(b.decode('utf-8','replace')[:12000])
+                      else:
+                          try:
+                              d=json.loads(b); out.append("JSON top keys: "+str(list(d)[:80]))
+                          except: pass
               for n in names:
-                  if n.lower().endswith('global-metadata.dat'):
-                      b=z.read(n); out.append(f"{fn}: {len(b)} bytes; header256_sha256={hashlib.sha256(b[:256]).hexdigest()}; tables="+str([struct.unpack_from('<II',b,8+i*8) for i in range(31)]))
-          pathlib.Path("inspect/deep-report.txt").write_text("\n".join(out))
+                  if n.lower().endswith(('data.unity3d','.bundle','.assetbundle')):
+                      i=z.getinfo(n); out.append(f"ASSETFILE {n} size={i.file_size}")
+                      if i.file_size<300000000:
+                          raw=z.read(n)
+                          versions=sorted(set(x.decode('ascii','ignore') for x in re.findall(rb'\d{4}\.\d+\.\d+[abfp]?\d*',raw)))
+                          if versions: out.append(f"VERSION STRINGS: {versions[:30]}")
+                          for pat in (b'UnityFS',b'UnityWeb',b'UnityRaw',b'Addressables',b'AssetBundle'):
+                              if pat in raw: out.append(f"MARKER {pat.decode()}: yes")
+              for n in names:
+                  low=n.lower()
+                  if any(x in low for x in ('streamingassets','addressables','assetbundle')) and not low.endswith(('.dll','.pdb')):
+                      out.append("RESOURCE "+n)
+          pathlib.Path("inspect/resource-report.txt").write_text("\n".join(out))
           PY
-          cat inspect/sha256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-deep-inspection
-          path: inspect/deep-report.txt
+          name: azurearchive-resource-comparison
+          path: inspect/resource-report.txt
