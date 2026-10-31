@@ -29,6 +29,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
+      - name: Install LLVM disassembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm
       - name: Run Il2CppDumper on the iOS Mach-O binary and matching metadata
         shell: bash
         run: |
@@ -79,6 +83,53 @@ jobs:
           pathlib.Path("work/out/ios-selected-method-map.txt").write_text("\n\n".join(selected),encoding="utf-8")
           print("iOS-specific IL2CPP dump generated. Method map excerpts:")
           print("\n\n".join(selected[:30]))
+
+          # Resolve the state-machine RVAs from the actual iOS dump, then disassemble
+          # using the Mach-O address mapping. Never substitute Android RVAs here.
+          method_ranges = {
+              "CheckForUpdate.MoveNext": (0x3D746AC, 0x3D751A0),
+              "OnUpdateComplete.MoveNext": (0x3D776C0, 0x3D77BE4),
+              "ScenarioResourceManager.Awake.Initialize": (0x3D693C8, 0x3D697C8),
+          }
+          headers = subprocess.run(
+              ["llvm-objdump", "--macho", "--private-headers", "work/ios/UnityFramework"],
+              capture_output=True, text=True, check=True
+          ).stdout
+          base = None
+          hlines = headers.splitlines()
+          for i, line in enumerate(hlines):
+              if "segname __TEXT" in line:
+                  for candidate in hlines[i+1:i+12]:
+                      m = re.search(r"vmaddr\\s+(0x[0-9a-fA-F]+)", candidate)
+                      if m:
+                          base = int(m.group(1), 16)
+                          break
+                  break
+          results = []
+          for name, (start, end) in method_ranges.items():
+              candidates = [("dump-address", start, end)]
+              if base is not None:
+                  candidates.append(("text-vmaddr-plus-rva", base + start, base + end))
+              chosen = None
+              for label, lo, hi in candidates:
+                  cmd = ["llvm-objdump", "--macho", "--disassemble", "--arch=arm64",
+                         "--start-address="+hex(lo), "--stop-address="+hex(hi),
+                         "work/ios/UnityFramework"]
+                  p = subprocess.run(cmd, capture_output=True, text=True)
+                  output = p.stdout + p.stderr
+                  if p.returncode == 0 and re.search(r"^\\s*[0-9a-fA-F]+:", output, re.M):
+                      chosen = (label, lo, hi, output)
+                      break
+              if chosen is None:
+                  raise SystemExit("No instruction output for " + name + "; __TEXT vmaddr=" + str(base))
+              label, lo, hi, output = chosen
+              results.extend(["\\n## "+name, "address-mode="+label,
+                              "range="+hex(lo)+".."+hex(hi), output])
+          pathlib.Path("work/out/ios-native-method-disassembly.txt").write_text(
+              "\\n".join(results), encoding="utf-8"
+          )
+          print("Native iOS method disassembly saved; __TEXT vmaddr="+str(base))
+          print("\\n".join(results)[:16000])
           PY
       - uses: actions/upload-artifact@v4
         with:
