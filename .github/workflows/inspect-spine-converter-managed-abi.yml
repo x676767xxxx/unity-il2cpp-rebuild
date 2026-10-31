@@ -1,0 +1,79 @@
+name: Inspect Spine converter managed PInvoke ABI
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/inspect-spine-converter-managed-abi.yml"
+permissions:
+  contents: write
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Download recovered Android and Windows assemblies
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/in/recovery
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169615291
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+      - name: Install ILSpy
+        run: dotnet tool install ilspycmd --tool-path work/tools
+      - name: Export converter wrapper and Spine version enum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/out/{android,windows}
+          for platform in android windows; do
+            asm="work/in/recovery/cpp2il-$platform/spine-unity.dll"
+            test -f "$asm"
+            work/tools/ilspycmd --ilcode --type Native.SpineConverter.Converter "$asm" > "work/out/$platform/Converter.il" 2> "work/out/$platform/Converter.log"
+            work/tools/ilspycmd --ilcode --type Native.SpineConverter.SpineVersion "$asm" > "work/out/$platform/SpineVersion.il" 2> "work/out/$platform/SpineVersion.log" || true
+          done
+      - name: Generate exact PInvoke report and commit
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root=Path("work/out")
+          report=["# Spine converter managed P/Invoke ABI (2026-10-31)","","Input: Cpp2IL recovered Android 1.0 and Windows 1.0.1 spine-unity assemblies, inspected with ILSpy. This report records managed declarations and native library names only; it is not a substitute for the original converter source or an iOS build.",""]
+          fence=chr(96)*3
+          for platform in ["android","windows"]:
+            report.append("## "+platform)
+            for name in ["Converter","SpineVersion"]:
+              p=root/platform/f"{name}.il"
+              if not p.exists():
+                report.append(f"### {name}: not exported")
+                continue
+              s=p.read_text(errors="replace")
+              report += [f"### {name} (SHA256 {hashlib.sha256(p.read_bytes()).hexdigest()})",fence+"il",*s.splitlines()[:500],fence]
+              report.append("#### Native import declarations")
+              matches=[line.strip() for line in s.splitlines() if "pinvokeimpl" in line.lower() or "DllImport" in line or "EntryPoint" in line or "CastJsonSkeletonToBinary" in line or "CastSkeletonDataToDstVersion" in line or "FreeBuffer" in line]
+              report += matches or ["No P/Invoke marker found in exported excerpt."]
+            report.append("")
+          report += ["## Interpretation",
+          "- Compare module names, entry points, calling convention, argument/return types, byte-buffer ownership and FreeBuffer pairing across Android and Windows.",
+          "- The native exports observed in the separate binary inspection are CastJsonSkeletonToBinary, CastSkeletonDataToDstVersion and FreeBuffer. Do not assume their ABI from export names alone.",
+          "- The Windows and Android native libraries are different architectures and toolchains. Neither binary can be embedded into iOS.",
+          "- The iOS 0.7.9.2 app inventory did not include a standalone Spine converter file, and its UnityFramework string scan did not find these converter identifiers. This is absence-of-evidence only; static linking/stripping remains possible.",
+          "- Do not implement a DllImport declaration for iOS until a matching arm64-apple-ios implementation and verified ABI are available.",
+          "- No iOS converter, Unity assembly, or IPA is produced by this workflow."]
+          Path("analysis/spine-converter-managed-pinvoke-abi-2026-10-31.md").write_text("\n".join(report)+"\n")
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add analysis/spine-converter-managed-pinvoke-abi-2026-10-31.md
+          git commit -m "Inspect Spine converter managed PInvoke ABI" || echo "No report changes"
+          git push
+      - name: Upload raw converter wrapper IL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-spine-converter-managed-abi
+          path: work/out/
