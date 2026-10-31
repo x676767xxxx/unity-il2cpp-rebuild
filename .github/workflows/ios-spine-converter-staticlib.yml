@@ -41,6 +41,16 @@ jobs:
           test -s build/ios-arm64/libazurearchive_spine_converter_ios.a
           file build/ios-arm64/libazurearchive_spine_converter_ios.a
           xcrun nm -gU build/ios-arm64/libazurearchive_spine_converter_ios.a | grep -E 'AzureArchiveSpine(ConvertBuffer|JsonToBinary|FreeBuffer)'
+      - name: Verify C ABI with a host-side conversion test
+        run: |
+          set -euxo pipefail
+          cmake -S external/SpineSkeletonDataConverter -B build/host-abi -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/host-abi --config Release --target azurearchive_spine_converter_ios --parallel 3
+          c++ -std=c++20 -Iexternal/SpineSkeletonDataConverter/include \\
+            scripts/ios_abi_smoke_test.cpp \\
+            build/host-abi/libazurearchive_spine_converter_ios.a \\
+            -o build/host-abi/abi_smoke
+          build/host-abi/abi_smoke external/SpineSkeletonDataConverter/data/42/alien/export/alien-ess.json
       - name: Upload iOS static library and ABI header
         uses: actions/upload-artifact@v4
         with:
