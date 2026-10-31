@@ -82,3 +82,27 @@ The `AuthoringCliHost.Bootstrap()` managed IL confirms the CLI branch uses `User
 The `UserSettings.ReadUserSettings.MoveNext()` and `UIPatchDownload.CoChangeSource.MoveNext()` native bodies are now available for further inspection. Their presence alone does not establish an assignment to `ScenarioResourceManager.AddrLoadUrl`; no such assignment has yet been demonstrated.
 
 Updated disassembly artifact: Run 41192985832, artifact `azurearchive-android-arm64-disassembly-corrected`.
+
+## Follow-up native inspection of settings and source-change coroutines — artifact 13039996236
+
+The corrected Android ARM64 disassembly artifact was downloaded and inspected directly.
+
+### UserSettings.ReadUserSettings.MoveNext (RVA 0x3289908–0x32899e8)
+- The coroutine checks file/deserialization-related results, then calls UserSettings.InitializeSettings() (RVA 0x3287388) on its continuation paths.
+- This short state machine does not visibly write ScenarioResourceManager.AddrLoadUrl and does not itself reveal a gameplay CDN literal.
+- Settings initialization is therefore separate from the still-unresolved mobile Addressables URL provider.
+
+### UIPatchDownload.CoChangeSource.MoveNext (RVA 0x3285c5c–0x3286038)
+- The coroutine operates on UI-patch/source-selection state and persists/uses several setting/UI objects.
+- Its final state calls a helper at RVA 0x325a97c with values assembled from coroutine fields and local state.
+- No direct static-field store to ScenarioResourceManager.AddrLoadUrl is visible in this method body.
+- The UI source-change flow is a candidate for further inspection, but this disassembly alone does not prove it sets the gameplay Addressables base URL.
+
+### AuthoringOfflineResources.TryGetStartupUrl (RVA 0x33c5e00–0x33c6320)
+- This method performs multi-stage validation/resolution, invokes ValidateDirectory at RVA 0x33c6320, and returns a selected URL/string through its out parameter on a success path.
+- CheckForUpdate.MoveNext invokes it at RVA 0x3270040 before proceeding into its update state machine.
+- The method belongs to the authoring-offline startup subsystem. Its presence in the normal coroutine does not prove the returned URL is the production CDN; it appears to be an optional offline/manual-startup override gate.
+- No direct store to ScenarioResourceManager.AddrLoadUrl is visible in this method body.
+
+### Updated conclusion
+The ordinary update coroutine has a verified optional offline-startup URL gate, then performs Addressables catalog update and dependency download. The AddrLoadUrl assignment remains unresolved. Do not hard-code the authoring CLI fallback, and do not treat the manual/offline startup URL as the normal remote source without proving the activation branch and assignment target.
