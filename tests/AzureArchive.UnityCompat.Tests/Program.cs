@@ -90,6 +90,25 @@ internal static class Program
             "Addressables hook restores previous transform");
 
         Addressables.Reset();
+        ScenarioResourceManagerFixture.AddrLoadUrl = "https://runtime.example.org/mobile/";
+        var runtimeHook = AddressablesInternalIdTransformHook.InstallFromRuntimeType(
+            typeof(ScenarioResourceManagerFixture));
+        var runtimeLocation = new UnityEngine.ResourceManagement.ResourceLocations.TestResourceLocation(
+            "{ScenarioResourceManager.AddrLoadUrl}/backgrounds/scene.bundle");
+        Assert(Addressables.InternalIdTransformFunc!(runtimeLocation) ==
+            "https://runtime.example.org/mobile/backgrounds/scene.bundle",
+            "runtime hook reads the verified ScenarioResourceManager.AddrLoadUrl field");
+        ScenarioResourceManagerFixture.AddrLoadUrl = "https://runtime.example.org/updated/";
+        Assert(Addressables.InternalIdTransformFunc!(runtimeLocation) ==
+            "https://runtime.example.org/updated/backgrounds/scene.bundle",
+            "runtime hook reads AddrLoadUrl lazily after installation");
+        runtimeHook.Dispose();
+
+        AssertThrows<InvalidOperationException>(() =>
+            AddressablesInternalIdTransformHook.InstallFromRuntimeType(typeof(InvalidAddrLoadUrlFixture)),
+            "runtime hook rejects a missing AddrLoadUrl field");
+
+        Addressables.Reset();
         var hookWithLaterOwner = AddressablesInternalIdTransformHook.Install(() => "https://cdn.example.org/game");
         Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string> laterTransform =
             location => "later:" + location.InternalId;
@@ -151,4 +170,15 @@ internal static class Program
         catch (T) { return; }
         throw new Exception(name + ": expected " + typeof(T).Name);
     }
+}
+
+
+internal static class ScenarioResourceManagerFixture
+{
+    public static string AddrLoadUrl = string.Empty;
+}
+
+internal static class InvalidAddrLoadUrlFixture
+{
+    public static int AddrLoadUrl;
 }
