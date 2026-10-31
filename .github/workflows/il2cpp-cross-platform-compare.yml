@@ -1,0 +1,119 @@
+name: Compare IL2CPP metadata across iOS Android Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/il2cpp-cross-platform-compare.yml"
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.x
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip llvm file
+      - name: Download game packages
+        run: |
+          set -euo pipefail
+          mkdir -p work/pkg/ios work/pkg/android work/pkg/windows work/tools work/out
+          curl -fL --retry 3 -o work/pkg/ios/base.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o work/pkg/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          curl -fL --retry 3 -o work/pkg/windows/base.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+          unzip -q work/pkg/ios/base.ipa -d work/pkg/ios/unpacked
+          unzip -q work/pkg/android/base.apk -d work/pkg/android/unpacked
+          unzip -q work/pkg/windows/base.zip -d work/pkg/windows/unpacked
+      - name: Download Il2CppDumper
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o work/tools/Il2CppDumper.zip "https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net6-v6.7.46.zip"
+          mkdir -p work/tools/dumper
+          unzip -q work/tools/Il2CppDumper.zip -d work/tools/dumper
+          find work/tools/dumper -maxdepth 2 -type f -printf '%p\n' > work/out/dumper-files.txt
+          dotnet --info > work/out/dotnet-info.txt
+      - name: Locate platform binaries
+        run: |
+          set -euo pipefail
+          IOS="work/pkg/ios/unpacked/Payload/AzureArchive.app/Frameworks/UnityFramework.framework/UnityFramework"
+          META="work/pkg/ios/unpacked/Payload/AzureArchive.app/Data/Managed/Metadata/global-metadata.dat"
+          ANDROID="work/pkg/android/unpacked/lib/arm64-v8a/libil2cpp.so"
+          WINDOWS=$(find work/pkg/windows/unpacked -type f -iname GameAssembly.dll | head -1)
+          test -f "$IOS"; test -f "$META"; test -f "$ANDROID"; test -n "$WINDOWS"
+          cp "$META" work/pkg/ios/global-metadata.dat
+          cp "$ANDROID" work/pkg/android/libil2cpp.so
+          cp "$WINDOWS" work/pkg/windows/GameAssembly.dll
+          file "$IOS" "$ANDROID" "$WINDOWS" > work/out/binary-file-types.txt
+          llvm-lipo "$IOS" -archs > work/out/ios-architectures.txt 2>&1 || true
+          llvm-lipo "$IOS" -thin arm64 -output work/pkg/ios/UnityFramework.arm64 || cp "$IOS" work/pkg/ios/UnityFramework.arm64
+      - name: Configure dumper
+        run: |
+          cat > work/tools/dumper/config.json <<'JSON'
+          {
+            "DumpMethod": true, "DumpField": true, "DumpProperty": true,
+            "DumpAttribute": true, "DumpFieldOffset": true, "DumpMethodOffset": true,
+            "DumpTypeDefIndex": true, "GenerateDummyDll": true, "GenerateScript": true,
+            "DummyDllAddToken": true, "RequireAnyKey": false,
+            "ForceIl2CppVersion": false, "ForceVersion": 0,
+            "ForceDump": false, "NoRedirectedPointer": false
+          }
+          JSON
+      - name: Run iOS metadata dump
+        continue-on-error: true
+        run: |
+          set +e
+          DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
+          dotnet "$DLL" "$PWD/work/pkg/ios/UnityFramework.arm64" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/ios" > work/out/ios-dumper.log 2>&1
+          echo "EXIT_CODE=$?" >> work/out/ios-dumper.log
+      - name: Run Android metadata dump
+        continue-on-error: true
+        run: |
+          set +e
+          DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
+          dotnet "$DLL" "$PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
+          echo "EXIT_CODE=$?" >> work/out/android-dumper.log
+      - name: Run Windows metadata dump
+        continue-on-error: true
+        run: |
+          set +e
+          DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
+          dotnet "$DLL" "$PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
+          echo "EXIT_CODE=$?" >> work/out/windows-dumper.log
+      - name: Compare target type and method names
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path("work/out")
+          targets=["ScenarioResourceManager","AuthoringResourceCatalog","Character","CharacterManager"]
+          methods=["InitializeAuthoringResources","ResolveBackground","EnumerateBackgrounds","GetBackgroundTexture","GetBackgroundTextureAsync","AcquireBackgroundSpine","TryGetBackgroundOverridePath","GetCustomBgEffect","GetBgEffectChoices","GetBackgroundPreviewAsync","Search","Resolve","StageReferencedResources","Import","ApplyDisplayRank","GetSkeletonDataAssetAtPath"]
+          report=["# Cross-platform IL2CPP metadata comparison","","Metadata declarations only; not runtime proof or buildable source.",""]
+          for platform in ["ios","android","windows"]:
+              dump=root/platform/"dump.cs"
+              report += [f"## {platform}",f"dump.cs exists: {dump.exists()}"]
+              if not dump.exists():
+                  log=root/f"{platform}-dumper.log"
+                  if log.exists(): report += ["```text"]+log.read_text(errors="replace").splitlines()[-35:]+["```"]
+                  continue
+              data=dump.read_text(errors="replace")
+              for t in targets:
+                  idx=data.find("class "+t)
+                  if idx<0: idx=data.find("struct "+t)
+                  if idx<0:
+                      report.append(f"- {t}: NOT FOUND")
+                      continue
+                  chunk=data[idx:idx+120000]
+                  report.append(f"- {t}: FOUND")
+                  for m in methods:
+                      if m in chunk: report.append(f"  - {m}: present in nearby type text")
+              report.append("")
+          (root/"cross-platform-method-comparison.md").write_text("\n".join(report))
+          PY
+          find work/out -type f -printf '%p %s bytes\n' | sort > work/out/inventory.txt
+      - name: Upload comparison results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-cross-platform-il2cpp-comparison
+          path: work/out/
