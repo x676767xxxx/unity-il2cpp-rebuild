@@ -378,7 +378,60 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => previewQueue.TryEnqueue("scene-c", null!),
             "preview callback must be non-null");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks");
+        // Verified preview-cache ledger: reference counts and LRU eligibility/order.
+        var previewLedger = new BackgroundPreviewCacheLedger<object>();
+        var previewTextureA = new object();
+        var previewTextureB = new object();
+        var previewTextureC = new object();
+        previewLedger.Add("preview-a", previewTextureA, false, "scene/a", true, 0, 10);
+        previewLedger.Add("preview-b", previewTextureB, true, "scene/b", false, 0, 5);
+        previewLedger.Add("preview-c", previewTextureC, false, "scene/c", false, 1, 1);
+        AssertEqual("3", previewLedger.Count.ToString(), "preview ledger registers cache records");
+        AssertTrue(previewLedger.TryAcquire("preview-a", 20, out object? acquiredA),
+            "preview ledger acquires cached texture");
+        AssertTrue(ReferenceEquals(previewTextureA, acquiredA), "preview ledger returns same texture instance");
+        AssertTrue(previewLedger.TryGet("preview-a", out var entryA), "preview ledger retrieves entry");
+        AssertEqual("1", entryA!.Users.ToString(), "acquire increments preview user count");
+        AssertEqual("20", entryA.LastUse.ToString(), "acquire updates preview last-use frame");
+        AssertTrue(entryA.PreferThumbnail, "preview record retains thumbnail preference");
+        AssertFalse(entryA.Addressable, "preview record retains owned-texture flag");
+        AssertTrue(previewLedger.TryRelease(previewTextureA, 21, out var releasedA),
+            "preview ledger releases by texture identity");
+        AssertTrue(ReferenceEquals(entryA, releasedA), "release returns matching cache entry");
+        AssertEqual("0", entryA.Users.ToString(), "release decrements preview user count");
+        AssertEqual("21", entryA.LastUse.ToString(), "release updates preview last-use frame");
+        AssertTrue(previewLedger.TryGet("preview-b", out var entryB) && entryB!.Addressable,
+            "preview record retains Addressables ownership flag");
+        AssertTrue(previewLedger.TryAcquire("preview-c", 22, out _), "active preview can be acquired");
+        AssertEqual("2", previewLedger.GetUnusedLeastRecentlyUsed().Length.ToString(),
+            "LRU candidate set excludes in-use preview");
+        var unusedPreviews = previewLedger.GetUnusedLeastRecentlyUsed();
+        AssertEqual("preview-b", unusedPreviews[0].Key, "unused preview candidates sort by oldest LastUse");
+        AssertEqual("preview-a", unusedPreviews[1].Key, "newer unused preview follows older candidate");
+        AssertFalse(previewLedger.TryRelease(new object(), 23, out _),
+            "release of unregistered texture does not mutate cache");
+        AssertThrows<InvalidOperationException>(() => previewLedger.Remove("preview-c", out _),
+            "in-use preview cannot be removed");
+        AssertTrue(previewLedger.TryRelease(previewTextureC, 24, out _), "second preview release succeeds");
+        AssertTrue(previewLedger.Remove("preview-b", out var removedB),
+            "unused preview can be removed");
+        AssertTrue(removedB!.Addressable, "removed entry preserves ownership metadata for adapter cleanup");
+        previewLedger.ClearUnused();
+        AssertEqual("0", previewLedger.Count.ToString(), "clear unused removes remaining idle entries");
+        AssertFalse(previewLedger.TryGet("preview-a", out _), "cleared preview is absent");
+        AssertThrows<ArgumentException>(() => previewLedger.Add(" ", new object(), false, null, false, 0, 0),
+            "preview ledger requires key");
+        AssertThrows<ArgumentNullException>(() => previewLedger.Add("null-texture", null!, false, null, false, 0, 0),
+            "preview ledger requires texture");
+        AssertThrows<ArgumentOutOfRangeException>(() => previewLedger.Add("negative-users", new object(), false, null, false, -1, 0),
+            "preview ledger rejects negative initial users");
+        previewLedger.Add("duplicate", new object(), false, null, false, 0, 0);
+        AssertThrows<InvalidOperationException>(() => previewLedger.Add("duplicate", new object(), false, null, false, 0, 0),
+            "preview ledger rejects duplicate cache key");
+        AssertThrows<ArgumentException>(() => previewLedger.TryGet("", out _),
+            "preview ledger lookup requires key");
+
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 24 preview cache ledger checks");
         return 0;
     }
 
