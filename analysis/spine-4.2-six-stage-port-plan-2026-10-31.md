@@ -66,3 +66,13 @@ No upstream Spine runtime source has been copied into this project. Before integ
 - No Spine 4.2 runtime has been copied or integrated.
 - No actual skeleton is currently being animated by the iOS build.
 - No IPA is claimed.
+
+
+## Follow-up: atlas parser fix and resource mapping contract
+
+- The atlas parser initially mistook an indented region property (`xy: 0, 0`) for a page filename.
+- Fixed page detection to ignore indented lines. CI run [41185026824](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185026824) passed: library build, 13 path safety checks, 5 override resolver checks, 5 atlas metadata checks, and 7 isolated Unity decoder contract checks.
+- Artifact `azurearchive-background-path-compat-library`, ID `13036062383`, size 10,880 bytes.
+- Added `SpineAtlasPageResourceResolver.ResolveResourceKeys`, a callback-based contract mapping atlas page names to caller-owned resource keys. It reuses path-safety validation and rejects missing mappings.
+- Added tests for two page mappings, missing resource mappings, and unsafe page names. CI run [41185065041](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185065041) was queued/in progress at the time of this note.
+- This does not load textures, decode skeleton binaries, create Spine materials, or play animations. The resolver is not connected to Unity Addressables or the actual game resource manager.
