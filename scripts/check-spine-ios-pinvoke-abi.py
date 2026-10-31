@@ -39,4 +39,4 @@ if errors:
         print(" - " + error)
     sys.exit(1)
 
-print("PASS: 7 iOS Spine P/Invoke ABI contract checks")
+print(f"PASS: {len(symbols) * 3 + 2} iOS Spine P/Invoke ABI contract checks")
