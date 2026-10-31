@@ -66,3 +66,11 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 
 - Final result: managed bridge CI [41185474591](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185474591) completed successfully. The project compiled with `UNITY_IOS` defined, all existing Unity decoder checks passed, and the four Spine bridge argument checks passed. Artifact ID `13036883377`, size 13,136 bytes.
 - The workflow's successful result is limited to compilation against .NET and isolated Unity API stubs. Native iOS link/runtime validation remains outstanding.
+
+
+## Managed/native ABI drift gate added (2026-10-31)
+
+- Added `scripts/check-spine-ios-pinvoke-abi.py` to check that all three exported C ABI symbol names are declared in the header and represented by matching `__Internal` Cdecl P/Invoke entries; it also guards the iOS-only compilation condition and Spine 4.2 enum value (6).
+- Wired the checker into `ios-spine-converter-staticlib.yml`, including path filters for the managed bridge and checker. A bridge/header change now triggers the iPhoneOS ARM64 workflow and checks managed/native symbol naming before the native build.
+- Checker step passed in run [41185690740](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185690740). At the latest poll the ARM64 library build and artifact upload were still running; no final workflow success or new artifact is claimed yet.
+- This is a static ABI drift check, not proof of iOS runtime linking or UnityFramework integration.
