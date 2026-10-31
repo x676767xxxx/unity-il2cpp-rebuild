@@ -88,6 +88,8 @@ jobs:
             (" DestroyOwned(","RuntimeSpineLoader"),
             (" AtlasPages(","RuntimeSpineLoader"),
             (" CanLoadPngAsDxt5(","RuntimeSpineLoader"),
+            (" <TrimBackgroundSkeletonCache>b__34_0(","<>c"),
+            (" <TrimBackgroundSkeletonCache>b__34_1(","<>c"),
             (" Own(","RuntimeSpineAsset"),
             (" get_HasConsumers(","RuntimeSpineAsset"),
             (" get_EstimatedTextureBytes(","RuntimeSpineAsset"),
@@ -141,7 +143,7 @@ jobs:
               for dst,name in callees:
                   report.append(f"  - calls 0x{dst:x}: {name}")
           (out/"android-background-callgraph.md").write_text("\n".join(report))
-          spine_targets=[x for x in targets if x[1] in ("RuntimeSpineLoader","RuntimeSpineAsset","PageTextureLoader") or "DisplayClass4_0" in x[1] or "DisplayClass6_0" in x[1] or x[2].strip().startswith("TrimBackgroundSkeletonCache")]
+          spine_targets=[x for x in targets if x[1] in ("RuntimeSpineLoader","RuntimeSpineAsset","PageTextureLoader","<>c") or "DisplayClass4_0" in x[1] or "DisplayClass6_0" in x[1] or x[2].strip().startswith("TrimBackgroundSkeletonCache")]
           asm=["# Android ARM64 Spine runtime lifecycle and loader disassembly","",
                "Method bodies are extracted from the Android 1.0 ARM64 libil2cpp.so using the matching dump.cs RVAs. This is Android evidence only; do not reuse these addresses or instructions on iOS.",""]
           for addr,cls,needle,decl in spine_targets:
