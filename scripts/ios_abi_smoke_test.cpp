@@ -35,7 +35,6 @@ int main(int argc, char** argv) {
         return 13;
     }
     std::cout << "PASS: 4 invalid-input and output-parameter checks\\n";
- {
     if (argc != 2) return 2;
     std::ifstream input(argv[1], std::ios::binary);
     if (!input) return 3;
