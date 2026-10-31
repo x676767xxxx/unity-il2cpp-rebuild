@@ -45,6 +45,8 @@ namespace AzureArchive.BackgroundCompat
 
                 if (entries.TryGetValue(resourceKey, out Entry existing))
                 {
+                    if (existing.References == int.MaxValue)
+                        throw new OverflowException("Spine atlas page lease count cannot be incremented.");
                     existing.References++;
                     return new Lease(this, resourceKey, existing);
                 }
