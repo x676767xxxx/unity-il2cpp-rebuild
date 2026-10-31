@@ -48,8 +48,29 @@ internal static class Program
             pages, name => name == "page-one.png" ? "bundle://atlas/one" : null!), "missing atlas page resource");
         AssertThrows<InvalidDataException>(() => SpineAtlasPageResourceResolver.ResolveResourceKeys(
             new[] { "../escape.png" }, name => "bundle://escape"), "unsafe atlas page resource name");
+        int textureLoads = 0;
+        int textureReleases = 0;
+        var pageCache = new SpineAtlasPageCache<object>(
+            key => { textureLoads++; return new object(); },
+            texture => textureReleases++);
+        var pageLeaseA = pageCache.Acquire("atlas/page.png");
+        var pageLeaseB = pageCache.Acquire("atlas/page.png");
+        AssertTrue(ReferenceEquals(pageLeaseA.Value, pageLeaseB.Value), "atlas texture shared by key");
+        AssertEqual("1", textureLoads.ToString(), "atlas texture loaded once");
+        pageLeaseA.Dispose();
+        AssertEqual("0", textureReleases.ToString(), "atlas texture retained while leased");
+        pageLeaseB.Dispose();
+        AssertEqual("1", textureReleases.ToString(), "atlas texture released after final lease");
+        var deferredLease = pageCache.Acquire("atlas/deferred.png");
+        pageCache.Dispose();
+        AssertEqual("1", textureReleases.ToString(), "cache dispose defers active texture release");
+        deferredLease.Dispose();
+        AssertEqual("2", textureReleases.ToString(), "active texture released after cache disposal and final lease");
+        AssertThrows<ObjectDisposedException>(() => pageCache.Acquire("atlas/after-dispose.png"), "acquire after cache disposal");
+        using (var nullPageCache = new SpineAtlasPageCache<object>(key => null!, texture => { }))
+            AssertThrows<InvalidOperationException>(() => nullPageCache.Acquire("atlas/missing.png"), "null texture load");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 8 texture cache lifecycle checks");
         return 0;
     }
 
