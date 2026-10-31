@@ -17,6 +17,27 @@ namespace AzureArchive.UnityCompat
         /// Reads a custom background image from the app's filesystem and decodes it.
         /// Invoke on Unity's main thread; Unity texture creation/destruction is not worker-thread safe.
         /// </summary>
+        /// <summary>
+        /// Decodes a custom Image descriptor using its recovered FullPath semantics.
+        /// Native Addressables resources and Spine resources must use their own runtime paths.
+        /// </summary>
+        public static Texture2D DecodeCustomResource(BackgroundResourceDescriptor resource)
+        {
+            if (resource == null)
+                throw new ArgumentNullException(nameof(resource));
+
+            if (resource.Kind != BackgroundResourceKind.Image)
+                throw new InvalidOperationException("Only Image background resources can use the static image decoder.");
+
+            if (resource.Origin == BackgroundResourceOrigin.Native)
+                throw new InvalidOperationException("Native background resources must be loaded through Addressables.");
+
+            string fullPath = resource.FullPath ??
+                throw new InvalidDataException("Custom background resource has no resolved path.");
+
+            return DecodeFile(fullPath);
+        }
+
         public static Texture2D DecodeFile(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
