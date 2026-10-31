@@ -94,3 +94,12 @@ No upstream Spine runtime source has been copied into this project. Before integ
 - Corrected by making the cache entry assembly-internal and the lease constructor internal, and using a null-forgiving assignment after the lease owner is detached.
 - Corrected build/test run: [41185169633](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185169633), pending at this checkpoint.
 - Previous cache attempt is not a successful build; do not count it as passing until the corrected CI completes.
+
+
+## Corrected cache build verified
+
+- Corrected CI [41185169633](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185169633) completed successfully.
+- Build succeeded; the log reports 0 warnings and 0 errors.
+- Tests: 13 path-safety, 5 background override, 5 atlas metadata, 4 page-resource mapping, 8 texture-cache lifecycle, and 7 isolated Unity decoder contract checks all passed.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13036513008`, size 13,127 bytes.
+- This verifies the standalone .NET helper library and its fake-backend tests only. It does not verify Unity Texture2D creation, Spine runtime loading, actual game assets, or iOS playback.
