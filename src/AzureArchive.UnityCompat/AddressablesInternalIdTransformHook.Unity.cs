@@ -1,5 +1,6 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
+using System.Reflection;
 using AzureArchive.BackgroundCompat;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.ResourceLocations;
@@ -44,6 +45,51 @@ namespace AzureArchive.UnityCompat
         public static AddressablesInternalIdTransformHook Install(Func<string> getAddrLoadUrl)
         {
             return new AddressablesInternalIdTransformHook(getAddrLoadUrl);
+        }
+
+        /// <summary>
+        /// Installs the hook using the actual static AddrLoadUrl field on the
+        /// game's ScenarioResourceManager type. The field is read lazily for each
+        /// matching catalog ID so installation can happen before the game assigns
+        /// its runtime URL. Call before Addressables begins catalog-backed loads.
+        /// </summary>
+        public static AddressablesInternalIdTransformHook InstallFromRuntimeType(Type scenarioResourceManagerType)
+        {
+            if (scenarioResourceManagerType == null)
+                throw new ArgumentNullException(nameof(scenarioResourceManagerType));
+
+            FieldInfo? field = scenarioResourceManagerType.GetField(
+                "AddrLoadUrl", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+
+            if (field == null || field.FieldType != typeof(string))
+                throw new InvalidOperationException(
+                    "ScenarioResourceManager must expose a static string AddrLoadUrl field.");
+
+            return Install(() => field.GetValue(null) as string ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Finds the global ScenarioResourceManager type in Assembly-CSharp and
+        /// installs the verified AddrLoadUrl transform without a compile-time
+        /// reference to the game's Assembly-CSharp.dll.
+        /// </summary>
+        public static AddressablesInternalIdTransformHook InstallFromGameRuntime()
+        {
+            Type? managerType = Type.GetType("ScenarioResourceManager, Assembly-CSharp", false);
+            if (managerType == null)
+            {
+                foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    managerType = assembly.GetType("ScenarioResourceManager", false, false);
+                    if (managerType != null) break;
+                }
+            }
+
+            if (managerType == null)
+                throw new InvalidOperationException(
+                    "Could not find the game's ScenarioResourceManager type in loaded assemblies.");
+
+            return InstallFromRuntimeType(managerType);
         }
 
         public void Dispose()
