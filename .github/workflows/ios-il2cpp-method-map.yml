@@ -98,9 +98,14 @@ jobs:
           binary = lief.parse(str(thin_path))
           if binary is None:
               raise SystemExit("LIEF could not parse the thin arm64 Mach-O")
-          sections = [s for s in binary.sections if s.name == "__text"]
+          all_sections = list(binary.sections)
+          sections = [s for s in all_sections if s.name == "__text"]
           if not sections:
               raise SystemExit("Mach-O __text section not found")
+          print("ALL SECTIONS:", [(s.name, hex(int(s.virtual_address)),
+                                  hex(int(s.offset)), hex(int(s.size)),
+                                  str(getattr(s, "flags", "")))
+                                 for s in all_sections])
           text_segments = [s for s in binary.segments
                            if getattr(s, "segment_name", "") == "__TEXT"
                            or getattr(s, "name", "") == "__TEXT"]
@@ -125,7 +130,21 @@ jobs:
           results = []
           for name, (rva, end_rva) in method_ranges.items():
               mapped = None
-              for sec in sections:
+              # First test direct Mach-O file offset mapping within __TEXT segment.
+              # Il2CppDumper's Offset field for Mach-O is often the usable file offset,
+              # even when the RVA exceeds the compact __text section's range.
+              for seg in binary.segments:
+                  seg_name = getattr(seg, "name", "")
+                  seg_off = int(seg.file_offset)
+                  seg_size = int(seg.file_size)
+                  if seg_name == "__TEXT" and seg_off <= rva < seg_off + seg_size:
+                      off = rva - seg_off
+                      va = int(seg.virtual_address) + off
+                      end_off = min(rva + (end_rva-rva), seg_off+seg_size) - seg_off
+                      if 0 <= off < end_off <= len(raw):
+                          mapped = ("__TEXT-file-offset", va, off, end_off)
+                          break
+              for sec in ([] if mapped else sections):
                   sec_va = int(sec.virtual_address)
                   sec_off = int(sec.offset)
                   sec_size = int(sec.size)
