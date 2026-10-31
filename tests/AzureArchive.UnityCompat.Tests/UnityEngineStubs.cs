@@ -14,7 +14,13 @@ namespace UnityEngine
     public class Object
     {
         public bool Destroyed { get; private set; }
-        public static void Destroy(Object value) { value.Destroyed = true; }
+        public bool DestroyImmediateCalled { get; private set; }
+        public static void Destroy(Object value) { value.Destroyed = true; value.DestroyImmediateCalled = false; }
+        public static void DestroyImmediate(Object value) { value.Destroyed = true; value.DestroyImmediateCalled = true; }
+    }
+    public static class Application
+    {
+        public static bool isPlaying { get; set; }
     }
     public enum TextureFormat { RGBA32 = 4 }
     public enum TextureWrapMode { Clamp = 1 }
