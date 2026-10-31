@@ -17,6 +17,10 @@ jobs:
           mkdir -p work/ios work/out
           curl -fL --retry 3 --retry-delay 2 -o work/ios/AzureArchive_IOS_0.7.9.2.ipa 'https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa'
           unzip -q work/ios/AzureArchive_IOS_0.7.9.2.ipa -d work/ios/extracted
+      - name: Install LLVM disassembler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm
       - name: Locate UnityFramework and disassemble baseline methods
         shell: bash
         run: |
