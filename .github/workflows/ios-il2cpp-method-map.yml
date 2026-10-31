@@ -38,7 +38,9 @@ jobs:
           find work/dumper -maxdepth 2 -type f | sort | head -40
           DLL="$(find work/dumper -maxdepth 3 -type f -name Il2CppDumper.dll -print -quit)"
           test -n "$DLL" || { echo 'Il2CppDumper.dll not found'; exit 1; }
-          dotnet "$DLL" work/ios/UnityFramework work/ios/global-metadata.dat work/out/ios-dump
+          # Il2CppDumper uses Console.ReadKey for platform selection; run it under a PTY.
+          mkdir -p work/out/ios-dump
+          script -q -e -c "dotnet \"$DLL\" work/ios/UnityFramework work/ios/global-metadata.dat work/out/ios-dump" /dev/null <<< "1"
           test -s work/out/ios-dump/dump.cs
           cp work/out/ios-dump/dump.cs work/out/ios-dump.cs
       - name: Extract actual iOS method RVAs and bounded disassembly
