@@ -86,3 +86,11 @@ No upstream Spine runtime source has been copied into this project. Before integ
 - CI run [41185134531](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185134531) was in progress at this checkpoint. Do not treat this cache as Unity Texture2D integration until CI passes and a Unity main-thread adapter is implemented.
 - The prior page-name mapping tests passed in [41185065041](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185065041); artifact ID `13036557879`, size 11,337 bytes.
 - Remaining for this stage: actual page resource source mapping, texture decode/load adapter, material construction and teardown tests using the real Unity/Spine runtime.
+
+
+## Cache CI correction
+
+- First cache CI failed at compile time: nested lease constructor could not access the private entry type, and nullable analysis rejected assigning null to the owner field.
+- Corrected by making the cache entry assembly-internal and the lease constructor internal, and using a null-forgiving assignment after the lease owner is detached.
+- Corrected build/test run: [41185169633](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185169633), pending at this checkpoint.
+- Previous cache attempt is not a successful build; do not count it as passing until the corrected CI completes.
