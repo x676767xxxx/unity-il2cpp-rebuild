@@ -6,6 +6,8 @@ This project contains standalone, testable C# primitives recovered or derived fr
 
 - `SafeResourcePath`: prevents rooted paths and traversal outside a trusted resource root.
 - `BackgroundOverrideResolver`: applies local-before-global override precedence; caller supplies the verified ID matcher.
+- `BackgroundOverrideSetFactory`: projects the already-deserialized `BgOverrides` image-path set and `BgSpineOverrides` records into the Android iterator's image-first, Spine-second descriptor sequence; it does not parse JSON manifests.
+- `BackgroundImageOverrideFactory` / `SpineBackgroundOverrideFactory`: map the corresponding Android 1.0 override fields into platform-neutral descriptors and validate Spine identifiers/framing values.
 - `AddressableInternalIdResolver`: replaces the exact catalog prefix `{ScenarioResourceManager.AddrLoadUrl}` with a runtime-supplied HTTP(S) base URL after validating the suffix and origin. It deliberately does not supply or guess the CDN URL.
 - `AddressableAssetLease`: owns one successful Addressables operation handle and releases it exactly once through a supplied callback.
 - `SpineAtlasPageNames` / `SpineAtlasPageResourceResolver`: extracts atlas page names and maps them to caller-provided resource keys.
