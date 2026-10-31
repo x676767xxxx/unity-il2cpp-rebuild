@@ -125,3 +125,17 @@ The corrected full disassembly also exposes the helper bodies, not only their ca
 ### Coroutine reconstruction boundary
 
 The iterator metadata and native call graph establish six states and the separate async operations (file-byte task, Spine-files task and Addressables handle), but the generated state machine has several compiler/runtime helper calls whose high-level exception and callback semantics are not yet fully mapped. In particular, do not yet claim a complete ordering for: Addressables handle acquisition vs completion, callback-list fan-out vs cache registration, temporary RenderTexture ownership vs final Texture ownership, and exception fan-out to every pending callback. Those are the remaining reverse-engineering targets before a production Unity coroutine adapter is written.
+
+
+### Additional raw MoveNext observations from corrected ARM64 disassembly (artifact 13041984071)
+
+The complete selected-disassembly text was re-opened and checked directly, rather than relying on the earlier summary.
+
+- The state-machine dispatch reads the integer state at object offset `0x10`, rejects values above 5, and dispatches through a six-entry jump table. This confirms six dispatch arms; the current text-only artifact does not expose the jump-table bytes needed to assign every arm index to a semantic label with certainty.
+- The iterator stores the source resource at offset `0x20`, thumbnail preference at `0x30`, working/final texture references in fields around `0x40` and `0x50`, a task/async working reference around `0x78`, and another async/temporary reference around `0x80`. These are state-machine field offsets, not managed C# field names.
+- One path obtains the resource path, reads file bytes asynchronously, then calls `DecodeBackgroundImage`; the returned texture is stored in the iterator's texture field and the byte-task field is cleared before control advances.
+- A separate branch obtains the resource's Addressables-related value and invokes completion/result helpers before the preview-generation path continues. The exact generic helper identities and exception/result semantics are not symbolized in this artifact.
+- The preview generation branch selects a target dimension of 512 when the thumbnail flag is set and 1024 otherwise, then calls the native method at RVA `0x3263310` (previously identified as `LimitBackgroundPreviewSize`). It subsequently checks the resulting texture/RenderTexture state and enters the preview-save/render operations.
+- The state machine contains native exception landing pads and cleanup branches. Their presence is confirmed, but the exception object mapping, exact task-await exception propagation, and whether every failure path fans out the same exception to all queued callbacks are not established by this disassembly alone.
+
+**Implementation consequence:** the static-file decode ordering and 512/1024 sizing choice can now be treated as evidence-backed. Do not yet implement a single shared failure callback path or assert exact Addressables-vs-file fallback order; those require the jump-table bytes plus symbolized helper/type metadata or a controlled runtime trace.
