@@ -77,6 +77,7 @@ jobs:
             ("AddressableFlatBufferLoader.LoadAll","LoadAll(Action callback)",0x326D520),
             ("ScenarioResourceManager.OnUpdateComplete.TextAssetCallback","<OnUpdateComplete>b__93_1(AsyncOperationHandle<TextAsset> handle)",0x326BE84),
             ("ScenarioResourceManager.ResolveBackground","ResolveBackground(uint id)",0x3260EE0),
+            ("BackgroundResource.ResolveOverride","public static BackgroundResource ResolveOverride(uint id, ResourceOverrideData local, ResourceOverrideData global)",0x3432DFC),
             ("BackgroundResource.ResolveOverride.localPredicate","internal bool <ResolveOverride>b__0(BackgroundResource x)",0x3433298),
             ("BackgroundResource.ResolveOverride.globalPredicate","internal bool <ResolveOverride>b__1(BackgroundResource x)",0x34332BC),
             ("BackgroundResource.Overrides.MoveNext","private bool MoveNext()",0x34332F0),
