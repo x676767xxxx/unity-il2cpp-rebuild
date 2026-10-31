@@ -81,19 +81,18 @@ jobs:
           set -euo pipefail
           mkdir -p work/out/all-assembly-search
           : > work/out/all-assembly-search/url-config-references.txt
+          find work/in/recovery -type f -name '*.dll' | sort | head -n 250 > work/out/all-assembly-search/dll-inventory.txt
           while IFS= read -r DLL; do
             base=$(basename "$DLL")
             case "$base" in
               mscorlib.dll|System*.dll|Mono.*.dll|UnityEngine*.dll|Unity.*.dll|netstandard.dll) continue ;;
             esac
-            tmp="work/out/all-assembly-search/current.il"
-            work/tools/ilspycmd --ilcode "$DLL" > "$tmp" 2>/dev/null || continue
-            hits=$(grep -ni -C 5 -E 'AddrLoadUrl|addr_load_url|https?://|cdn|catalog.?url|remote.?load.?path|asset.?load.?url' "$tmp" | head -n 600 || true)
-            if [ -n "$hits" ]; then
-              { echo "===== $DLL ====="; printf '%s\\n' "$hits"; } >> work/out/all-assembly-search/url-config-references.txt
+            hits=$(strings -el "$DLL"; strings "$DLL") 
+            matches=$(printf '%s\\n' "$hits" | grep -ni -E 'AddrLoadUrl|addr_load_url|https?://|cdn|catalog.?url|remote.?load.?path|asset.?load.?url|customSource' | head -n 120 || true)
+            if [ -n "$matches" ]; then
+              { echo "===== $DLL ====="; printf '%s\\n' "$matches"; } >> work/out/all-assembly-search/url-config-references.txt
             fi
-          done < <(find work/in/recovery -type f -name '*.dll' | sort)
-          rm -f work/out/all-assembly-search/current.il
+          done < work/out/all-assembly-search/dll-inventory.txt
       - name: Upload raw IL
         if: always()
         uses: actions/upload-artifact@v4
