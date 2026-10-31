@@ -75,6 +75,25 @@ jobs:
           grep -ni -C 3 -E "https?://|addressables|cdn|asset.?load.?url|load.?url" work/out/android/Assembly-CSharp.full.il work/out/windows/Assembly-CSharp.full.il | head -n 2000 >> work/out/addrloadurl-symbol-search.txt 2>/dev/null || true
           echo "===== exported IL file inventory =====" >> work/out/addrloadurl-symbol-search.txt
           find work/out -type f -name '*.il' -printf '%p %s bytes\\n' >> work/out/addrloadurl-symbol-search.txt
+      - name: Search all managed assemblies for URL configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/out/all-assembly-search
+          : > work/out/all-assembly-search/url-config-references.txt
+          while IFS= read -r DLL; do
+            base=$(basename "$DLL")
+            case "$base" in
+              mscorlib.dll|System*.dll|Mono.*.dll|UnityEngine*.dll|Unity.*.dll|netstandard.dll) continue ;;
+            esac
+            tmp="work/out/all-assembly-search/current.il"
+            work/tools/ilspycmd --ilcode "$DLL" > "$tmp" 2>/dev/null || continue
+            hits=$(grep -ni -C 5 -E 'AddrLoadUrl|addr_load_url|https?://|cdn|catalog.?url|remote.?load.?path|asset.?load.?url' "$tmp" | head -n 600 || true)
+            if [ -n "$hits" ]; then
+              { echo "===== $DLL ====="; printf '%s\\n' "$hits"; } >> work/out/all-assembly-search/url-config-references.txt
+            fi
+          done < <(find work/in/recovery -type f -name '*.dll' | sort)
+          rm -f work/out/all-assembly-search/current.il
       - name: Upload raw IL
         if: always()
         uses: actions/upload-artifact@v4
