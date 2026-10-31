@@ -409,3 +409,18 @@ Workflow run [41200328434](https://github.com/x676767xxxx/unity-il2cpp-rebuild/a
 - The native call graph confirms static image async file reads and decode, a distinct Spine preview path through `RuntimeSpineLoader.ReadAsync/Create` and `SpineBackgroundVisual.RenderPreview(..., 1024)`, Addressables handle state, RenderTexture blit/save, 1024 size limiting, and cleanup/error helpers.
 - Preview records track `Users` and `LastUse`; native eviction filters `Users == 0` and sorts by `LastUse`. The trim body contains a 32 MiB threshold and a 25-entry check. Destroy chooses Addressables release vs Unity destruction using the record's Addressable flag.
 - No replacement coroutine was guessed. The next implementation task is to write a Unity-side preview runtime adapter against these exact behaviors, but this is blocked from real integration/testing until the target Unity project, Unity/Addressables assemblies and matching Spine 4.2 runtime are available.
+
+
+## Preview cache ledger implementation — 2026-10-31
+
+Added `src/AzureArchive.BackgroundCompat/BackgroundPreviewCacheLedger.cs` as an engine-independent model of the verified `BackgroundPreview` record. It tracks texture identity, Addressables ownership, resource identity, thumbnail preference, active user count and LastUse frame.
+
+The ledger supports registration, acquire/release accounting, unused-entry enumeration ordered by LastUse, and removal/clear of unused entries. It refuses duplicate keys, negative initial user counts, invalid keys, null textures, reference-count overflow and removal of active entries.
+
+The test suite was extended with 29 checks for this ledger. `src/AzureArchive.BackgroundCompat/README.md` now lists both the request coalescer and ledger.
+
+### Deliberate non-implementation boundary
+The Android disassembly confirms a 32 MiB threshold and a 25-entry check in `TrimBackgroundPreviews`, but the exact conditional/forced-trim policy is not yet encoded. This ledger therefore exposes eligible unused entries in verified LRU order and does not choose a trim trigger, evict automatically, or destroy/release Unity objects. The runtime adapter must perform ownership-aware cleanup after exact threshold branches are fully reconstructed.
+
+### CI
+The latest workflow triggered by these changes is [41200672989](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200672989), commit `281d6ab3605340e807a465fd35562cd598b3762d`. Its final result and artifact are pending verification at the time of this note.
