@@ -25,7 +25,7 @@ jobs:
           import zipfile, pathlib, re
           root=pathlib.Path('work/in')
           output=[]
-          terms=[b'filev2.foxxlight.top',b'AddrLoadUrl',b'ScenarioResourceManager',b'输入源地址',b'留空默认',b'aares/']
+          terms=[b'filev2.foxxlight.top',b'AddrLoadUrl',b'ScenarioResourceManager','输入源地址'.encode('utf-8'),'留空默认'.encode('utf-8'),b'aares/']
           for label,archive in [('iOS',root/'ios.ipa'),('Android',root/'android.apk'),('Windows',root/'windows.zip')]:
               output += ['', '## '+label]
               with zipfile.ZipFile(archive) as z:
