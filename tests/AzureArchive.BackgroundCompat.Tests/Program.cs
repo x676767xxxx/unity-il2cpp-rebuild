@@ -521,6 +521,39 @@ internal static class Program
         AssertThrows<OverflowException>(() => maxSpineReferences.Retain(),
             "Spine reference ledger rejects overflow");
 
+        // Transactional ownership staging for Unity objects created by RuntimeSpineLoader.Create.
+        var stagedAtlas = new object();
+        var stagedPageTexture = new object();
+        var committedConstruction = new SpineAssetConstructionLedger<object>();
+        AssertFalse(committedConstruction.Register(null), "construction ledger ignores null objects");
+        AssertTrue(committedConstruction.Register(stagedAtlas), "construction ledger registers first owned object");
+        AssertFalse(committedConstruction.Register(stagedAtlas), "construction ledger deduplicates repeated ownership");
+        AssertTrue(committedConstruction.Register(stagedPageTexture), "construction ledger registers later page texture");
+        AssertEqual("2", committedConstruction.Count.ToString(), "construction ledger tracks unique owned objects");
+        object[] committedObjects = committedConstruction.Commit();
+        AssertEqual("2", committedObjects.Length.ToString(), "commit transfers all unique objects");
+        AssertTrue(committedObjects.Any(value => ReferenceEquals(value, stagedAtlas)),
+            "commit preserves atlas object identity");
+        AssertTrue(committedObjects.Any(value => ReferenceEquals(value, stagedPageTexture)),
+            "commit preserves page texture identity");
+        AssertTrue(committedConstruction.IsCompleted, "commit closes construction ledger");
+        AssertThrows<InvalidOperationException>(() => committedConstruction.Register(new object()),
+            "committed construction ledger rejects later registrations");
+
+        var failedConstruction = new SpineAssetConstructionLedger<object>();
+        var partialPage = new object();
+        var partialMaterial = new object();
+        failedConstruction.Register(partialPage);
+        failedConstruction.Register(partialMaterial);
+        object[] rollbackObjects = failedConstruction.Abort();
+        AssertEqual("2", rollbackObjects.Length.ToString(), "abort returns every partially created object for rollback");
+        AssertEqual("0", failedConstruction.Count.ToString(), "abort clears staged ownership");
+        AssertEqual("0", failedConstruction.Abort().Length.ToString(), "repeated abort does not transfer objects twice");
+        AssertThrows<InvalidOperationException>(() => failedConstruction.Register(new object()),
+            "aborted construction ledger rejects later registrations");
+        AssertThrows<InvalidOperationException>(() => failedConstruction.Commit(),
+            "aborted construction ledger cannot be committed");
+
         // Verified Android 1.0 callback exception policy: report one failure and continue.
         string callbackOrder = "";
         int reportedCallbackErrors = 0;
@@ -547,7 +580,7 @@ internal static class Program
             BackgroundPreviewCallbackDispatcher.Dispatch(Array.Empty<Action<int>>(), 0, null!),
             "callback dispatcher requires error reporter");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks; 16 Spine construction ownership checks");
         return 0;
     }
 
