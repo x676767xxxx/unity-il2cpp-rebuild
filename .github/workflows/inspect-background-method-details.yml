@@ -42,11 +42,11 @@ jobs:
           from pathlib import Path
           import re, hashlib
           targets = [
-            ("BackgroundResource", ["ResolveOverride", "ResolvePath", "Overrides", "FullPath", "get_FullPath"]),
+            ("BackgroundResource", ["ResolveOverride", "ResolvePath", "Overrides", "FullPath"]),
             ("ScenarioResourceManager", ["ResolveBackground", "GetBackgroundTexture", "DecodeBackgroundImage", "GetBackgroundPreviewAsync", "QueueBackgroundPreview", "BackgroundPreviewKey", "AcquireBackgroundSpine"])
           ]
           out=Path("work/out")
-          report=["# Exact background method IL evidence (2026-10-31)","","Inputs: Cpp2IL recovered Android 1.0 and Windows 1.0.1 assemblies; ILSpy IL output. This report contains method-level excerpts, not original C# source. Decompiler gaps are preserved; no guessed behavior is filled in.",""]
+          report=["# Exact background method IL evidence (2026-10-31)","","Inputs: Cpp2IL recovered Android 1.0 and Windows 1.0.1 assemblies; ILSpy IL output. The ILSpy formatter wraps method declarations across multiple lines, so this report extracts bounded contexts around every exact symbol occurrence rather than assuming the name is on the .method line. This is recovered IL, not original C# source.",""]
           for typ,names in targets:
             report.append("## "+typ)
             for platform in ["android","windows"]:
@@ -54,22 +54,15 @@ jobs:
               s=p.read_text(errors="replace")
               lines=s.splitlines()
               report += [f"### {platform} (SHA256 {hashlib.sha256(p.read_bytes()).hexdigest()})"]
-              hits=[]
-              for i,line in enumerate(lines):
-                if ".method" in line and any(re.search(r"\b"+re.escape(n)+r"\b",line) for n in names):
-                  hits.append(i)
-              if not hits:
-                report.append("No method declarations matched the requested names; inspect raw artifact.")
-              for i in hits:
-                start=i
-                end=len(lines)
-                for j in range(i+1,len(lines)):
-                  if ".method" in lines[j] or ".property" in lines[j] or ".event" in lines[j] or lines[j].strip().startswith("} // end of class"):
-                    end=j
-                    break
-                excerpt=lines[start:min(end,start+260)]
-                fence=chr(96)*3
-                report += ["#### "+lines[i].strip(),fence+"il",*excerpt,fence]
+              for name in names:
+                hits=[i for i,line in enumerate(lines) if name in line]
+                report.append(f"#### {name}: {len(hits)} occurrences")
+                if not hits:
+                  report.append("No textual occurrence found.")
+                for i in hits[:8]:
+                  lo=max(0,i-8); hi=min(len(lines),i+100)
+                  fence=chr(96)*3
+                  report += [f"Context at line {i+1}:",fence+"il",*lines[lo:hi],fence]
               report.append("")
           report += ["## Guardrails",
             "- A recovered IL call is evidence of the call in that recovered method body, not proof that every runtime path succeeds.",
