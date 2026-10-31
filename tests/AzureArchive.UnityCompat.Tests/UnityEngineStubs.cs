@@ -69,6 +69,7 @@ namespace UnityEngine.AddressableAssets
 
     public static class Addressables
     {
+        public static Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string>? InternalIdTransformFunc { get; set; }
         public static object? LastOperation { get; private set; }
         public static int ReleaseCount { get; private set; }
         public static bool ThrowOnLoad { get; set; }
@@ -92,9 +93,24 @@ namespace UnityEngine.AddressableAssets
             LastOperation = null;
             ReleaseCount = 0;
             ThrowOnLoad = false;
+            InternalIdTransformFunc = null;
         }
 
         public static AsyncOperationHandle<T> Last<T>() =>
             (AsyncOperationHandle<T>)LastOperation!;
+    }
+}
+
+namespace UnityEngine.ResourceManagement.ResourceLocations
+{
+    public interface IResourceLocation
+    {
+        string InternalId { get; }
+    }
+
+    public sealed class TestResourceLocation : IResourceLocation
+    {
+        public TestResourceLocation(string internalId) { InternalId = internalId; }
+        public string InternalId { get; }
     }
 }
