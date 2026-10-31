@@ -39,6 +39,25 @@ internal static class Program
             ImageConversion.Reset();
             Texture2D rootedDecoded = BackgroundImageDecoder.DecodeFile(resourceRoot, "backgrounds/scene.png");
             Assert(rootedDecoded.name == "scene.png", "root-confined file decode");
+
+            ImageConversion.Reset();
+            var customDescriptor = new BackgroundResourceDescriptor(
+                91u, "scene", BackgroundResourceKind.Image, BackgroundResourceOrigin.LocalCustom,
+                "backgrounds/scene.png", resourceRoot, false);
+            Texture2D descriptorDecoded = BackgroundImageDecoder.DecodeCustomResource(customDescriptor);
+            Assert(descriptorDecoded.name == "scene.png", "descriptor FullPath feeds custom image decoder");
+            var nativeDescriptor = new BackgroundResourceDescriptor(
+                92u, "native", BackgroundResourceKind.Image, BackgroundResourceOrigin.Native,
+                "Addressables/Backgrounds/native.png", null, false);
+            AssertThrows<InvalidOperationException>(
+                () => BackgroundImageDecoder.DecodeCustomResource(nativeDescriptor),
+                "native resource is not sent through custom file decoder");
+            var spineDescriptor = new BackgroundResourceDescriptor(
+                93u, "spine", BackgroundResourceKind.Spine, BackgroundResourceOrigin.LocalCustom,
+                "spine/scene.skel", resourceRoot, true);
+            AssertThrows<InvalidOperationException>(
+                () => BackgroundImageDecoder.DecodeCustomResource(spineDescriptor),
+                "Spine resource is not sent through static image decoder");
             AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, "../outside.png"), "reject parent traversal");
             AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, rootedImage), "reject absolute resource path");
         }
