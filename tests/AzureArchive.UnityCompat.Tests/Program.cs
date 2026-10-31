@@ -60,6 +60,17 @@ internal static class Program
                 "Spine resource is not sent through static image decoder");
             AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, "../outside.png"), "reject parent traversal");
             AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, rootedImage), "reject absolute resource path");
+
+            var imageCache = new BackgroundImageRuntimeCache(path => "corrected:" + path);
+            Texture2D? cachedCustomA = null;
+            Texture2D? cachedCustomB = null;
+            imageCache.Load(customDescriptor, texture => cachedCustomA = texture);
+            imageCache.Load(customDescriptor, texture => cachedCustomB = texture);
+            Assert(cachedCustomA != null && ReferenceEquals(cachedCustomA, cachedCustomB),
+                "custom background cache reuses decoded texture");
+            Assert(imageCache.CachedCustomCount == 1, "custom background cache stores one FullPath entry");
+            imageCache.Dispose();
+            Assert(cachedCustomA!.Destroyed, "custom background cache destroys owned texture on dispose");
         }
         finally
         {
@@ -86,6 +97,48 @@ internal static class Program
         AssertThrows<ArgumentException>(() => SpineConverterNative.JsonToSpine42Binary(Array.Empty<byte>()), "empty Spine JSON");
         AssertThrows<ArgumentNullException>(() => SpineConverterNative.ConvertToSpine42Binary(null!), "null Spine skeleton");
         AssertThrows<ArgumentException>(() => SpineConverterNative.ConvertToSpine42Binary(Array.Empty<byte>()), "empty Spine skeleton");
+
+
+        Addressables.Reset();
+        var nativeImageCache = new BackgroundImageRuntimeCache(path => "manifest:" + path);
+        var nativeImageDescriptor = new BackgroundResourceDescriptor(
+            94u, "native-image", BackgroundResourceKind.Image, BackgroundResourceOrigin.Native,
+            "Addressables/Backgrounds/native.png", null, false);
+        Texture2D? nativeLoadedA = null;
+        Texture2D? nativeLoadedB = null;
+        nativeImageCache.Load(nativeImageDescriptor, texture => nativeLoadedA = texture);
+        nativeImageCache.Load(nativeImageDescriptor, texture => nativeLoadedB = texture);
+        Assert(nativeLoadedA == null && nativeLoadedB == null, "native background load remains asynchronous");
+        Assert(Addressables.LastKey?.ToString() == "manifest:Addressables/Backgrounds/native.png",
+            "native background key passes through game CorrectPath adapter");
+        var nativeImageOperation = Addressables.Last<Texture2D>();
+        var nativeImage = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        nativeImageOperation.Complete(nativeImage);
+        Assert(ReferenceEquals(nativeImage, nativeLoadedA) && ReferenceEquals(nativeImage, nativeLoadedB),
+            "concurrent native background requests share one Addressables result");
+        Assert(nativeImageCache.CachedNativeCount == 1, "native background cache retains one Addressables lease");
+        Texture2D? nativeLoadedCached = null;
+        nativeImageCache.Load(nativeImageDescriptor, texture => nativeLoadedCached = texture);
+        Assert(ReferenceEquals(nativeImage, nativeLoadedCached), "native background cache serves retained asset");
+        Assert(Addressables.ReleaseCount == 0, "native background lease remains retained until cache disposal");
+        nativeImageCache.Dispose();
+        Assert(Addressables.ReleaseCount == 1 && nativeImageOperation.Released,
+            "native background cache releases retained Addressables handle exactly once");
+        Assert(!nativeImage.Destroyed, "Addressables-owned texture is not manually destroyed");
+
+        Addressables.Reset();
+        var failedNativeCache = new BackgroundImageRuntimeCache(path => path);
+        Exception? nativeLoadFailure = null;
+        failedNativeCache.Load(nativeImageDescriptor, texture => throw new Exception("unexpected native load success"),
+            exception => nativeLoadFailure = exception);
+        var failedNativeImageOperation = Addressables.Last<Texture2D>();
+        var expectedNativeFailure = new InvalidOperationException("native background missing");
+        failedNativeImageOperation.Fail(expectedNativeFailure);
+        Assert(ReferenceEquals(expectedNativeFailure, nativeLoadFailure),
+            "native background Addressables failure reaches caller");
+        Assert(Addressables.ReleaseCount == 1 && failedNativeImageOperation.Released,
+            "failed native background handle released");
+        failedNativeCache.Dispose();
 
         Addressables.Reset();
         int previousTransformCalls = 0;
