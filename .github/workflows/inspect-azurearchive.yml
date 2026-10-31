@@ -11,48 +11,50 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Extract catalog remote bundle map
+      - name: Decode Addressables bundle references and locate bundle files
         run: |
           python3 - <<'PY'
-          import zipfile,pathlib,json,re,collections,hashlib
+          import zipfile,pathlib,json,base64,re,collections,hashlib
           files={"iOS":"inspect/AzureArchive_IOS_0.7.9.2.ipa","Android":"inspect/base.apk","Windows":"inspect/AzureArchive_Win_1.0.1.zip"}
-          out=[]; catalogs={}
+          out=[]; refs={}; inventories={}
           def add(x=""): out.append(str(x))
+          pat=re.compile(rb'[A-Za-z0-9_./-]{4,180}\\.bundle',re.I)
           for platform,path in files.items():
             z=zipfile.ZipFile(path); names=z.namelist()
             cn=next((n for n in names if n.endswith("/catalog.json") and "/aa/" in n.lower()),None)
             add("## "+platform)
-            if not cn: add("NO CATALOG FOUND"); continue
-            raw=z.read(cn); c=json.loads(raw); catalogs[platform]=c
-            ids=c.get("m_InternalIds",[])
-            add(f"Catalog={cn} bytes={len(raw)} sha256={hashlib.sha256(raw).hexdigest()}")
-            add("InternalIds count="+str(len(ids)))
-            for i,x in enumerate(ids):
-              if isinstance(x,str) and (x.startswith("http://") or x.startswith("https://")):
-                add(f"URL[{i}] {x[:1000]}")
-            for key in ("m_ProviderIds","m_ResourceProviderData","m_Keys","m_BucketDataString","m_EntryDataString","m_ExtraDataString","m_KeyDataString"):
-              v=c.get(key)
-              if isinstance(v,list):
-                add(f"{key} count={len(v)}")
-                for item in v[:8]: add("  "+repr(item)[:1000])
-              elif isinstance(v,str):
-                add(f"{key} chars={len(v)} prefix={v[:500]!r}")
-              elif v is not None: add(f"{key} type={type(v).__name__} value={repr(v)[:1000]}")
-            # Search raw catalog text for CDN and bundle references
-            txt=raw.decode("utf-8","replace")
-            urls=sorted(set(re.findall(r'https?://[^\\"\\s]+',txt)))
-            add("Unique literal URLs="+str(len(urls)))
-            for u in urls[:100]: add("  "+u[:1000])
-          add("## Catalog pairwise equality")
+            if not cn: add("CATALOG MISSING"); continue
+            c=json.loads(z.read(cn)); found=collections.Counter()
+            for key in ("m_KeyDataString","m_ExtraDataString","m_EntryDataString","m_BucketDataString"):
+              val=c.get(key)
+              if isinstance(val,str):
+                try: raw=base64.b64decode(val+"===")
+                except Exception: raw=val.encode()
+                for m in pat.findall(raw): found[m.decode("utf-8","replace")]+=1
+            refs[platform]=set(found)
+            add(f"Bundle-like strings decoded from catalog: {len(found)} unique")
+            for x,n in found.most_common(100): add(f"  CATALOG_REF {x} occurrences={n}")
+            # List likely local Addressables/bundle files independent of extension
+            candidates=[]
+            for n in names:
+              low=n.lower()
+              if any(s in low for s in ("/aa/","streamingassets","assetbundle","bundles/")):
+                try: size=z.getinfo(n).file_size
+                except: continue
+                if size>=64*1024: candidates.append((n,size))
+            inventories[platform]=candidates
+            add(f"Archive AA/bundle candidates >=64KiB: {len(candidates)}")
+            for n,size in sorted(candidates,key=lambda x:x[1],reverse=True)[:120]:
+              add(f"  ARCHIVE_FILE {size} {n}")
+          add("## Cross-platform bundle reference comparison")
           for a,b in (("iOS","Android"),("iOS","Windows"),("Android","Windows")):
-            if a in catalogs and b in catalogs:
-              ca,cb=catalogs[a],catalogs[b]
-              add(f"{a} vs {b}:")
-              for k in ("m_InternalIds","m_ProviderIds","m_ResourceProviderData","m_Keys","m_BucketDataString","m_EntryDataString","m_ExtraDataString","m_KeyDataString"):
-                add(f"  {k}: equal={ca.get(k)==cb.get(k)}")
-          pathlib.Path("inspect/catalog-map.txt").write_text("\n".join(out))
+            if a in refs and b in refs:
+              add(f"{a} vs {b}: common={len(refs[a]&refs[b])} only_{a}={len(refs[a]-refs[b])} only_{b}={len(refs[b]-refs[a])}")
+              for x in sorted(refs[a]-refs[b])[:25]: add("  ONLY "+a+" "+x)
+              for x in sorted(refs[b]-refs[a])[:25]: add("  ONLY "+b+" "+x)
+          pathlib.Path("inspect/bundle-reference-report.txt").write_text("\n".join(out))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-catalog-map
-          path: inspect/catalog-map.txt
+          name: azurearchive-bundle-reference-report
+          path: inspect/bundle-reference-report.txt
