@@ -156,6 +156,21 @@ internal static class Program
             "runtime cache rejects a missing CorrectPath method");
 
         Addressables.Reset();
+        var singletonBoundCache = BackgroundImageRuntimeCache.CreateFromGameRuntimeSingleton(
+            typeof(ScenarioResourceManagerPathFixture));
+        singletonBoundCache.Load(nativeImageDescriptor, texture => { });
+        Assert(Addressables.LastKey?.ToString() == "game-corrected:Addressables/Backgrounds/native.png",
+            "runtime cache resolves inherited game Singleton.Instance before binding CorrectPath");
+        singletonBoundCache.Dispose();
+        var singletonInFlight = Addressables.Last<Texture2D>();
+        singletonInFlight.Complete(new Texture2D(2, 2, TextureFormat.RGBA32, false));
+        Assert(Addressables.ReleaseCount == 1 && singletonInFlight.Released,
+            "singleton-bound cache releases operation completing after disposal");
+        AssertThrows<InvalidOperationException>(() =>
+            BackgroundImageRuntimeCache.CreateFromGameRuntimeSingleton(typeof(InvalidCorrectPathFixture)),
+            "runtime cache rejects a missing game Singleton.Instance property");
+
+        Addressables.Reset();
         int previousTransformCalls = 0;
         Func<UnityEngine.ResourceManagement.ResourceLocations.IResourceLocation, string> previousTransform =
             location => { previousTransformCalls++; return location.InternalId; };
@@ -284,6 +299,7 @@ internal static class InvalidAddrLoadUrlFixture
 
 internal sealed class ScenarioResourceManagerPathFixture
 {
+    public static ScenarioResourceManagerPathFixture Instance { get; } = new ScenarioResourceManagerPathFixture();
     public string CorrectPath(string path) => "game-corrected:" + path;
 }
 
