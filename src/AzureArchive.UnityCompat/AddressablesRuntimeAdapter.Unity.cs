@@ -17,7 +17,7 @@ namespace AzureArchive.UnityCompat
         public static void Load<TAsset>(
             object key,
             Action<AddressableAssetLease<AsyncOperationHandle<TAsset>, TAsset>> onLoaded,
-            Action<Exception> onFailed = null)
+            Action<Exception>? onFailed = null)
             where TAsset : class
         {
             if (key == null) throw new ArgumentNullException(nameof(key));
