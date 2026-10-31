@@ -32,3 +32,18 @@ The source is used for the user's stated personal, noncommercial purpose. Preser
 This is now a **compiled iPhoneOS ARM64 static library**, not merely pseudocode. It remains a custom converter ABI, not a verified drop-in replacement for the game's native converter. UnityFramework linkage, matching the game's native ABI, Spine managed runtime upgrade, resource-loader integration, and IPA build are still outstanding.
 
 A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to SKEL and SKEL round-trip). That test has not yet completed.
+
+
+## Rechecked converter artifact and managed iOS bridge (2026-10-31)
+
+- Rechecked iOS ARM64 run [41183828305](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41183828305): all 8 substantive steps completed successfully, including iPhoneOS ARM64 static-library build, exported-symbol check, host C ABI smoke test, and artifact upload.
+- Downloaded artifact ID `13035881289` and inspected the archive locally. It contains:
+  - `libazurearchive_spine_converter_ios.a` (8,195,192 bytes);
+  - `azurearchive_spine_converter_abi.h`;
+  - upstream `LICENSE`.
+- Extracted archive members are Mach-O 64-bit arm64 object files. This confirms the archive is an iPhoneOS ARM64 static library, not a simulator or desktop library.
+- Host-side functional smoke test passed: invalid-input/output-parameter checks and JSON -> SKEL -> Spine 4.2 SKEL round-trip (8,910 -> 8,910 bytes).
+- Compiler emitted upstream switch-enum warnings for several feature enum values. Build success does not establish that all Spine 4.2 features are faithfully converted; compare against real AzureArchive skeleton fixtures and investigate warning cases before production use.
+- Added `src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs`: an iOS-only `DllImport("__Internal")` bridge for the custom ABI. It copies native buffers to managed byte arrays and releases them through the matching native free function.
+- The wrapper is not yet linked into a Unity iOS project and has not been compiled by Unity/Xcode. The static library still needs to be added to the Unity-generated Xcode target, with symbol visibility and linker flags verified.
+- No full Unity project, UnityFramework integration, actual AzureArchive skeleton fixture, app signing, or IPA exists in this stage.
