@@ -61,12 +61,12 @@ namespace AzureArchive.BackgroundCompat
         /// Mirrors Android 1.0 FullPath: Native resources return Path unchanged;
         /// custom resources resolve Root + Path through the guarded relative-path resolver.
         /// </summary>
-        public string FullPath
+        public string? FullPath
         {
             get
             {
                 if (Origin == BackgroundResourceOrigin.Native)
-                    return Path ?? string.Empty;
+                    return Path;
 
                 return SafeResourcePath.ResolveUnderRoot(Root ?? string.Empty, Path ?? string.Empty);
             }
