@@ -412,7 +412,8 @@ internal static class Program
             "release of unregistered texture does not mutate cache");
         AssertThrows<InvalidOperationException>(() => previewLedger.Remove("preview-c", out _),
             "in-use preview cannot be removed");
-        AssertTrue(previewLedger.TryRelease(previewTextureC, 24, out _), "second preview release succeeds");
+        AssertTrue(previewLedger.TryRelease(previewTextureC, 24, out _), "release of acquired preview lease succeeds");
+        AssertTrue(previewLedger.TryRelease(previewTextureC, 25, out _), "release of original preview lease succeeds");
         AssertTrue(previewLedger.Remove("preview-b", out var removedB),
             "unused preview can be removed");
         AssertTrue(removedB!.Addressable, "removed entry preserves ownership metadata for adapter cleanup");
@@ -431,7 +432,7 @@ internal static class Program
         AssertThrows<ArgumentException>(() => previewLedger.TryGet("", out _),
             "preview ledger lookup requires key");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 29 preview cache ledger checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks");
         return 0;
     }
 
