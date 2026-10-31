@@ -217,3 +217,17 @@ Successful run [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild
 - `ScenarioResourceManager.UpdateAddressable` is a single `ret` stub in this Android build and is not a URL provider.
 
 The exact URL writer remains unproven. Next focus: generated settings iterator bodies, `InitializeAfterSplash.MoveNext`, and cross-references to the IL2CPP static-field storage after metadata correlation. Existing URL resolver/bootstrap code remains unchanged; no speculative C# file was added.
+
+
+## Latest follow-up and next CI gate
+
+Run [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783) succeeded (artifact ID `13040553305`). It confirms the settings persistence and initialization findings recorded in `analysis/android-checkforupdate-addressables-callchain-2026-10-31.md`. In particular, `UpdateAddressable()` is a `ret` stub in this Android binary, and the inspected settings setters do not establish `ScenarioResourceManager.AddrLoadUrl`.
+
+The existing Android disassembly workflow was then extended in place to inspect the generated iterator bodies:
+- `UserSettings.InitTask.MoveNext` at RVA `0x32894A0`
+- `UserSettings.InitializeSettings.MoveNext` at RVA `0x3289750`
+- `UserSettings.ReadUserSettings.MoveNext` at RVA `0x3289908`
+- `UserSettings.SettingData.Deserialize` at RVA `0x3286854`
+- `ScenarioResourceManager.InitializeAfterSplash.MoveNext` at RVA `0x32771DC`
+
+New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196544855) was triggered by this workflow-only change and was in progress at this checkpoint. No runtime C# implementation or duplicate source file was added.
