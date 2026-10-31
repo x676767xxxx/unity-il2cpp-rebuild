@@ -9,13 +9,12 @@
     <DefineConstants>$(DefineConstants);UNITY_2021_3_OR_NEWER;UNITY_IOS</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../src/AzureArchive.BackgroundCompat/AddressableAssetLease.cs" Link="AddressableAssetLease.cs" />
-    <Compile Include="../../src/AzureArchive.BackgroundCompat/SafeResourcePath.cs" Link="SafeResourcePath.cs" />
-    <Compile Include="../../src/AzureArchive.BackgroundCompat/BackgroundResourceDescriptor.cs" Link="BackgroundResourceDescriptor.cs" />
+    <ProjectReference Include="../../src/AzureArchive.BackgroundCompat/AzureArchive.BackgroundCompat.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesRuntimeAdapter.Unity.cs" Link="AddressablesRuntimeAdapter.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesInternalIdTransformHook.Unity.cs" Link="AddressablesInternalIdTransformHook.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesTransformBootstrap.Unity.cs" Link="AddressablesTransformBootstrap.Unity.cs" />
-    <Compile Include="../../src/AzureArchive.BackgroundCompat/AddressableInternalIdResolver.cs" Link="AddressableInternalIdResolver.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/BackgroundImageDecoder.Unity.cs" Link="BackgroundImageDecoder.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs" Link="SpineConverterNative.Unity.cs" />
   </ItemGroup>
