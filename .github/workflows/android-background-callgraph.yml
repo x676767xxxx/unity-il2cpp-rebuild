@@ -123,11 +123,46 @@ jobs:
       - name: Extract preview coroutine switch-table bytes
         run: |
           set -euo pipefail
-          llvm-objdump -s --start-address=0x13377e6 --stop-address=0x13377ec work/bin/libil2cpp.so > work/out/preview-coroutine-state-jumptable.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          binary = Path("work/bin/libil2cpp.so").read_bytes()
+          if binary[:6] != b"\\x7fELF\\x02\\x01":
+              raise SystemExit("Expected ELF64 little-endian Android ARM64 binary")
+          shoff = struct.unpack_from("<Q", binary, 40)[0]
+          shentsize = struct.unpack_from("<H", binary, 58)[0]
+          shnum = struct.unpack_from("<H", binary, 60)[0]
+          shstrndx = struct.unpack_from("<H", binary, 62)[0]
+          sections = [struct.unpack_from("<IIQQQQIIQQ", binary, shoff + i * shentsize) for i in range(shnum)]
+          names_hdr = sections[shstrndx]
+          names = binary[names_hdr[4]:names_hdr[4] + names_hdr[5]]
+          target, count = 0x13377E6, 6
+          for section in sections:
+              name_off, _, _, addr, offset, size, *_ = section
+              name = names[name_off:names.find(b"\\0", name_off)].decode(errors="replace")
+              if addr <= target and target + count <= addr + size:
+                  file_offset = offset + target - addr
+                  table = binary[file_offset:file_offset + count]
+                  if len(table) != count:
+                      raise SystemExit("Truncated jump-table read")
+                  expected = bytes.fromhex("00 5b 55 58 2c a4")
+                  if table != expected:
+                      raise SystemExit(f"Unexpected jump table bytes: {table.hex(' ')}")
+                  Path("work/out/preview-coroutine-state-jumptable.txt").write_text(
+                      f"section={name} virtual_address=0x{target:x} file_offset=0x{file_offset:x}\\n"
+                      f"bytes={table.hex(' ')}\\n" +
+                      "".join(f"state_{i}: byte=0x{b:02x} target=0x{0x3270F48 + b * 4:x}\\n" for i, b in enumerate(table))
+                  )
+                  break
+          else:
+              raise SystemExit("Jump table virtual address was not found in any ELF section")
+          PY
+          llvm-objdump -d --no-show-raw-insn --start-address=0x3270d7c --stop-address=0x3272474 work/bin/libil2cpp.so > work/out/preview-coroutine-movenext.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x2f2dc8c --stop-address=0x2f2dd10 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-2f2dc8c.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x3261d74 --stop-address=0x3261e20 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-3261d74.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x5ad7ad8 --stop-address=0x5ad7b60 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-5ad7ad8.txt
           llvm-objdump -d --no-show-raw-insn --start-address=0x66b9ad8 --stop-address=0x66b9b60 work/bin/libil2cpp.so > work/out/preview-coroutine-helper-66b9ad8.txt
+          rm -f work/out/full-disassembly.txt
       - name: Upload call graph
         uses: actions/upload-artifact@v4
         with:
