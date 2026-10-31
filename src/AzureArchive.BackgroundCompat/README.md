@@ -15,6 +15,7 @@ This project contains standalone, testable C# primitives recovered or derived fr
 - `BackgroundPreviewCacheLedger`: records preview texture ownership metadata, user counts and last-use frames; exposes unused entries in LastUse order. It deliberately leaves the exact trim trigger and Unity/Addressables destruction to the runtime adapter.
 - `BackgroundSkeletonTrimPlanner`: applies the separate Android 1.0 768 MiB retained-Spine-asset budget, selecting least-recently-accessed entries without consumers; it returns keys only and never disposes Unity objects. This is intentionally separate from the 32 MiB / 24-entry preview texture cache.
 - `SpineAssetReferenceLedger`: models the verified `RuntimeSpineAsset` count semantics: one cache-owned reference, consumers when count > 1, no resurrection after zero, and a one-time final-release signal. It deliberately does not destroy Unity objects; the runtime adapter must perform the actual Atlas/material/object cleanup.
+- `SpineAssetConstructionLedger<TObject>`: stages unique objects created during runtime Spine asset construction and transfers them on commit or returns the partial set on abort. The Unity adapter supplies the target runtime's equality comparer and performs rollback/destruction on Unity's main thread; this ledger never calls Unity APIs.
 - `SpineAtlasPageNames` / `SpineAtlasPageResourceResolver`: extracts atlas page names and maps them to caller-provided resource keys.
 - `SpineAtlasPageCache`: tracks texture ownership across active leases and defers release until the final lease is returned.
 
