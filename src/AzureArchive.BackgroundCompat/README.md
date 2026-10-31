@@ -10,6 +10,8 @@ This project contains standalone, testable C# primitives recovered or derived fr
 - `BackgroundImageOverrideFactory` / `SpineBackgroundOverrideFactory`: map the corresponding Android 1.0 override fields into platform-neutral descriptors and validate Spine identifiers/framing values.
 - `AddressableInternalIdResolver`: replaces the exact catalog prefix `{ScenarioResourceManager.AddrLoadUrl}` with a runtime-supplied HTTP(S) base URL after validating the suffix and origin. It deliberately does not supply or guess the CDN URL.
 - `AddressableAssetLease`: owns one successful Addressables operation handle and releases it exactly once through a supplied callback.
+- `BackgroundPreviewRequestCoalescer`: joins callbacks for an already-running preview key so only the first request starts the load.
+- `BackgroundPreviewCacheLedger`: records preview texture ownership metadata, user counts and last-use frames; exposes unused entries in LastUse order. It deliberately leaves the exact trim trigger and Unity/Addressables destruction to the runtime adapter.
 - `SpineAtlasPageNames` / `SpineAtlasPageResourceResolver`: extracts atlas page names and maps them to caller-provided resource keys.
 - `SpineAtlasPageCache`: tracks texture ownership across active leases and defers release until the final lease is returned.
 
