@@ -14,8 +14,11 @@ Date: 2026-10-31
 ## CI findings and correction
 - First runs after the path-hardening edit failed at compile time because the generated C# null-character literal had an extra backslash (CS1012). This was detected from the GitHub Actions log.
 - Corrected the source to use the C# null character literal `'\\0'`.
-- A fresh run was triggered: [41184151823](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184151823). At the time of this report it was still in progress; no passing result is claimed yet.
-- Earlier failed runs: [41184126992](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184126992) and [41184130094](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184130094).
+- A fresh run completed successfully: [41184151823](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184151823).
+- Build result: 0 warnings, 0 errors.
+- Test output: `PASS: 13 SafeResourcePath checks`.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13036136760`, 8,878 bytes. SHA-256: `ccf00173363e525a109f7d2416cb05cc3ae6df278f4113cd808d7b508371a78c`.
+- Earlier failed runs: [41184126992](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184126992) and [41184130094](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184130094); both were due to the null-character literal issue fixed in the final run.
 
 ## Validation boundaries
 - The path-safety utility is standalone .NET code and does not yet prove integration into AzureArchive's Unity runtime.
