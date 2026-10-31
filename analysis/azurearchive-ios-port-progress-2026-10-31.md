@@ -289,3 +289,14 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - Extended the Unity compatibility test project to compile the descriptor source and test successful descriptor-driven decoding, Native rejection and Spine rejection.
 - GitHub Actions run [41198025689](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41198025689) passed: compatibility library build/tests and Unity API-stub compile/runtime tests. Artifact ID: `13041850514`.
 - Validation boundary: tests use isolated Unity API stubs, not the real Unity 2023.2.20f1c1 player. The adapter is not yet wired into a complete game scene or the original ScenarioResourceManager.
+
+
+## Spine background override metadata checkpoint
+
+- Decompiled Android 1.0 `ResourceOverrideData.BgSpineOverrideData` and its direct IL establish fields: Identifier, SpinePath, Animation, Loop, Skin, PreviewPath, PreviewTime, Scale, OffsetX, OffsetY; Id is `CalculateHash(Identifier)`. Constructor defaults are Loop=true and Scale=1.
+- Direct Android `BackgroundResource.Validate` IL establishes required Identifier/SpinePath, nonzero hashed ID, positive finite Scale, finite offsets, and nonnegative finite PreviewTime. The portable factory mirrors those constraints and error cases.
+- Added `SpineBackgroundOverrideRecord`, `SpineBackgroundOverrideFactory`, and `BackgroundOverrideSetFactory`. The set factory emits Image entries before Spine entries and preserves local/global source.
+- Background descriptors now retain Spine animation/framing/skin/preview metadata and resolve the preview image under the custom root. This is still data modeling; no actual Spine skeleton/atlas playback is integrated.
+- Caveat: generated iterator and constructor IL contain unresolved/type-inconsistent Cpp2IL output around the final Spine object parameter. Do not claim the original runtime's exact Spine attachment semantics as proven until native method/callsite verification.
+- Detailed evidence: `analysis/android-spine-background-override-record-findings-2026-10-31.md`.
+- Pre-preview-path CI run [41198701750](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41198701750) passed. A new run is triggered for the latest preview-path tests and report.
