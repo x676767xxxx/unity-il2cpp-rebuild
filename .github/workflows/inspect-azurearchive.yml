@@ -11,50 +11,54 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Decode Addressables bundle references and locate bundle files
+      - name: Inspect catalog structure and full archive inventories
         run: |
           python3 - <<'PY'
           import zipfile,pathlib,json,base64,re,collections,hashlib
           files={"iOS":"inspect/AzureArchive_IOS_0.7.9.2.ipa","Android":"inspect/base.apk","Windows":"inspect/AzureArchive_Win_1.0.1.zip"}
-          out=[]; refs={}; inventories={}
+          out=[]
           def add(x=""): out.append(str(x))
-          pat=re.compile(rb'[A-Za-z0-9_./-]{4,180}\\.bundle',re.I)
+          def find_catalog(names): return next((n for n in names if n.lower().endswith("catalog.json") and "/aa/" in n.lower()),None)
           for platform,path in files.items():
-            z=zipfile.ZipFile(path); names=z.namelist()
-            cn=next((n for n in names if n.endswith("/catalog.json") and "/aa/" in n.lower()),None)
-            add("## "+platform)
-            if not cn: add("CATALOG MISSING"); continue
-            c=json.loads(z.read(cn)); found=collections.Counter()
-            for key in ("m_KeyDataString","m_ExtraDataString","m_EntryDataString","m_BucketDataString"):
-              val=c.get(key)
-              if isinstance(val,str):
-                try: raw=base64.b64decode(val+"===")
-                except Exception: raw=val.encode()
-                for m in pat.findall(raw): found[m.decode("utf-8","replace")]+=1
-            refs[platform]=set(found)
-            add(f"Bundle-like strings decoded from catalog: {len(found)} unique")
-            for x,n in found.most_common(100): add(f"  CATALOG_REF {x} occurrences={n}")
-            # List likely local Addressables/bundle files independent of extension
+            z=zipfile.ZipFile(path); names=z.namelist(); add("## "+platform)
+            cn=find_catalog(names)
+            if cn:
+              raw=z.read(cn); c=json.loads(raw)
+              add(f"CATALOG {cn} size={len(raw)}")
+              for k,v in c.items():
+                if isinstance(v,str): add(f"FIELD {k}: string len={len(v)} prefix={v[:140]!r}")
+                elif isinstance(v,list): add(f"FIELD {k}: list len={len(v)} sample={repr(v[:2])[:500]}")
+                elif isinstance(v,dict): add(f"FIELD {k}: dict keys={list(v)[:30]}")
+                else: add(f"FIELD {k}: {type(v).__name__} {repr(v)[:200]}")
+              for k,v in c.items():
+                if isinstance(v,str) and len(v)>100:
+                  variants=[]
+                  try: variants.append(("base64",base64.b64decode(v+"===")))
+                  except Exception: pass
+                  variants.append(("utf8",v.encode()))
+                  for label,b in variants:
+                    for enc,data in (("bytes",b),("utf16le",b.decode("utf-16le","ignore").encode("utf-8","ignore"))):
+                      hits=re.findall(rb'[A-Za-z0-9_./-]{3,160}(?:\\.bundle|\\.hash|\\.json|\\.assetbundle)',data,re.I)
+                      if hits: add(f"DECODE_HITS {k} {label}/{enc}: "+repr([x.decode("utf8","replace") for x in hits[:100]]))
+            # All archive paths and sizes: large files plus anything with likely resource-related names/extensions
+            infos=[i for i in z.infolist() if not i.is_dir()]
+            add(f"ARCHIVE_FILES total={len(infos)} total_uncompressed={sum(i.file_size for i in infos)}")
             candidates=[]
+            for i in infos:
+              n=i.filename; low=n.lower()
+              if i.file_size>=1024*1024 or any(t in low for t in ("bundle","asset","streamingassets","addressable","catalog","resource","data.unity3d","obb")):
+                candidates.append(i)
+            add(f"INVENTORY candidates={len(candidates)}")
+            for i in sorted(candidates,key=lambda x:x.file_size,reverse=True)[:250]:
+              add(f"FILE {i.file_size} {i.filename}")
+            # APK expansion/OBB indicators and Unity data file names
             for n in names:
               low=n.lower()
-              if any(s in low for s in ("/aa/","streamingassets","assetbundle","bundles/")):
-                try: size=z.getinfo(n).file_size
-                except: continue
-                if size>=64*1024: candidates.append((n,size))
-            inventories[platform]=candidates
-            add(f"Archive AA/bundle candidates >=64KiB: {len(candidates)}")
-            for n,size in sorted(candidates,key=lambda x:x[1],reverse=True)[:120]:
-              add(f"  ARCHIVE_FILE {size} {n}")
-          add("## Cross-platform bundle reference comparison")
-          for a,b in (("iOS","Android"),("iOS","Windows"),("Android","Windows")):
-            if a in refs and b in refs:
-              add(f"{a} vs {b}: common={len(refs[a]&refs[b])} only_{a}={len(refs[a]-refs[b])} only_{b}={len(refs[b]-refs[a])}")
-              for x in sorted(refs[a]-refs[b])[:25]: add("  ONLY "+a+" "+x)
-              for x in sorted(refs[b]-refs[a])[:25]: add("  ONLY "+b+" "+x)
-          pathlib.Path("inspect/bundle-reference-report.txt").write_text("\n".join(out))
+              if any(t in low for t in ("main.", "patch.", ".obb", "data.unity3d", "globalgamemanagers", "resources.assets", "sharedassets")):
+                add("UNITY_OR_EXPANSION_PATH "+n)
+          pathlib.Path("inspect/catalog-structure-inventory.txt").write_text("\n".join(out))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-bundle-reference-report
-          path: inspect/bundle-reference-report.txt
+          name: azurearchive-catalog-structure-inventory
+          path: inspect/catalog-structure-inventory.txt
