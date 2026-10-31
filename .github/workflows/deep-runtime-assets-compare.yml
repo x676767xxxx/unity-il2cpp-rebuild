@@ -1,0 +1,92 @@
+name: Deep compare iOS Android Windows runtime assets
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/deep-runtime-assets-compare.yml"
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install inspection tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file binutils
+      - name: Download release inputs
+        run: |
+          set -euo pipefail
+          mkdir -p work/in work/out work/ios
+          curl -fL --retry 3 -o work/in/old-ios.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o work/in/android-1.0.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          curl -fL --retry 3 -o work/in/windows-1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+          unzip -q work/in/old-ios.ipa -d work/ios
+          echo "Inputs downloaded" > work/out/input-status.txt
+          sha256sum work/in/* > work/out/input-sha256.txt
+      - name: Inspect platform archives and catalogs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, zipfile, plistlib, re
+          from pathlib import Path
+          out=Path("work/out")
+          ipa=zipfile.ZipFile("work/in/old-ios.ipa")
+          apk=zipfile.ZipFile("work/in/android-1.0.apk")
+          win=zipfile.ZipFile("work/in/windows-1.0.1.zip")
+          report=["# Deep runtime and resource comparison","", "Archive/catalog evidence only. Filenames and strings do not prove runtime API compatibility.",""]
+          def archive_section(label,z):
+              infos=z.infolist()
+              report.extend([f"## {label}",f"Entries: {len(infos)}", "### Relevant paths"])
+              pats=re.compile(r"(spine|skeleton|addressable|catalog|assetbundle|\.bundle$|\.assets$|\.ress$|global-metadata|assembly-csharp|gameassembly|unityframework|unityplayer|\.skel$|\.atlas$|\.bytes$)",re.I)
+              matches=[f"{i.filename}\t{i.file_size}" for i in infos if pats.search(i.filename)]
+              report.extend(matches[:1500] or ["(no matching paths)"])
+              report.append("")
+          archive_section("iOS 0.7.9.2 IPA",ipa)
+          archive_section("Android 1.0 APK",apk)
+          archive_section("Windows 1.0.1 ZIP",win)
+          app_info=next((n for n in ipa.namelist() if n.endswith(".app/Info.plist")),None)
+          if app_info:
+              info=plistlib.loads(ipa.read(app_info))
+              report += ["## iOS Info.plist (plistlib)",json.dumps({k:info.get(k) for k in ["CFBundleIdentifier","CFBundleName","CFBundleShortVersionString","CFBundleVersion","MinimumOSVersion","DTPlatformVersion","DTSDKName"]},indent=2,default=str),""] 
+          catname=next((n for n in ipa.namelist() if n.endswith("/Data/Raw/aa/catalog.json")),None)
+          if catname:
+              raw=ipa.read(catname)
+              try:
+                  cat=json.loads(raw)
+                  report += ["## iOS Addressables catalog",f"Bytes: {len(raw)}",f"Root type: {type(cat).__name__}"]
+                  if isinstance(cat,dict):
+                      report.append("Top-level keys: "+", ".join(list(cat.keys())[:80]))
+                      for k,v in cat.items():
+                          if isinstance(v,list):
+                              report.append(f"Array {k}: {len(v)} entries")
+                              for x in v[:8]:
+                                  report.append("  "+json.dumps(x,ensure_ascii=False,default=str)[:1000])
+                  report.append("")
+              except Exception as e: report += ["Catalog JSON parse failed: "+repr(e),"Raw prefix: "+raw[:300].decode("utf-8","replace")]
+          for label,z in [("iOS",ipa),("Android",apk),("Windows",win)]:
+              selected=[]
+              for i in z.infolist():
+                  n=i.filename.lower()
+                  if any(t in n for t in ["global-metadata.dat","libil2cpp.so","unityframework","gameassembly.dll","assembly-csharp.dll","spine-unity","spine-csharp","catalog.json","settings.json"]):
+                      selected.append((i.filename,i.file_size))
+              report += [f"## {label} key files"]+[f"{n}\t{s}" for n,s in selected[:500]]+[""]
+          (out/"deep-runtime-assets-report.md").write_text("\n".join(report))
+          print("Report generated; iOS catalog:",catname or "not found")
+          PY
+      - name: Extract runtime version strings and headers
+        run: |
+          set -euo pipefail
+          APP=$(find work/ios/Payload -maxdepth 1 -type d -name '*.app' | head -1)
+          find "$APP" -type d -name '*.framework' -print | sort > work/out/ios-framework-directories.txt
+          find "$APP" -type f \( -name '*.dylib' -o -name '*.bundle' -o -name '*.dll' \) -print | sort > work/out/ios-native-and-managed-files.txt
+          find "$APP" -type f \( -name '*.assets' -o -name '*.resS' -o -name '*.resource' \) -printf '%P\t%s\n' | sort > work/out/ios-unity-serialized-assets.tsv
+          UNITY=$(find "$APP/Frameworks" -type f -name UnityFramework | head -1)
+          strings -a "$UNITY" | grep -Ei 'Spine|SkeletonData|RuntimeSpineAsset|ImageConversion|LoadImage|Texture2D|Addressables' | sort -u | head -1000 > work/out/ios-runtime-symbol-strings.txt || true
+          cat > work/out/inspection-notes.txt <<'EOF'
+          Info.plist is parsed using Python plistlib in this workflow.
+          Frameworks are enumerated as directories; dylibs/bundles/DLLs are enumerated separately.
+          String hits are clues only, not callable API or ABI proof.
+          EOF
+      - name: Upload deep comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-deep-runtime-assets
+          path: work/out/
