@@ -53,6 +53,7 @@ jobs:
           llvm-lipo "$IOS" -thin arm64 -output work/pkg/ios/UnityFramework.arm64 || cp "$IOS" work/pkg/ios/UnityFramework.arm64
       - name: Configure dumper
         run: |
+          mkdir -p work/out/ios work/out/android work/out/windows
           cat > work/tools/dumper/config.json <<'JSON'
           {
             "DumpMethod": true, "DumpField": true, "DumpProperty": true,
@@ -70,6 +71,7 @@ jobs:
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
           dotnet "$DLL" "$PWD/work/pkg/ios/UnityFramework.arm64" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/ios" > work/out/ios-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/ios-dumper.log
+          test -s work/out/ios/dump.cs
       - name: Run Android metadata dump
         continue-on-error: true
         run: |
@@ -77,6 +79,7 @@ jobs:
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
           dotnet "$DLL" "$PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/android/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/android-dumper.log
+          test -s work/out/android/dump.cs
       - name: Run Windows metadata dump
         continue-on-error: true
         run: |
@@ -84,6 +87,7 @@ jobs:
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
           dotnet "$DLL" "$PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/windows/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/windows-dumper.log
+          test -s work/out/windows/dump.cs
       - name: Compare target type and method names
         if: always()
         run: |
