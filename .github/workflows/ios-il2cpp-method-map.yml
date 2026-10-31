@@ -100,7 +100,7 @@ jobs:
           for i, line in enumerate(hlines):
               if "segname __TEXT" in line:
                   for candidate in hlines[i+1:i+12]:
-                      m = re.search(r"vmaddr\\s+(0x[0-9a-fA-F]+)", candidate)
+                      m = re.search(r"vmaddr\s+(0x[0-9a-fA-F]+)", candidate)
                       if m:
                           base = int(m.group(1), 16)
                           break
@@ -117,7 +117,7 @@ jobs:
                          "work/ios/UnityFramework"]
                   p = subprocess.run(cmd, capture_output=True, text=True)
                   output = p.stdout + p.stderr
-                  if p.returncode == 0 and re.search(r"^\\s*[0-9a-fA-F]+:", output, re.M):
+                  if p.returncode == 0 and re.search(r"^\s*[0-9a-fA-F]+:", output, re.M):
                       chosen = (label, lo, hi, output)
                       break
               if chosen is None:
