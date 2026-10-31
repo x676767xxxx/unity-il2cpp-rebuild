@@ -1,0 +1,70 @@
+name: Compare Unity runtime versions and native plugin ABI
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/compare-unity-runtime-abi.yml"
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file binutils
+      - name: Download release packages
+        run: |
+          set -euo pipefail
+          mkdir -p work/{ios,android,windows,out}
+          curl -fsSL --retry 3 -o work/ios/old.ipa https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa
+          curl -fsSL --retry 3 -o work/android/base.apk https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk
+          curl -fsSL --retry 3 -o work/windows/windows.zip https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip
+      - name: Extract engine binaries and compare metadata
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile,pathlib
+          for plat,arc in [('ios','work/ios/old.ipa'),('android','work/android/base.apk'),('windows','work/windows/windows.zip')]:
+              with zipfile.ZipFile(arc) as z:
+                  for i in z.infolist():
+                      n=i.filename.lower()
+                      wanted=(plat=='ios' and (n.endswith('/unityframework') or n.endswith('/global-metadata.dat') or n.endswith('/info.plist'))) or (plat=='android' and (n.endswith('/libunity.so') or n.endswith('/libil2cpp.so') or n.endswith('/global-metadata.dat') or n.endswith('androidmanifest.xml'))) or (plat=='windows' and (n.endswith('/unityplayer.dll') or n.endswith('/gameassembly.dll') or n.endswith('/globalgamemanagers')))
+                      if wanted:
+                          p=pathlib.Path('work')/plat/'extract'/i.filename
+                          p.parent.mkdir(parents=True,exist_ok=True)
+                          with z.open(i) as src,p.open('wb') as dst:
+                              while True:
+                                  b=src.read(1024*1024)
+                                  if not b: break
+                                  dst.write(b)
+          PY
+          {
+            for p in work/ios/extract work/android/extract work/windows/extract; do
+              echo "## $p"
+              find "$p" -type f -printf '%p\t%s bytes\n' | sort
+              while IFS= read -r f; do
+                echo "### $f"
+                file "$f"
+                case "$f" in
+                  *UnityFramework|*libunity.so|*UnityPlayer.dll)
+                    strings -a "$f" | grep -Eo '20[0-9]{2}\.[0-9]+\.[0-9]+f[0-9]+([a-z][0-9]+)?|Unity [0-9]+\.[0-9]+\.[0-9]+' | sort -u | head -40 || true
+                    ;;
+                  *global-metadata.dat)
+                    strings -a "$f" | grep -E 'Spine|RuntimeSpine|Addressables|ScenarioResourceManager|UnityEngine.ImageConversion' | sort -u | head -60 || true
+                    ;;
+                esac
+              done < <(find "$p" -type f | sort)
+            done
+            echo "## iOS Mach-O architecture"
+            find work/ios/extract -type f -name UnityFramework -exec readelf -h {} \; || true
+            echo "## Android ELF headers"
+            find work/android/extract -type f -name 'libil2cpp.so' -o -name 'libunity.so' | while read f; do echo "$f"; readelf -h "$f" | grep -E 'Class:|Machine:|Type:'; done
+            echo "## Windows PE machine"
+            find work/windows/extract -type f -name '*.dll' | while read f; do echo "$f"; objdump -f "$f" | head -8; done
+          } | tee work/out/runtime-abi-comparison.txt
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-unity-runtime-abi
+          path: work/out/
