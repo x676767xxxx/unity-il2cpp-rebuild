@@ -37,3 +37,14 @@
 - Analysis and binary export inspection only. No production compatibility-layer code has been compiled.
 - No iOS 1.0 Unity project/source tree or iOS 1.0 native build is available.
 - No iOS 1.0 IPA has been built or device-verified.
+
+
+## Addressables internal-ID substitution adapter (2026-10-31 follow-up)
+
+- Re-opened the catalog comparison artifact from run 41174257250 and the deep runtime archive report from run 41174212438.
+- Confirmed the catalog's internal IDs begin with the exact token `{ScenarioResourceManager.AddrLoadUrl}`, followed by a slash and a bundle filename. The iOS catalog has 32,353 internal IDs; the ordered tokenized internal-ID list matches Android 1.0 and Windows 1.0.1.
+- Added `AddressableInternalIdResolver.Resolve(internalId, addrLoadUrl)`. It replaces only this verified leading token with a runtime-supplied base URL. It does not guess or hardcode a CDN endpoint.
+- Added URL validation for HTTP(S), origin preservation, credentials/query/fragment rejection, absolute/authority overrides, empty path segments, literal and percent-encoded traversal, encoded separators and control characters.
+- Regression coverage: 13 internal-ID resolver checks. The standalone compatibility CI passed on [run 41187379970](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41187379970) with 0 warnings and 0 errors. Test output: `PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks`, plus Unity adapter checks.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13037047891`, 14,808 bytes.
+- Important limit: the exact runtime value/selection logic that populates `ScenarioResourceManager.AddrLoadUrl` has not yet been reconstructed. This resolver is an independently tested token-substitution primitive; it is not yet wired into the actual catalog provider or game ScenarioResourceManager.
