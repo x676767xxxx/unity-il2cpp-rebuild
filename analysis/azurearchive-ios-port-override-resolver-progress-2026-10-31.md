@@ -16,8 +16,10 @@ This follows the recovered Android 1.0 / Windows 1.0.1 local-before-global overr
 Added five checks for local precedence, global fallback, null sequences, no match, and null predicate. The existing 13 path-safety checks remain.
 
 ## CI
-- Run [41184475166](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184475166) was in progress when this note was written.
-- No pass/fail result is claimed until it completes.
+- Run [41184475166](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41184475166) completed its build/test/upload steps successfully; job log confirms all checks passed.
+- Build: 0 warnings, 0 errors.
+- Test output: `PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks` and `PASS: 7 Unity decoder contract checks`.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13036396150`, 9,495 bytes. SHA-256: `fc0cb215337cdb50756097d2c854413b1fad5e4e9a18d3a4adc1ccca409f8746`.
 
 ## Current 1.0 feature implementation assessment
 Implemented/build-tested standalone helpers:
