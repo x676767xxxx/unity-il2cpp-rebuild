@@ -158,6 +158,13 @@ internal static class Program
         AssertEqual("Idle", spineDescriptor.SpineOverride!.Animation, "Spine animation retained");
         AssertEqual("Night", spineDescriptor.SpineOverride.Skin, "Spine skin retained");
         AssertEqual("preview/night.png", spineDescriptor.SpineOverride.PreviewPath, "preview path normalized and retained");
+        AssertEqual(Path.GetFullPath(Path.Combine(root, "preview", "night.png")),
+            spineDescriptor.SpinePreviewFullPath, "Spine preview path resolves beneath basePath");
+        var unsafePreview = SpineBackgroundOverrideFactory.Create(
+            new SpineBackgroundOverrideRecord("unsafe-preview", "scene.skel", previewPath: "../outside.png"),
+            root, BackgroundResourceOrigin.LocalCustom);
+        AssertThrows<InvalidDataException>(() => { var ignored = unsafePreview.SpinePreviewFullPath; },
+            "Spine preview path rejects root traversal");
         AssertEqual("False", spineDescriptor.SpineOverride.Loop.ToString(), "Spine loop setting retained");
         AssertEqual("1.25", spineDescriptor.SpineOverride.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "Spine scale retained");
