@@ -11,54 +11,70 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Inspect catalog structure and full archive inventories
+      - name: Resolve remote Addressables URL configuration
         run: |
           python3 - <<'PY'
-          import zipfile,pathlib,json,base64,re,collections,hashlib
+          import zipfile,pathlib,json,re,collections,hashlib
           files={"iOS":"inspect/AzureArchive_IOS_0.7.9.2.ipa","Android":"inspect/base.apk","Windows":"inspect/AzureArchive_Win_1.0.1.zip"}
-          out=[]
+          out=[]; ids={}
           def add(x=""): out.append(str(x))
-          def find_catalog(names): return next((n for n in names if n.lower().endswith("catalog.json") and "/aa/" in n.lower()),None)
           for platform,path in files.items():
             z=zipfile.ZipFile(path); names=z.namelist(); add("## "+platform)
-            cn=find_catalog(names)
+            cn=next((n for n in names if n.lower().endswith("catalog.json") and "/aa/" in n.lower()),None)
             if cn:
-              raw=z.read(cn); c=json.loads(raw)
-              add(f"CATALOG {cn} size={len(raw)}")
-              for k,v in c.items():
-                if isinstance(v,str): add(f"FIELD {k}: string len={len(v)} prefix={v[:140]!r}")
-                elif isinstance(v,list): add(f"FIELD {k}: list len={len(v)} sample={repr(v[:2])[:500]}")
-                elif isinstance(v,dict): add(f"FIELD {k}: dict keys={list(v)[:30]}")
-                else: add(f"FIELD {k}: {type(v).__name__} {repr(v)[:200]}")
-              for k,v in c.items():
-                if isinstance(v,str) and len(v)>100:
-                  variants=[]
-                  try: variants.append(("base64",base64.b64decode(v+"===")))
-                  except Exception: pass
-                  variants.append(("utf8",v.encode()))
-                  for label,b in variants:
-                    for enc,data in (("bytes",b),("utf16le",b.decode("utf-16le","ignore").encode("utf-8","ignore"))):
-                      hits=re.findall(rb'[A-Za-z0-9_./-]{3,160}(?:\\.bundle|\\.hash|\\.json|\\.assetbundle)',data,re.I)
-                      if hits: add(f"DECODE_HITS {k} {label}/{enc}: "+repr([x.decode("utf8","replace") for x in hits[:100]]))
-            # All archive paths and sizes: large files plus anything with likely resource-related names/extensions
-            infos=[i for i in z.infolist() if not i.is_dir()]
-            add(f"ARCHIVE_FILES total={len(infos)} total_uncompressed={sum(i.file_size for i in infos)}")
-            candidates=[]
-            for i in infos:
-              n=i.filename; low=n.lower()
-              if i.file_size>=1024*1024 or any(t in low for t in ("bundle","asset","streamingassets","addressable","catalog","resource","data.unity3d","obb")):
-                candidates.append(i)
-            add(f"INVENTORY candidates={len(candidates)}")
-            for i in sorted(candidates,key=lambda x:x.file_size,reverse=True)[:250]:
-              add(f"FILE {i.file_size} {i.filename}")
-            # APK expansion/OBB indicators and Unity data file names
+              c=json.loads(z.read(cn)); vals=c.get("m_InternalIds",[]); ids[platform]=vals
+              add(f"Catalog={cn} entries={len(vals)}")
+              # classify URL placeholders and hashed bundle names
+              samples=collections.Counter()
+              for x in vals:
+                if isinstance(x,str):
+                  tail=x.rsplit("/",1)[-1]
+                  samples[tail.rsplit("_",1)[0] if "_" in tail else tail]+=1
+              add("First 35 InternalIds:")
+              for x in vals[:35]: add("  "+x)
+              add("URL placeholder occurrences="+str(sum("{ScenarioResourceManager.AddrLoadUrl}" in str(x) for x in vals)))
+              add("Distinct internal IDs="+str(len(set(vals))))
+            # print settings/build config files if present
             for n in names:
               low=n.lower()
-              if any(t in low for t in ("main.", "patch.", ".obb", "data.unity3d", "globalgamemanagers", "resources.assets", "sharedassets")):
-                add("UNITY_OR_EXPANSION_PATH "+n)
-          pathlib.Path("inspect/catalog-structure-inventory.txt").write_text("\n".join(out))
+              if low.endswith(("settings.json","build_info","addressableslink/link.xml")) or ("config" in low and low.endswith(".json")):
+                try:
+                  b=z.read(n)
+                  add(f"CONFIG {n} bytes={len(b)} content={b[:12000].decode('utf8','replace')}")
+                except Exception as e: add(f"CONFIG_READ_ERROR {n} {e}")
+            # search selected text and native binaries for resource URL tokens/domains and AddrLoadUrl
+            targets=[n for n in names if n.lower().endswith((".json",".config",".xml",".txt",".dat",".dll",".so",".framework","unityframework","gameassembly.dll"))]
+            patterns=[b"AddrLoadUrl",b"ScenarioResourceManager",b"https://",b"http://",b"cdn",b"addressable"]
+            found=0
+            for n in targets:
+              try:
+                b=z.read(n)
+              except: continue
+              for pat in patterns:
+                start=0
+                while True:
+                  i=b.find(pat,start)
+                  if i<0: break
+                  frag=b[max(0,i-180):min(len(b),i+500)]
+                  txt=frag.decode("utf8","replace").replace("\\x00","")
+                  if "http" in txt.lower() or "AddrLoadUrl" in txt or "ScenarioResourceManager" in txt:
+                    add(f"STRING_HIT {n} pattern={pat.decode()} offset={i}: {txt[:700]!r}")
+                    found+=1
+                  start=i+len(pat)
+                  if found>150: break
+                if found>150: break
+              if found>150: break
+            add("String hits recorded="+str(found))
+          add("## InternalId comparisons")
+          for a,b in (("iOS","Android"),("iOS","Windows"),("Android","Windows")):
+            if a in ids and b in ids:
+              sa,sb=set(ids[a]),set(ids[b])
+              add(f"{a} vs {b}: list_equal={ids[a]==ids[b]} same_set={sa==sb} intersection={len(sa&sb)} only_{a}={len(sa-sb)} only_{b}={len(sb-sa)}")
+              for x in list(sorted(sa-sb))[:30]: add("  ONLY "+a+" "+x)
+              for x in list(sorted(sb-sa))[:30]: add("  ONLY "+b+" "+x)
+          pathlib.Path("inspect/remote-url-resolution.txt").write_text("\n".join(out))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-catalog-structure-inventory
-          path: inspect/catalog-structure-inventory.txt
+          name: azurearchive-remote-url-resolution
+          path: inspect/remote-url-resolution.txt
