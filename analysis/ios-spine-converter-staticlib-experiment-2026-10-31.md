@@ -93,3 +93,14 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 
 - Packaging hardening exposed two shell portability issues, both corrected in follow-up commits: `lipo` requires the input archive before `-verify_arch`; with `set -o pipefail`, piping `nm` directly into `grep -q` can fail from SIGPIPE. The packager now runs `nm` to a temporary file before checking the three symbols.
 - Corrected packaging workflow [41186251935](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186251935) is running; artifact creation remains unconfirmed until its upload step succeeds.
+
+
+## Unity plugin package built and independently inspected (2026-10-31)
+
+- Fixed two package-workflow issues found in CI: corrected the `lipo -verify_arch` argument order, then removed a `pipefail`/SIGPIPE hazard from the exported-symbol check by writing `nm` output to a file before grepping.
+- Final run [41186251935](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186251935) completed successfully. All workflow steps passed: managed/native ABI check, iPhoneOS ARM64 library build, host-side conversion smoke test, plugin packaging, and both artifact uploads.
+- Artifacts: `azurearchive-spine-unity-ios-plugin` (ID `13036649978`, 1,842,580 bytes) and `azurearchive-spine-converter-ios-arm64` (ID `13036814492`, 1,938,905 bytes).
+- Downloaded and unpacked the plugin artifact independently. It contains Unity `Assets/Plugins/iOS/libazurearchive_spine_converter_ios.a`, ABI header, iOS plugin metadata, `Assets/Scripts/SpineConverterNative.Unity.cs`, README and third-party LICENSE.
+- Independently extracted the archive's 34 object files; each inspected object is Mach-O 64-bit arm64. Verified the packaged library SHA-256 against `SHA256SUMS.txt`: `69435478f4bf6acd85ee003e4b282148025f97ed9ea48eb490cad774fea55d44`.
+- This artifact is an importable Unity native-plugin package, not a Unity project or game build. The repository still has no `Assets/` game project, `ProjectSettings/`, scenes, Spine 4.2 runtime, atlas renderer or Xcode workspace. No AzureArchive 1.0 IPA is available yet.
+- Remaining technical validation: integrate the package into the actual Unity project, link and run the native calls on device, and test actual AzureArchive Spine assets. The upstream converter still reports unhandled enum cases including `BONE_INHERIT`, `PHYSICS_RESET`, and `AttachmentType_Point`; these must be resolved or shown irrelevant using actual game fixtures before claiming full Spine 4.2 fidelity.
