@@ -90,3 +90,14 @@ Porting decision:
 - Android ARM64 RVAs must not be applied to iOS Mach-O.
 - Current evidence supports a porting investigation plan, not full feature parity.
 - No iOS 1.0 IPA has been built yet.
+
+
+## Verified exact method diff (completed 2026-10-31)
+
+A platform-matched Il2CppDumper extraction subsequently succeeded for all three packages. Exact top-level class-scope parsing confirms:
+- ScenarioResourceManager: iOS has 3/11 selected declarations; Android 1.0 and Windows 1.0.1 have all 11. The eight additional Android/Windows declarations are ResolveBackground, EnumerateBackgrounds, AcquireBackgroundSpine, GetBackgroundTexture(BackgroundResource), GetBackgroundPreviewAsync, InitializeAuthoringResources, GetCustomBgEffect and GetBgEffectChoices.
+- AuthoringResourceCatalog: absent from the iOS 0.7.9.2 dump; present in Android and Windows with matching Search, Resolve, StageReferencedResources (two overloads) and Import declarations.
+- Character.ApplyDisplayRank(int): absent in old iOS; present in Android and Windows.
+- CharacterManager.GetSkeletonDataAssetAtPath exists on all platforms, but Android/Windows have an extra optional quiet parameter.
+
+Full signatures and limitations: [exact method diff](ios-android-windows-exact-method-diff-2026-10-31.md). These are metadata declarations, not recovered source bodies or proof of runtime behavior. The Android dump completed but logged a protection warning, so native offsets/call paths need independent verification.
