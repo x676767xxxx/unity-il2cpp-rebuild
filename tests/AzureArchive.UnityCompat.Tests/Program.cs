@@ -62,8 +62,8 @@ internal static class Program
             AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, rootedImage), "reject absolute resource path");
 
             var imageCache = new BackgroundImageRuntimeCache(path => "corrected:" + path);
-            Texture2D? cachedCustomA = null;
-            Texture2D? cachedCustomB = null;
+            Texture? cachedCustomA = null;
+            Texture? cachedCustomB = null;
             imageCache.Load(customDescriptor, texture => cachedCustomA = texture);
             imageCache.Load(customDescriptor, texture => cachedCustomB = texture);
             Assert(cachedCustomA != null && ReferenceEquals(cachedCustomA, cachedCustomB),
