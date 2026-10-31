@@ -40,3 +40,15 @@ Date: 2026-10-31
 - Added isolated tests for file-backed decode, filename propagation, empty path and missing-file behavior.
 - CI [41186565889](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186565889) completed successfully: Unity-compatible library build, path-safety checks and Unity decoder/Spine bridge stub tests all passed. Artifact `13037190870` (`azurearchive-background-path-compat-library`, 13,125 bytes).
 - This remains a standalone adapter/test, not connected to AzureArchive's runtime resource manager or Addressables. No actual game bundle, Unity project, iOS player or IPA was built.
+
+
+## Unity Addressables async adapter (2026-10-31)
+
+- Added `src/AzureArchive.UnityCompat/AddressablesRuntimeAdapter.Unity.cs`, wrapping the old-iOS-metadata-supported `Addressables.LoadAssetAsync<T>(object key)` completion callback.
+- Successful loads transfer the operation handle and asset into `AddressableAssetLease`; consumer disposal releases the Addressables handle exactly once.
+- Failed operations release their handle before reporting the exception. A synchronous load-start exception is forwarded to the failure callback (or rethrown if no callback was supplied). If the consumer's success callback throws, the adapter disposes the lease before rethrowing.
+- Added isolated Addressables API stubs and 11 adapter tests covering asynchronous completion, successful ownership, idempotent release, failed-load release, synchronous start failure, callback exception cleanup and invalid arguments.
+- Initial CI failures exposed missing test stubs and a nullable annotation mismatch; both were corrected based on Actions logs.
+- Final validation: [run 41187118977](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41187118977) succeeded with 0 warnings and 0 errors. Test output includes `PASS: 10 Unity decoder checks; 4 Spine bridge argument checks; 11 Addressables async adapter checks`.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13038070027`, 13,719 bytes.
+- This adapter is compiled against isolated API stubs, not the actual Unity/Addressables assemblies. It is not yet connected to the game's ScenarioResourceManager/catalog/provider. A real catalog key and bundle must be loaded and released in a Unity iOS player before claiming runtime integration.
