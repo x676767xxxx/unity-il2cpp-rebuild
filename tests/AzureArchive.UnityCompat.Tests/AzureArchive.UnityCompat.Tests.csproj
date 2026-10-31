@@ -13,6 +13,7 @@
     <Compile Include="../../src/AzureArchive.BackgroundCompat/SafeResourcePath.cs" Link="SafeResourcePath.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesRuntimeAdapter.Unity.cs" Link="AddressablesRuntimeAdapter.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesInternalIdTransformHook.Unity.cs" Link="AddressablesInternalIdTransformHook.Unity.cs" />
+    <Compile Include="../../src/AzureArchive.UnityCompat/AddressablesTransformBootstrap.Unity.cs" Link="AddressablesTransformBootstrap.Unity.cs" />
     <Compile Include="../../src/AzureArchive.BackgroundCompat/AddressableInternalIdResolver.cs" Link="AddressableInternalIdResolver.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/BackgroundImageDecoder.Unity.cs" Link="BackgroundImageDecoder.Unity.cs" />
     <Compile Include="../../src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs" Link="SpineConverterNative.Unity.cs" />
