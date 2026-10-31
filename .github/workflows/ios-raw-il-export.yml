@@ -27,6 +27,7 @@ jobs:
             DLL=$(find work/in/recovery -type f -path "*cpp2il-$platform*" -iname 'Assembly-CSharp.dll' | head -1)
             if [ -z "$DLL" ]; then echo "DLL not found for $platform" > "work/out/$platform/error.txt"; continue; fi
             work/tools/ilspycmd -l c "$DLL" > "work/out/$platform/types.txt"
+            work/tools/ilspycmd --ilcode "$DLL" > "work/out/$platform/Assembly-CSharp.full.il" 2> "work/out/$platform/Assembly-CSharp.full.log" || true
             for type in ScenarioResourceManager Character CharacterManager; do
               work/tools/ilspycmd --ilcode --type "$type" "$DLL" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log" || true
             done
@@ -68,6 +69,10 @@ jobs:
             grep -Rni -C 12 -E 'AddrLoadUrl|addr_load_url|set_AddrLoadUrl|get_AddrLoadUrl' "work/out/$platform" >> work/out/addrloadurl-symbol-search.txt 2>/dev/null
             if [ $? -ne 0 ]; then echo "No literal symbol hit in exported type set" >> work/out/addrloadurl-symbol-search.txt; fi
           done
+          echo "===== full-assembly AddrLoadUrl references =====" >> work/out/addrloadurl-symbol-search.txt
+          grep -ni -C 20 -E "AddrLoadUrl|addr_load_url|set_AddrLoadUrl|get_AddrLoadUrl" work/out/android/Assembly-CSharp.full.il work/out/windows/Assembly-CSharp.full.il >> work/out/addrloadurl-symbol-search.txt 2>/dev/null || true
+          echo "===== URL/config literals near addressable initialization =====" >> work/out/addrloadurl-symbol-search.txt
+          grep -ni -C 3 -E "https?://|addressables|cdn|asset.?load.?url|load.?url" work/out/android/Assembly-CSharp.full.il work/out/windows/Assembly-CSharp.full.il | head -n 2000 >> work/out/addrloadurl-symbol-search.txt 2>/dev/null || true
           echo "===== exported IL file inventory =====" >> work/out/addrloadurl-symbol-search.txt
           find work/out -type f -name '*.il' -printf '%p %s bytes\\n' >> work/out/addrloadurl-symbol-search.txt
       - name: Upload raw IL
