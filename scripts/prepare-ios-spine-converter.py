@@ -96,5 +96,5 @@ set_target_properties(azurearchive_spine_converter_ios PROPERTIES POSITION_INDEP
 """.replace("@DOLLAR@", dollar)
     if marker not in cmake_text:
         raise SystemExit("Could not locate CMake target insertion point")
-    cmake.write_text(cmake_text.replace(marker, block + "\\n" + marker, 1), encoding="utf-8")
+    cmake.write_text(cmake_text.replace(marker, block + "\n" + marker, 1), encoding="utf-8")
 print("Prepared iOS static-library target and custom buffer C ABI.")
