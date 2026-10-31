@@ -152,7 +152,7 @@ internal static class Program
         Assert(Addressables.ReleaseCount == 1 && inFlightAfterDispose.Released,
             "in-flight native texture handle is released when cache was disposed before completion");
         AssertThrows<InvalidOperationException>(() =>
-            BackgroundImageRuntimeCache.CreateFromGameRuntime(new InvalidAddrLoadUrlFixture()),
+            BackgroundImageRuntimeCache.CreateFromGameRuntime(new InvalidCorrectPathFixture()),
             "runtime cache rejects a missing CorrectPath method");
 
         Addressables.Reset();
