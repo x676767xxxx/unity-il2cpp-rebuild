@@ -175,3 +175,26 @@ A further instruction-level pass resolves the jump-table addressing mechanism ev
 - Native code writes state values 1, 2, 3, 4 and 5 at several suspension/continuation points. These writes are observed, but semantic names for each state are intentionally withheld until the table entries and the surrounding await/continuation paths are cross-checked.
 
 This gives an exact decoding formula for the pending CI table dump and prevents guessing state labels from write order alone.
+
+### Exact six-entry coroutine state dispatch recovered (Android ARM64)
+
+The completed extraction artifact from workflow [41201474393](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41201474393) contains the `.rodata` bytes at virtual address `0x13377E6`. The six bytes are `00 5B 55 58 2C A4`. The dispatcher instructions at `0x3270F30`–`0x3270F44` load `table[state]`, scale it by four, add it to `0x3270F48`, then branch.
+
+| State | Table byte | Resolved target | Confirmed entry behavior |
+|---:|---:|---:|---|
+| 0 | `0x00` | `0x3270F48` | Initial coroutine path; reads the resource and branches by its type/source |
+| 1 | `0x5B` | `0x32710B4` | Resume path entering the `AsyncOperationHandle<Texture>` status check; tests `preferThumbnail` and the handle status |
+| 2 | `0x55` | `0x327109C` | Sets state back to `-1`, then enters the second `AsyncOperationHandle<Texture>` status/result path at `0x3271184` |
+| 3 | `0x58` | `0x32710A8` | Sets state to `-1`, then enters the `Task<byte[]>` read/continuation path at `0x327154C` |
+| 4 | `0x2C` | `0x3271000` | Sets state to `-1`, then enters an alternate `Task<byte[]>` read/continuation path |
+| 5 | `0xA4` | `0x32711D8` | Sets state to `-1`, then enters the `Task<RuntimeSpineLoader.Files>` continuation path |
+
+Field identities are confirmed by the generated state-machine type declaration in Android `dump.cs`: `resource` at `0x20`, `preferThumbnail` at `0x30`, `key` at `0x38`, `texture` at `0x40`, `addressable` at `0x48`, `full` at `0x50`, `handle` (`AsyncOperationHandle<Texture>`) at `0x58`, `read` (`Task<byte[]>`) at `0x78`, and `read` (`Task<RuntimeSpineLoader.Files>`) at `0x80`.
+
+Resolved managed call targets used by these paths include `0x51AC688` = `AsyncOperationHandle<TObject>.get_Status` (shared generic body), `0x5CEE030` = `Task.get_IsCompleted`, and `0x3261D74` = `ScenarioResourceManager.ReportBackgroundError(Exception)`. `0x5AD7AD8` is `String.Concat(string, string)`; it is a string helper, not a loader or await helper.
+
+Important limitation: states 3 and 4 both use the same `Task<byte[]>` field but enter different native blocks. The current evidence supports naming their field/type and entry blocks, but not assigning distinct high-level meanings to those two awaits. Likewise, state 1 and state 2 both converge on handle-status processing through different entry paths. Keep these as separate continuation labels until all control-flow predecessors and exception edges are accounted for.
+
+### Extraction artifact size correction
+
+The first successful extraction step used `llvm-objdump -s` with address bounds, but that mode emitted the full ELF section contents rather than only the six requested bytes. The values above were read at the exact `.rodata` virtual address in that output and cross-checked against the dispatch instructions. The workflow is being tightened to parse the ELF section table and emit only the six bytes plus the focused MoveNext disassembly; the 649 MB full disassembly will remain an internal build intermediate and will not be uploaded in future runs.
