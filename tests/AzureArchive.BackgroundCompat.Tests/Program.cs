@@ -213,6 +213,23 @@ internal static class Program
         AssertEqual("Image", mixedOverrides[0].Kind.ToString(), "image overrides enumerate before Spine");
         AssertEqual("Spine", mixedOverrides[1].Kind.ToString(), "Spine overrides follow image overrides");
         AssertEqual("GlobalCustom", mixedOverrides[1].Origin.ToString(), "mixed override source preserved");
+
+        var deduplicatedOverrides = BackgroundOverrideSetFactory.Create(
+            new[] { "image.png", "image.png", @"image\image.png" },
+            Array.Empty<SpineBackgroundOverrideRecord>(),
+            root,
+            BackgroundResourceOrigin.LocalCustom);
+        AssertEqual("2", deduplicatedOverrides.Count.ToString(), "image override paths deduplicated by exact path");
+        AssertEqual("LocalCustom", deduplicatedOverrides[0].Origin.ToString(), "local override source preserved");
+        AssertEqual("0", BackgroundOverrideSetFactory.Create(
+            null, null, root, BackgroundResourceOrigin.GlobalCustom).Count.ToString(),
+            "null override collections produce empty set");
+        AssertThrows<InvalidDataException>(() => BackgroundOverrideSetFactory.Create(
+            new[] { (string)null! }, null, root, BackgroundResourceOrigin.LocalCustom),
+            "null image path rejected");
+        AssertThrows<ArgumentOutOfRangeException>(() => BackgroundOverrideSetFactory.Create(
+            null, null, root, BackgroundResourceOrigin.Native),
+            "native origin rejected for override set");
         AssertTrue(BackgroundOverrideResolver.TryResolve(
             spineDescriptor.Id,
             new[] { spineDescriptor },
