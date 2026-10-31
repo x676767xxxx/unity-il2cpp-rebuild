@@ -19,14 +19,14 @@ namespace AzureArchive.UnityCompat
     {
         private sealed class PendingNativeLoad
         {
-            public readonly List<Action<Texture2D>> Success = new List<Action<Texture2D>>();
+            public readonly List<Action<Texture>> Success = new List<Action<Texture>>();
             public readonly List<Action<Exception>> Failure = new List<Action<Exception>>();
         }
 
         private readonly Func<string, string> correctNativePath;
         private readonly Dictionary<string, Texture2D> customTextures =
             new Dictionary<string, Texture2D>(StringComparer.Ordinal);
-        private readonly Dictionary<string, AddressableAssetLease<AsyncOperationHandle<Texture2D>, Texture2D>> nativeLeases =
+        private readonly Dictionary<string, AddressableAssetLease<AsyncOperationHandle<Texture>, Texture>> nativeLeases =
             new Dictionary<string, AddressableAssetLease<AsyncOperationHandle<Texture2D>, Texture2D>>(StringComparer.Ordinal);
         private readonly Dictionary<string, PendingNativeLoad> pendingNative =
             new Dictionary<string, PendingNativeLoad>(StringComparer.Ordinal);
@@ -177,7 +177,7 @@ namespace AzureArchive.UnityCompat
             if (onFailed != null) pending.Failure.Add(onFailed);
             pendingNative.Add(key, pending);
 
-            AddressablesRuntimeAdapter.Load<Texture2D>(
+            AddressablesRuntimeAdapter.Load<Texture>(
                 key,
                 lease => CompleteNativeSuccess(key, pending, lease),
                 exception => CompleteNativeFailure(key, pending, exception));
