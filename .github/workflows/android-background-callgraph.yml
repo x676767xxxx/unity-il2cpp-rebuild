@@ -47,33 +47,37 @@ jobs:
                       decl=x[:260]; break
                   if x.startswith("}") or x.startswith("{"): break
               if decl: rva_to_decl[addr]=decl
+          def enclosing_type(index):
+              for j in range(index, -1, -1):
+                  match = re.search(r'\bclass\s+([^\s:{]+)', lines[j])
+                  if match:
+                      return match.group(1).rsplit(".", 1)[-1]
+              return None
           def find_method(needle, class_name=None):
               for i,line in enumerate(lines):
-                  if needle not in line or "(" not in line or line.strip().startswith("//"): continue
-                  if class_name:
-                      # Verify class scope by nearest preceding type declaration.
-                      scope=" ".join(lines[max(0,i-1000):i])
-                      if not re.search(r'\bclass\s+'+re.escape(class_name)+r'\b',scope): continue
+                  stripped=line.strip()
+                  if needle not in line or "(" not in line or stripped.startswith(("[", "//")): continue
+                  if class_name and enclosing_type(i) != class_name: continue
                   for j in range(i-1,max(-1,i-6),-1):
                       m=re.search(r'// RVA: 0x([0-9a-fA-F]+)',lines[j])
-                      if m: return int(m.group(1),16),line.strip()
+                      if m: return int(m.group(1),16),stripped
               return None,None
           requested=[
-            ("ResolveBackground","ScenarioResourceManager"),
-            ("EnumerateBackgrounds","ScenarioResourceManager"),
-            ("TryGetBackgroundOverridePath","ScenarioResourceManager"),
-            ("AcquireBackgroundSpine","ScenarioResourceManager"),
-            ("GetBackgroundTexture(BackgroundResource","ScenarioResourceManager"),
-            ("GetBackgroundPreviewAsync","ScenarioResourceManager"),
-            ("InitializeAuthoringResources","ScenarioResourceManager"),
-            ("GetCustomBgEffect","ScenarioResourceManager"),
-            ("GetBgEffectChoices","ScenarioResourceManager"),
-            ("BackgroundPreviewKey","ScenarioResourceManager"),
-            ("QueueBackgroundPreview","ScenarioResourceManager"),
-            ("DecodeBackgroundImage","ScenarioResourceManager"),
-            ("ResolveOverride","BackgroundResource"),
-            ("GetResourceOverrideRoot","ScenarioResourceManager"),
-            ("ReadOverrides","ScenarioResourceManager"),
+            (" ResolveBackground(","ScenarioResourceManager"),
+            (" EnumerateBackgrounds(","ScenarioResourceManager"),
+            (" TryGetBackgroundOverridePath(","ScenarioResourceManager"),
+            (" AcquireBackgroundSpine(","ScenarioResourceManager"),
+            (" GetBackgroundTexture(BackgroundResource","ScenarioResourceManager"),
+            (" GetBackgroundPreviewAsync(","ScenarioResourceManager"),
+            (" InitializeAuthoringResources(","ScenarioResourceManager"),
+            (" GetCustomBgEffect(","ScenarioResourceManager"),
+            (" GetBgEffectChoices(","ScenarioResourceManager"),
+            (" BackgroundPreviewKey(","ScenarioResourceManager"),
+            (" QueueBackgroundPreview(","ScenarioResourceManager"),
+            (" DecodeBackgroundImage(","ScenarioResourceManager"),
+            (" ResolveOverride(","BackgroundResource"),
+            (" GetResourceOverrideRoot(","ScenarioResourceManager"),
+            ("g__ReadOverrides|","ScenarioResourceManager"),
           ]
           targets=[]
           report=["# Android ARM64 background runtime call graph","",
