@@ -134,3 +134,13 @@ The previously implemented 32 MiB / 25-entry preview texture trim planner is not
 6. Preserve the independent preview texture and skeleton-asset cache budgets above.
 
 These are Android 1.0 behavior findings. They do not provide iOS-compatible addresses or machine code.
+
+## Atlas texture-loader callbacks and cleanup policy (new disassembly, 2026-10-31)
+
+The nested page loader has two confirmed behaviors from Android 1.0:
+- Its Load callback looks up a pre-created page material by the atlas page path, stores that material as the page renderer object, reads the material's main texture dimensions into the page metadata, and toggles a material keyword according to the page's premultiplied-alpha flag.
+- Its Unload callback is an empty method. Texture lifetime is therefore not delegated to Spine's page-unload callback; the RuntimeSpineAsset ownership set is responsible for releasing those Unity objects.
+
+The asynchronous worker closure simply calls the synchronous file reader with the captured base path and DXT5-support flag. This supports keeping file reading separate from Unity object creation.
+
+The HasConsumers getter is a strict references-greater-than-one check. The cache's own retained reference is the baseline; additional references indicate live consumers. The cleanup helper checks whether the Unity application is playing and chooses the matching deferred or immediate object-destruction path. Preserve that distinction in the eventual Unity adapter.
