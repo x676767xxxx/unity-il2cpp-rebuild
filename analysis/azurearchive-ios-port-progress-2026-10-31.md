@@ -329,3 +329,38 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - Updated the existing `BackgroundOverrideSetFactory` rather than creating a duplicate. It now validates the override source, preserves exact-string uniqueness for image paths (matching the source HashSet), appends Spine descriptors after image descriptors, and relies on the existing Spine factory to validate records and reject duplicate Spine IDs.
 - Added regression checks for exact-path deduplication, null collection handling, null image-path rejection, invalid Native source rejection, and image-before-Spine ordering. The corresponding CI run is [41199460222](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41199460222) and must be checked before claiming this checkpoint passed.
 - This is a projection of already-deserialized collections. The project still does not parse the actual `manifest.json` file or bind the records to the game's persistent override loader. The global `ResolveOverride` predicate body is still an anomalous switch-based native method and remains a separate verification item.
+
+
+## Preview request coalescing primitive — 2026-10-31
+
+### Evidence
+The recovered Android 1.0 IL for `ScenarioResourceManager.QueueBackgroundPreview` shows:
+- `pendingBackgroundPreviews` is keyed by the preview cache key and stores `List<Action<Texture>>`.
+- A callback for an existing key is appended to the existing list; no second coroutine is started.
+- A new key creates the callback list and starts `CoLoadBackgroundPreview(resource, preferThumbnail, key)`.
+- `BackgroundPreviewKey` begins with `BackgroundResource.CacheKey` plus the `preferThumbnail` flag. Custom Spine keys additionally incorporate sidecar stamps; the full key logic remains partly decompiler-noisy.
+
+### Implemented
+Added `src/AzureArchive.BackgroundCompat/BackgroundPreviewRequestCoalescer.cs`:
+- One pending callback list per key.
+- `TryEnqueue` returns true only for the first request, so the Unity owner knows when to start a coroutine.
+- `TryComplete` removes the pending entry and returns callbacks in registration order.
+- `Cancel` drops pending callbacks without claiming to cancel an external coroutine or release Unity assets.
+
+The existing test file was extended in place; no duplicate test project or workflow was added. Tests cover first-request behavior, same-key coalescing, callback order, completion/removal, independent keys, cancellation and invalid arguments.
+
+### CI
+- Run [41200035732](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200035732): success.
+- Build: .NET Standard 2.1, 0 warnings and 0 errors.
+- Source include preflight: 6 explicit C# includes checked; no missing paths or duplicate includes/Link names.
+- Background compatibility tests: all existing checks plus 11 preview request coalescer checks passed.
+- Unity compatibility stub tests also passed.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13042476136`, 20,706 bytes.
+
+### Validation boundary
+This is a tested coordination primitive, not a completed preview pipeline. It is not yet connected to a Unity coroutine, `backgroundPreviews` cache, RenderTexture validation/eviction, callback failure behavior, or the real game manager. Those require the actual Unity project/runtime and further exact coroutine IL recovery. It does not produce or advance an IPA build.
+
+### Next
+1. Recover the remaining `CoLoadBackgroundPreview` iterator behavior and cache completion/eviction semantics without guessing from unresolved IL.
+2. Implement a Unity-side adapter only after the actual `ScenarioResourceManager` and Unity assemblies are available.
+3. Keep the project/Xcode source acquisition as the hard blocker for full app integration and IPA packaging.
