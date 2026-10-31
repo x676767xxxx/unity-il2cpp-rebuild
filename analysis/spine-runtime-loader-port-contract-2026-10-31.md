@@ -77,3 +77,18 @@ Several branches in this method contain unresolved Cpp2IL decompiler markers. Th
 - No original converter C++ source, complete Unity project/source tree, or macOS/Xcode build host is currently available in the repository workflow.
 - No compilable Spine compatibility layer, signed IPA, or device-verified build has been produced.
 - No Android ARM64 RVA or machine code is proposed for iOS reuse.
+
+
+## Verified old-iOS API incompatibility (additional evidence)
+The actual three-platform `dump.cs` artifact from [run 41172721121](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41172721121) was inspected directly. Old iOS 0.7.9.2 has Spine.SkeletonBinary, SkeletonDataAsset and SpineAtlasAsset types, but not the newer API used by the 1.0 loader:
+- No `Native.SpineConverter.Converter` or `Native.SpineConverter.SpineVersion` in the old iOS namespace.
+- No `RuntimeSpineLoader`, `RuntimeSpineAsset`, `RuntimeAtlasTexture` or `BackgroundResource`.
+- Old iOS `SkeletonDataAsset.CreateRuntimeInstance` takes `ScriptableTextAsset`; it lacks the byte[]/name overload and `SetupRuntimeBlendModeMaterials`.
+- Old iOS `SpineAtlasAsset.CreateRuntimeInstance` lacks the custom texture-loader callback; `GetAtlas()` has no metadata-only bool overload.
+- `Spine.Unity.NoOpTextureLoader` is not present in the old iOS dump.
+- Old iOS `SkeletonBinary` has a visibly older feature surface; new Android/Windows include the newer `SkeletonLoader`, sequence and physics-constraint APIs.
+- Android/Windows enum confirms `SpineVersion.Version42 = 6`; the new loader's literal 6 is therefore Spine 4.2.
+
+See the full declaration-by-declaration evidence in `analysis/ios-spine-api-gap-verified-2026-10-31.md`.
+
+**Consequence:** porting only the native converter or writing a small wrapper is insufficient. The old iOS Spine C# / Spine-Unity API surface also needs upgrading or replacing. A safe Spine 3.8 fallback is not proven because the new runtime uses Spine 4.2-era features.
