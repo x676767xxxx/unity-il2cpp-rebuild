@@ -78,6 +78,13 @@ jobs:
             (" ResolveOverride(","BackgroundResource"),
             (" GetResourceOverrideRoot(","ScenarioResourceManager"),
             ("g__ReadOverrides|","ScenarioResourceManager"),
+            (" TrimBackgroundSkeletonCache(","ScenarioResourceManager"),
+            (" Retain(","RuntimeSpineAsset"),
+            (" Dispose(","RuntimeSpineAsset"),
+            (" Load(","RuntimeSpineLoader"),
+            (" Create(","RuntimeSpineLoader"),
+            (" Read(","RuntimeSpineLoader"),
+            (" ReadAsync(","RuntimeSpineLoader"),
           ]
           targets=[]
           report=["# Android ARM64 background runtime call graph","",
@@ -123,6 +130,16 @@ jobs:
               for dst,name in callees:
                   report.append(f"  - calls 0x{dst:x}: {name}")
           (out/"android-background-callgraph.md").write_text("\n".join(report))
+          spine_targets=[x for x in targets if x[1] in ("RuntimeSpineLoader","RuntimeSpineAsset") or x[2].strip().startswith("TrimBackgroundSkeletonCache")]
+          asm=["# Android ARM64 Spine runtime lifecycle and loader disassembly","",
+               "Method bodies are extracted from the Android 1.0 ARM64 libil2cpp.so using the matching dump.cs RVAs. This is Android evidence only; do not reuse these addresses or instructions on iOS.",""]
+          for addr,cls,needle,decl in spine_targets:
+              k=bisect.bisect_right(known,addr)
+              end=known[k] if k<len(known) else addr+0x1000
+              if end<=addr or end-addr>0x20000: end=addr+0x2000
+              segment=subprocess.check_output(["llvm-objdump","-d","--no-show-raw-insn",f"--start-address=0x{addr:x}",f"--stop-address=0x{end:x}",binary],text=True,errors="replace")
+              asm += [f"## {cls}.{needle.strip()} @ 0x{addr:x}",f"Declaration: {decl}","",segment,""]
+          (out/"spine-runtime-method-disassembly.txt").write_text("\n".join(asm))
           PY
       - name: Extract preview coroutine switch-table bytes
         run: |
