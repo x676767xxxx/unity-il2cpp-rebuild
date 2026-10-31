@@ -61,6 +61,25 @@ namespace AzureArchive.BackgroundCompat
         public SpineBackgroundOverrideRecord? SpineOverride { get; }
 
         /// <summary>
+        /// Resolves the optional Spine preview image beneath the same custom override root.
+        /// Null is returned when this descriptor has no preview image.
+        /// </summary>
+        public string? SpinePreviewFullPath
+        {
+            get
+            {
+                string? previewPath = SpineOverride?.PreviewPath;
+                if (previewPath == null)
+                    return null;
+
+                if (Origin == BackgroundResourceOrigin.Native)
+                    return previewPath;
+
+                return SafeResourcePath.ResolveUnderRoot(Root ?? string.Empty, previewPath);
+            }
+        }
+
+        /// <summary>
         /// Mirrors Android 1.0 FullPath: Native resources return Path unchanged;
         /// custom resources resolve Root + Path through the guarded relative-path resolver.
         /// </summary>
