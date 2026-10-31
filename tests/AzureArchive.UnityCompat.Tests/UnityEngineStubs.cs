@@ -1,6 +1,16 @@
 using System;
 namespace UnityEngine
 {
+    public enum RuntimeInitializeLoadType { BeforeSceneLoad }
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute
+    {
+        public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType loadType) { }
+    }
+    public static class Debug
+    {
+        public static void LogError(object message) { }
+    }
     public class Object
     {
         public bool Destroyed { get; private set; }
