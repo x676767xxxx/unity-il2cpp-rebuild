@@ -80,6 +80,8 @@ jobs:
             ("BackgroundResource.ResolveOverride.localPredicate","internal bool <ResolveOverride>b__0(BackgroundResource x)",0x3433298),
             ("BackgroundResource.ResolveOverride.globalPredicate","internal bool <ResolveOverride>b__1(BackgroundResource x)",0x34332BC),
             ("BackgroundResource.Overrides.MoveNext","private bool MoveNext()",0x34332F0),
+            ("ResourceOverrideData.BgSpineOverrideData.get_Id","public uint get_Id()",0x325BB9C),
+            ("Util.CalculateHash","public static uint CalculateHash(string name)",0x32E1430),
             ("ScenarioResourceManager.GetBackgroundPreviewAsync","GetBackgroundPreviewAsync(BackgroundResource resource",0x3261EA0),
             ("ScenarioResourceManager.GetBackgroundTexture(BackgroundResource)","GetBackgroundTexture(BackgroundResource resource)",0x326172C),
             ("AuthoringResourceCatalog.Search","Search(string kind, string query",0x336A1F0),
