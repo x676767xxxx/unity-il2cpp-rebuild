@@ -90,7 +90,7 @@ jobs:
             (" CanLoadPngAsDxt5(","RuntimeSpineLoader"),
             (" <TrimBackgroundSkeletonCache>b__34_0(","<>c"),
             (" <TrimBackgroundSkeletonCache>b__34_1(","<>c"),
-            (" <TrimBackgroundSkeletonCache>b__34_2(","<>c__DisplayClass34_0"),
+            (" <TrimBackgroundSkeletonCache>b__34_2(","ScenarioResourceManager"),
             (" Own(","RuntimeSpineAsset"),
             (" get_HasConsumers(","RuntimeSpineAsset"),
             (" get_EstimatedTextureBytes(","RuntimeSpineAsset"),
