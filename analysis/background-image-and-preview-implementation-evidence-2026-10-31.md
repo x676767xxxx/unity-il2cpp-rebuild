@@ -198,3 +198,15 @@ Important limitation: states 3 and 4 both use the same `Task<byte[]>` field but 
 ### Extraction artifact size correction
 
 The first successful extraction step used `llvm-objdump -s` with address bounds, but that mode emitted the full ELF section contents rather than only the six requested bytes. The values above were read at the exact `.rodata` virtual address in that output and cross-checked against the dispatch instructions. The workflow is being tightened to parse the ELF section table and emit only the six bytes plus the focused MoveNext disassembly; the 649 MB full disassembly will remain an internal build intermediate and will not be uploaded in future runs.
+
+### Callback exception handling is now resolved from the native call site
+
+The previous caution that the exception landing pads could not be tied to subscriber callbacks is superseded by the following direct control-flow evidence in `MoveNext`:
+
+- The callback enumerator loop begins around `0x3271AC8`. It loads each callback delegate's target and invoke pointer, then performs the indirect delegate call `blr x9` at `0x3271AF0`; the normal path branches back to the loop at `0x3271AC8`.
+- The immediately associated exception landing pad begins at `0x3271AF8`. It enters the native catch, checks the caught object against the managed `System.Exception` type, and stores the exception object pointer in a stack-backed temporary slot array rooted at `sp+0x40`, indexed by the counter at `sp+0x48`.
+- The handler calls `UnityEngine.Debug.LogException(Exception)` (managed RVA `0x66B2AA8`) for the caught callback exception, then decrements the temporary counter and branches back to the callback loop. Thus an exception from one delegate invocation is handled locally and does not simply escape the loop before later subscribers are visited.
+- On loop completion, the enumerator is cleaned up and `TrimBackgroundPreviews(false)` is called before the coroutine returns false. The handler also conditionally calls `ReleaseBackgroundPreview` while processing the exception path; preserve this observed conditional cleanup in any adapter rather than assuming all callback failures have identical ownership effects.
+
+This establishes per-invocation callback exception catching/logging and continuation of the callback loop. It does **not** establish that every possible exception in the entire coroutine is handled the same way: separate await/load exception landing pads remain distinct and route through additional reporting/rethrow paths, including `ScenarioResourceManager.ReportBackgroundError(Exception)` at `0x3261D74`.
+
