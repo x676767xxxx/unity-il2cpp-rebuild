@@ -28,6 +28,12 @@ namespace AzureArchive.BackgroundCompat
 
             for (int i = 0; i < lines.Length; i++)
             {
+                // Page and region names are unindented, while region properties
+                // (xy, size, rotate, index, etc.) are indented. Do not treat
+                // indented region properties as possible page names.
+                if (lines[i].Length > 0 && char.IsWhiteSpace(lines[i][0]))
+                    continue;
+
                 string candidate = lines[i].Trim();
                 if (candidate.Length == 0)
                     continue;
