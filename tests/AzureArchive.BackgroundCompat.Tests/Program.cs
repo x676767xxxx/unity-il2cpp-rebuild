@@ -70,7 +70,31 @@ internal static class Program
         using (var nullPageCache = new SpineAtlasPageCache<object>(key => null!, texture => { }))
             AssertThrows<InvalidOperationException>(() => nullPageCache.Acquire("atlas/missing.png"), "null texture load");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 8 texture cache lifecycle checks");
+        int onceLoads = 0;
+        int onceReleases = 0;
+        var onceCache = new SpineAtlasPageCache<object>(
+            key => { onceLoads++; return new object(); },
+            texture => onceReleases++);
+        var onceLease = onceCache.Acquire("atlas/once.png");
+        onceLease.Dispose();
+        onceLease.Dispose();
+        AssertEqual("1", onceLoads.ToString(), "single lease loads once");
+        AssertEqual("1", onceReleases.ToString(), "disposing one lease twice releases once");
+        onceCache.Dispose();
+        onceCache.Dispose();
+        AssertEqual("1", onceReleases.ToString(), "disposing cache twice does not double-release");
+
+        var independentCache = new SpineAtlasPageCache<object>(
+            key => new object(),
+            texture => { });
+        var independentA = independentCache.Acquire("atlas/a.png");
+        var independentB = independentCache.Acquire("atlas/b.png");
+        AssertFalse(ReferenceEquals(independentA.Value, independentB.Value), "different page keys own different textures");
+        independentA.Dispose();
+        independentB.Dispose();
+        independentCache.Dispose();
+
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks");
         return 0;
     }
 
