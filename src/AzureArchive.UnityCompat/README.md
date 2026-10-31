@@ -24,3 +24,10 @@ The standalone .NET Standard path utility in `../AzureArchive.BackgroundCompat` 
 `AddressablesRuntimeAdapter.Load<TAsset>(key, onLoaded, onFailed)` wraps the Addressables `LoadAssetAsync<TAsset>(object key)` completion event. On success it transfers ownership of the completed operation handle to an `AddressableAssetLease`; the consumer must dispose the lease exactly once when finished. On a failed operation, the adapter releases the failed handle before reporting the error. If the consumer's success callback throws, the adapter disposes the newly created lease before rethrowing.
 
 The adapter is compiled in CI against isolated API stubs that mirror the old iOS metadata surface. This verifies C# structure and ownership/error paths, not binary compatibility with the exact Addressables package, Unity player execution, or runtime catalog/provider behavior. Before gameplay integration, compile against the actual Unity 2023.2.20f1c1/Addressables assemblies and test a real catalog key and bundle on device.
+
+
+### Catalog internal-ID transform hook
+
+`AddressablesInternalIdTransformHook.Install(getAddrLoadUrl)` registers a transform through `Addressables.InternalIdTransformFunc`. It chains any previously registered transform, rewrites only IDs beginning with the verified `{ScenarioResourceManager.AddrLoadUrl}` token, and leaves unrelated IDs unchanged. Disposing restores the previous delegate only if this hook still owns the global slot, avoiding overwriting a later subsystem's registration.
+
+Install it before the relevant catalog-backed loads begin. The supplied URL callback must read the actual game runtime configuration; do not pass the authoring CLI fallback URL without proving it is the mobile runtime value. The standalone tests use an isolated API stub; compile and test against the exact Unity 2023.2.20f1c1 / Addressables assemblies before shipping.
