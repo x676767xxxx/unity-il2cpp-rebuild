@@ -71,3 +71,32 @@ Latest branch head at checkpoint: `06769338ac4e11982f334877bcd986535ca32b34`.
 
 ### Completion definition
 The port is not complete until a signed installable IPA is produced from the real project and successfully installed/launched on the target iPhone with the required Android 1.0 background behavior. Compatibility-library CI success or an analysis artifact does not satisfy this definition.
+
+
+## Spine Unity plugin package verification — 2026-10-31
+
+A later branch workflow run completed successfully:
+- Workflow run: [41186251935](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186251935)
+- Commit built: `d19ec444a84de0dc7f7dd19fd52c50f9e8341f57`
+- iPhoneOS ARM64 static library build: success
+- Exported C ABI symbol check: success
+- Host-side JSON-to-SKEL smoke test: success
+- Unity plugin packaging step: success
+- Uploaded plugin artifact: `azurearchive-spine-unity-ios-plugin`, artifact ID `13036649978`, 1,842,580 bytes
+- Uploaded standalone archive artifact: `azurearchive-spine-converter-ios-arm64`, artifact ID `13036814492`, 1,938,905 bytes
+
+Artifact download is available from the run's Actions artifacts section:
+https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186251935
+
+This closes the converter-plugin packaging gate only. The package includes an iOS ARM64 converter archive, ABI header, Unity P/Invoke bridge, metadata and license. It does not include the game's Unity project, UnityFramework, game scenes/assets, Spine 4.2 runtime, Addressables catalog/provider configuration, signed app, or IPA. The converter has not been validated against the actual AzureArchive background skeletons or on an iPhone.
+
+## Current execution queue after plugin packaging
+
+1. **Obtain the real Unity/Xcode project and game resource fixtures** — still the hard blocker; no `Assets/`, `Packages/`, `ProjectSettings/`, `.xcodeproj`, or `.xcworkspace` exists in this repository.
+2. Import the existing converter plugin package into that project and compile against its exact Unity/Addressables/Spine assemblies.
+3. Test the converter with the game's real Spine JSON/SKEL, atlas and texture resources; resolve the known unsupported enum/features before enabling it.
+4. Wire the static background override and Addressables path into the actual game's initialization and loading lifecycle.
+5. Build the full iOS app, then install and test it on iPhone 13.
+6. Generate and verify a signed IPA only after all runtime checks pass.
+
+No duplicate plugin or source file was added for this checkpoint; the existing progress document was updated in place.
