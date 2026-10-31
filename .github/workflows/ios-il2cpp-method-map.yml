@@ -47,6 +47,8 @@ jobs:
           script -q -e -c "dotnet \"$DLL\" work/ios/UnityFramework work/ios/global-metadata.dat work/out/ios-dump" /dev/null <<< "1"
           test -s work/out/ios-dump/dump.cs
           cp work/out/ios-dump/dump.cs work/out/ios-dump.cs
+      - name: Install Mach-O parsing libraries
+        run: python3 -m pip install --break-system-packages lief capstone
       - name: Extract actual iOS method RVAs and bounded disassembly
         shell: bash
         run: |
@@ -84,52 +86,63 @@ jobs:
           print("iOS-specific IL2CPP dump generated. Method map excerpts:")
           print("\n\n".join(selected[:30]))
 
-          # Resolve the state-machine RVAs from the actual iOS dump, then disassemble
-          # using the Mach-O address mapping. Never substitute Android RVAs here.
+          # Resolve actual method RVAs from dump.cs and map them through the
+          # Mach-O __text section's virtual address and file offset. Do not
+          # accept llvm-objdump's first-section output as proof of a match.
+          import lief
+          from capstone import Cs, CS_ARCH_ARM64, CS_MODE_ARM
+          binary_path = pathlib.Path("work/ios/UnityFramework")
+          subprocess.run(["llvm-lipo", "-thin", "arm64", str(binary_path),
+                          "-output", "work/ios/UnityFramework.arm64"], check=True)
+          thin_path = pathlib.Path("work/ios/UnityFramework.arm64")
+          binary = lief.parse(str(thin_path))
+          if binary is None:
+              raise SystemExit("LIEF could not parse the thin arm64 Mach-O")
+          sections = [s for s in binary.sections if s.name == "__text"]
+          if not sections:
+              raise SystemExit("Mach-O __text section not found")
+          image_base = min(s.virtual_address for s in binary.segments
+                           if s.name == "__TEXT")
+          md = Cs(CS_ARCH_ARM64, CS_MODE_ARM)
+          raw = thin_path.read_bytes()
           method_ranges = {
               "CheckForUpdate.MoveNext": (0x3D746AC, 0x3D751A0),
               "OnUpdateComplete.MoveNext": (0x3D776C0, 0x3D77BE4),
-              "ScenarioResourceManager.Awake.Initialize": (0x3D693C8, 0x3D697C8),
+              "ScenarioResourceManager.Awake": (0x3D693C8, 0x3D69690),
+              "ScenarioResourceManager.Initialize": (0x3D69690, 0x3D699A4),
           }
-          headers = subprocess.run(
-              ["llvm-objdump", "--macho", "--private-headers", "work/ios/UnityFramework"],
-              capture_output=True, text=True, check=True
-          ).stdout
-          base = None
-          hlines = headers.splitlines()
-          for i, line in enumerate(hlines):
-              if "segname __TEXT" in line:
-                  for candidate in hlines[i+1:i+12]:
-                      m = re.search(r"vmaddr\s+(0x[0-9a-fA-F]+)", candidate)
-                      if m:
-                          base = int(m.group(1), 16)
-                          break
-                  break
           results = []
-          for name, (start, end) in method_ranges.items():
-              candidates = [("dump-address", start, end)]
-              if base is not None:
-                  candidates.append(("text-vmaddr-plus-rva", base + start, base + end))
-              chosen = None
-              for label, lo, hi in candidates:
-                  cmd = ["llvm-objdump", "--macho", "--disassemble", "--arch=arm64",
-                         "--start-address="+hex(lo), "--stop-address="+hex(hi),
-                         "work/ios/UnityFramework"]
-                  p = subprocess.run(cmd, capture_output=True, text=True)
-                  output = p.stdout + p.stderr
-                  if p.returncode == 0 and re.search(r"^\s*[0-9a-fA-F]+:", output, re.M):
-                      chosen = (label, lo, hi, output)
+          for name, (rva, end_rva) in method_ranges.items():
+              candidates = [("RVA-as-VA", rva), ("imagebase-plus-RVA", image_base+rva)]
+              mapped = None
+              for mode, va in candidates:
+                  for sec in sections:
+                      sec_va = int(sec.virtual_address)
+                      sec_size = int(sec.size)
+                      if sec_va <= va < sec_va + sec_size:
+                          off = int(sec.offset) + (va - sec_va)
+                          end_va = min(end_rva + (va-rva), sec_va + sec_size)
+                          end_off = off + (end_va-va)
+                          if 0 <= off < end_off <= len(raw):
+                              mapped = (mode, va, off, end_off)
+                              break
+                  if mapped:
                       break
-              if chosen is None:
-                  raise SystemExit("No instruction output for " + name + "; __TEXT vmaddr=" + str(base))
-              label, lo, hi, output = chosen
-              results.extend(["\\n## "+name, "address-mode="+label,
-                              "range="+hex(lo)+".."+hex(hi), output])
+              if not mapped:
+                  raise SystemExit(f"{name}: RVA {rva:#x} did not map into Mach-O __text; imagebase={image_base:#x}")
+              mode, va, off, end_off = mapped
+              code = raw[off:end_off]
+              insns = list(md.disasm(code, va))
+              if len(insns) < 10 or insns[0].address != va:
+                  raise SystemExit(f"{name}: insufficient valid ARM64 instructions at {va:#x}")
+              results.append(f"## {name}\\nmode={mode}\\nRVA={rva:#x}\\nVA={va:#x}\\nfile_offset={off:#x}\\n")
+              results.extend(f"{i.address:#x}:\\t{i.mnemonic}\\t{i.op_str}" for i in insns)
+              results.append("")
           pathlib.Path("work/out/ios-native-method-disassembly.txt").write_text(
               "\\n".join(results), encoding="utf-8"
           )
-          print("Native iOS method disassembly saved; __TEXT vmaddr="+str(base))
-          print("\\n".join(results)[:16000])
+          print("Verified ARM64 disassembly mapped into Mach-O __text.")
+          print("\\n".join(results)[:20000])
           PY
       - uses: actions/upload-artifact@v4
         with:
