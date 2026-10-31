@@ -13,8 +13,10 @@ namespace AzureArchive.BackgroundCompat
         /// <summary>
         /// Resolves an Android 1.0 background ID from already source-filtered
         /// local and global override sequences. The Android IL calls Overrides
-        /// with ResourceType 2 for local and 1 for global, then applies the
-        /// same captured-ID predicate and FirstOrDefault to each sequence.
+        /// with ResourceType 2 for local and 1 for global, and applies FirstOrDefault
+        /// to each sequence. The local ID predicate is directly confirmed by native
+        /// disassembly; the global predicate body remains anomalous/unverified, so
+        /// applying the same ID predicate globally is the current candidate behavior.
         /// </summary>
         public static bool TryResolve(
             uint requestedId,
