@@ -24,9 +24,19 @@ namespace AzureArchive.BackgroundCompat
                 throw new InvalidDataException("Background paths must be relative to the resource directory.");
             }
 
+            if (normalized.IndexOf('\\0') >= 0 || normalized.Any(char.IsControl))
+                throw new InvalidDataException("Background paths cannot contain null or control characters.");
+
             string[] segments = normalized.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Any(segment => segment == ".."))
-                throw new InvalidDataException("Background path escapes its resource directory.");
+            if (segments.Any(segment =>
+                segment == "." ||
+                segment == ".." ||
+                segment.IndexOf(':') >= 0 ||
+                segment.EndsWith(".", StringComparison.Ordinal) ||
+                segment.EndsWith(" ", StringComparison.Ordinal)))
+            {
+                throw new InvalidDataException("Background path contains an invalid or escaping path segment.");
+            }
 
             string fullRoot = Path.GetFullPath(root);
             string platformRelative = normalized.Replace('/', Path.DirectorySeparatorChar);
