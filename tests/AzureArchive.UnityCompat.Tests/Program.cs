@@ -131,7 +131,7 @@ internal static class Program
         Exception? nativeLoadFailure = null;
         failedNativeCache.Load(nativeImageDescriptor, texture => throw new Exception("unexpected native load success"),
             exception => nativeLoadFailure = exception);
-        var failedNativeImageOperation = Addressables.Last<Texture2D>();
+        var failedNativeImageOperation = Addressables.Last<Texture>();
         var expectedNativeFailure = new InvalidOperationException("native background missing");
         failedNativeImageOperation.Fail(expectedNativeFailure);
         Assert(ReferenceEquals(expectedNativeFailure, nativeLoadFailure),
@@ -147,7 +147,7 @@ internal static class Program
         Assert(Addressables.LastKey?.ToString() == "game-corrected:Addressables/Backgrounds/native.png",
             "runtime cache binds the live ScenarioResourceManager CorrectPath method");
         gameBoundCache.Dispose();
-        var inFlightAfterDispose = Addressables.Last<Texture2D>();
+        var inFlightAfterDispose = Addressables.Last<Texture>();
         inFlightAfterDispose.Complete(new Texture2D(2, 2, TextureFormat.RGBA32, false));
         Assert(Addressables.ReleaseCount == 1 && inFlightAfterDispose.Released,
             "in-flight native texture handle is released when cache was disposed before completion");
@@ -162,7 +162,7 @@ internal static class Program
         Assert(Addressables.LastKey?.ToString() == "game-corrected:Addressables/Backgrounds/native.png",
             "runtime cache resolves inherited game Singleton.Instance before binding CorrectPath");
         singletonBoundCache.Dispose();
-        var singletonInFlight = Addressables.Last<Texture2D>();
+        var singletonInFlight = Addressables.Last<Texture>();
         singletonInFlight.Complete(new Texture2D(2, 2, TextureFormat.RGBA32, false));
         Assert(Addressables.ReleaseCount == 1 && singletonInFlight.Released,
             "singleton-bound cache releases operation completing after disposal");
