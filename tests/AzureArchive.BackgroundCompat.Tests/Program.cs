@@ -492,6 +492,26 @@ internal static class Program
                     new BackgroundSkeletonTrimPlanner.Candidate("same", 2, false, 2) }, 900),
             "skeleton planner rejects duplicate keys");
 
+        // Verified RuntimeSpineAsset reference semantics: one cache reference, external consumers above one.
+        var spineReferences = new SpineAssetReferenceLedger();
+        AssertEqual("1", spineReferences.ReferenceCount.ToString(), "Spine asset starts with one cache-owned reference");
+        AssertFalse(spineReferences.HasConsumers, "cache-owned reference alone is not a consumer");
+        spineReferences.Retain();
+        AssertEqual("2", spineReferences.ReferenceCount.ToString(), "Spine asset retain increments reference count");
+        AssertTrue(spineReferences.HasConsumers, "additional retained reference marks active consumer");
+        AssertFalse(spineReferences.Release(), "releasing consumer does not trigger final cleanup");
+        AssertFalse(spineReferences.HasConsumers, "consumer flag clears when only cache reference remains");
+        AssertTrue(spineReferences.Release(), "releasing final cache reference signals cleanup exactly at zero");
+        AssertEqual("0", spineReferences.ReferenceCount.ToString(), "Spine asset reference count reaches zero");
+        AssertThrows<ObjectDisposedException>(() => spineReferences.Retain(),
+            "released Spine asset cannot be resurrected");
+        AssertFalse(spineReferences.Release(), "releasing an already-zero Spine asset is harmless");
+        AssertThrows<ArgumentOutOfRangeException>(() => new SpineAssetReferenceLedger(-1),
+            "Spine reference ledger rejects negative initial count");
+        var maxSpineReferences = new SpineAssetReferenceLedger(int.MaxValue);
+        AssertThrows<OverflowException>(() => maxSpineReferences.Retain(),
+            "Spine reference ledger rejects overflow");
+
         // Verified Android 1.0 callback exception policy: report one failure and continue.
         string callbackOrder = "";
         int reportedCallbackErrors = 0;
@@ -518,7 +538,7 @@ internal static class Program
             BackgroundPreviewCallbackDispatcher.Dispatch(Array.Empty<Action<int>>(), 0, null!),
             "callback dispatcher requires error reporter");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 11 Spine reference lifecycle checks");
         return 0;
     }
 
