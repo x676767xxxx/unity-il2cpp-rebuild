@@ -154,3 +154,29 @@ Only a demonstrated difference should produce a code change. Existing adapters r
 - No real Android 1.0 background bundle/override fixture has been attached to a Unity integration test.
 - The Spine converter plugin is packaged, but the actual Spine 4.2 runtime/presenter integration is not proven.
 - No full Unity iOS build, signed IPA, or iPhone 13 device test exists.
+
+
+## Addressables bootstrap audit and URL-source blocker — follow-up
+
+### Verified integration surface
+- The old iOS 0.7.9.2 metadata contains `Addressables.InternalIdTransformFunc` getter/setter, `LoadAssetAsync` overloads, and `Release(AsyncOperationHandle)`. This establishes API-surface availability only.
+- iOS, Android and Windows catalogs contain the same ordered set of 32,353 tokenized internal IDs, using the exact prefix `{ScenarioResourceManager.AddrLoadUrl}`.
+- Android 1.0's normal mobile update coroutine follows catalog check → catalog update → download-size check → dependency download → post-update TextAsset/FlatBuffer loading → local global-override manifest loading.
+- The ordinary mobile value/assignment of `ScenarioResourceManager.AddrLoadUrl` remains unresolved. The visible `https://filev2.foxxlight.top/aares/` fallback belongs to `AuthoringCliHost.Bootstrap()`, not proven mobile gameplay configuration. Do not hard-code it.
+- `AddressablesInternalIdTransformHook` and `AddressablesTransformBootstrap` are candidate integration source only. They have not been included in a real Unity player build, and no runtime evidence proves `BeforeSceneLoad` is early enough for this target's actual Addressables initialization order.
+
+### Source audit / change-control decision
+- Existing `BackgroundOverrideResolver` and its tests already cover local-first selection, first matching entry, global fallback, null lists and missing matches. This is only the list-selection primitive: Android's `BackgroundResource.Overrides(data, source)` performs source-specific enumeration, and the recovered predicate body still has decompiler gaps. Do not claim full resolver equivalence or duplicate this helper.
+- Existing `AddressableInternalIdResolver` tests cover the verified catalog token and unsafe URL/path cases. The runtime base URL provider is still unknown; do not add a guessed default.
+- Existing `AddressablesRuntimeAdapter` and `AddressableAssetLease` provide a candidate handle-ownership pattern, but actual target Addressables package version and runtime callback behavior remain untested.
+- No new C# implementation was added in this checkpoint because no behavior delta or safe URL source has been proven. This is intentional: adding a second bootstrap or speculative URL provider would create integration risk rather than progress.
+
+### Exact next execution gates
+1. Recover the mobile assignment/provider for `AddrLoadUrl` from Android/Windows native field writes, startup coroutine state transitions, configuration files, or observed catalog/network requests. Keep authoring CLI/offline URL paths separate.
+2. Compare Android and old-iOS Addressables initialization order, catalog locator setup, and transform ownership. Determine the earliest proven hook point; preserve/chain any existing transform.
+3. Only after gates 1–2, connect the existing token transform to the real player bootstrap and test that a representative catalog internal ID resolves to the same origin/path the original app uses.
+4. Validate catalog update, dependency-size query, dependency download and post-update TextAsset/FlatBuffer loads in a real Unity iOS player.
+5. Then connect static background native/custom branches, preview coalescing and cache ownership. Spine playback remains a separate runtime compatibility gate.
+
+### Completion boundary
+The current branch still has only three standalone .NET project files and no Unity `Assets/`, `Packages/`, `ProjectSettings/`, Xcode project or workspace. No production CDN value is established, no real-player Addressables test exists, and no signed/device-tested IPA exists.
