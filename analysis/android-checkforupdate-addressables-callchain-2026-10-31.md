@@ -106,3 +106,27 @@ The corrected Android ARM64 disassembly artifact was downloaded and inspected di
 
 ### Updated conclusion
 The ordinary update coroutine has a verified optional offline-startup URL gate, then performs Addressables catalog update and dependency download. The AddrLoadUrl assignment remains unresolved. Do not hard-code the authoring CLI fallback, and do not treat the manual/offline startup URL as the normal remote source without proving the activation branch and assignment target.
+
+## Native verification of UI source submission callback — run 41196234346
+
+Artifact `azurearchive-android-arm64-disassembly-corrected`, ID `13040812483`, completed successfully. The exact callback declaration `UIPatchDownload.<>c.<CoChangeSource>b__13_1(string source)` is at RVA `0x3285AB0`.
+
+Direct ARM64 inspection shows:
+- The incoming `source` argument is preserved in X19.
+- The callback stores that string at object offset `0x90` on the `UserSettings.SettingData` object reached through the singleton/settings object chain.
+- Android `dump.cs` identifies `UserSettings.SettingData.<customSource>k__BackingField` at offset `0x90`; it is not the `ScenarioResourceManager.AddrLoadUrl` static field.
+- The callback later calls `PopupManager.ShowPopupOk(...)` at RVA `0x325A46C`, consistent with the UI source-change confirmation flow.
+- Therefore this callback proves persistence/update of the authoring/UI `customSource` setting; it does **not** prove assignment of the normal mobile Addressables base URL. Do not wire `customSource` into `AddrLoadUrl` based on this callback.
+
+The Android metadata separately declares `UserSettings.SettingData.catalogUrlOverride` at field offset `0x18`, but no runtime use/assignment has yet been proven. The actual mobile `AddrLoadUrl` writer remains unresolved.
+
+### Follow-up methods queued for direct disassembly
+The existing Android native-disassembly workflow was extended (no new workflow or source file) to inspect:
+- `UserSettings.WriteUserSettings` (RVA `0x3284FB0`)
+- `UserSettings.InitializeSettings` (RVA `0x3287388`)
+- `UserSettings.SettingData.set_catalogUrlOverride` (RVA `0x3287DAC`)
+- `ScenarioResourceManager.Awake` (RVA `0x3264724`)
+- `ScenarioResourceManager.Initialize` (RVA `0x3264A00`)
+- `ScenarioResourceManager.UpdateAddressable` (RVA `0x3265514`)
+
+The resulting run is [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783), currently queued at checkpoint creation.
