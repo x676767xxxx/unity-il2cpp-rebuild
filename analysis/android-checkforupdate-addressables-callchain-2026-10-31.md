@@ -130,3 +130,26 @@ The existing Android native-disassembly workflow was extended (no new workflow o
 - `ScenarioResourceManager.UpdateAddressable` (RVA `0x3265514`)
 
 The resulting run is [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783), currently queued at checkpoint creation.
+
+## Settings persistence and resource-manager initialization disassembly — run 41196441783
+
+Run [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783) completed successfully. Artifact `azurearchive-android-arm64-disassembly-corrected`, ID `13040553305`, contains the additional ARM64 method bodies.
+
+Verified findings:
+- `UserSettings.WriteUserSettings` (RVA `0x3284FB0`) reads the current `SettingData` object, serializes it through `SettingData.Serialize()` (RVA `0x32874B0`), and writes the resulting settings file. This confirms persistence of the settings object, not a write to `ScenarioResourceManager.AddrLoadUrl`.
+- `UserSettings.InitializeSettings` (RVA `0x3287388`) is a coroutine wrapper that starts its iterator state machine; the substantive work is in the generated `MoveNext` method.
+- `UserSettings.SettingData.set_catalogUrlOverride` (RVA `0x3287DAC`) is a simple instance-field store at offset `0x18`. It does not write the static `AddrLoadUrl` field.
+- `ScenarioResourceManager.Awake` (RVA `0x3264724`) initializes the singleton and starts `InitializeAfterSplash`; it does not show a direct store to `AddrLoadUrl` in this body.
+- `ScenarioResourceManager.Initialize` (RVA `0x3264A00`) sets up resource-manager runtime state and calls into Addressables-related native methods, but the inspected body does not establish a direct `AddrLoadUrl` assignment.
+- `ScenarioResourceManager.UpdateAddressable` (RVA `0x3265514`) is a one-instruction `ret` stub in this Android binary. It must not be treated as the URL-provider implementation.
+
+### Revised conclusion
+The source-change UI callback writes `SettingData.customSource`; the catalog override setter writes `SettingData.catalogUrlOverride`; settings persistence serializes the settings object. None of these inspected paths proves the production mobile `ScenarioResourceManager.AddrLoadUrl` value or its writer. The actual URL provider remains unresolved.
+
+### Next investigation
+1. Inspect the full generated iterator bodies for `UserSettings.InitTask`, `InitializeSettings`, and `ReadUserSettings`, including the actual settings JSON defaults and deserialization path.
+2. Inspect `ScenarioResourceManager.InitializeAfterSplash.MoveNext` and the Addressables initialization/configuration calls it triggers.
+3. Search the Android binary for all cross-references to the static-field storage resolved from IL2CPP metadata/class initialization; correlate every candidate store with managed metadata before assigning semantics.
+4. Compare the iOS 0.7.9.2 equivalent initialization path. Only then decide whether a custom iOS transform bootstrap is required.
+
+No C# runtime implementation was changed in this checkpoint.
