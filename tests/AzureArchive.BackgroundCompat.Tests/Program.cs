@@ -463,6 +463,35 @@ internal static class Program
                     new BackgroundPreviewTrimPlanner.Candidate("same", 2) }, 64, 30, false),
             "trim planner rejects duplicate candidate keys");
 
+        // Verified Android 1.0 skeleton cache: a separate 768 MiB budget and consumer-aware LRU eviction.
+        var skeletonTrimCandidates = new[]
+        {
+            new BackgroundSkeletonTrimPlanner.Candidate("active-old", 200L * 1024L * 1024L, true, 1),
+            new BackgroundSkeletonTrimPlanner.Candidate("idle-new", 200L * 1024L * 1024L, false, 9),
+            new BackgroundSkeletonTrimPlanner.Candidate("idle-old", 200L * 1024L * 1024L, false, 2)
+        };
+        AssertEqual("0", BackgroundSkeletonTrimPlanner.Plan(
+            skeletonTrimCandidates, BackgroundSkeletonTrimPlanner.MemoryThresholdBytes).Length.ToString(),
+            "skeleton trim does not start at exactly 768 MiB");
+        AssertEqual("idle-old", string.Join(",", BackgroundSkeletonTrimPlanner.Plan(
+            skeletonTrimCandidates, BackgroundSkeletonTrimPlanner.MemoryThresholdBytes + 1)),
+            "skeleton trim selects oldest unused asset first");
+        AssertEqual("idle-old,idle-new", string.Join(",", BackgroundSkeletonTrimPlanner.Plan(
+            skeletonTrimCandidates, 900L * 1024L * 1024L)),
+            "skeleton trim skips active consumers and evicts unused assets until under budget");
+        AssertEqual("0", BackgroundSkeletonTrimPlanner.Plan(
+            new[] { new BackgroundSkeletonTrimPlanner.Candidate("active", 900L * 1024L * 1024L, true, 0) },
+            900L * 1024L * 1024L).Length.ToString(),
+            "skeleton trim never evicts an asset with consumers");
+        AssertThrows<ArgumentOutOfRangeException>(() => new BackgroundSkeletonTrimPlanner.Candidate(
+            "negative", -1, false, 0), "skeleton candidate rejects negative estimated size");
+        AssertThrows<ArgumentOutOfRangeException>(() => BackgroundSkeletonTrimPlanner.Plan(
+            skeletonTrimCandidates, -1), "skeleton planner rejects negative cache total");
+        AssertThrows<ArgumentException>(() => BackgroundSkeletonTrimPlanner.Plan(
+            new[] { new BackgroundSkeletonTrimPlanner.Candidate("same", 1, false, 1),
+                    new BackgroundSkeletonTrimPlanner.Candidate("same", 2, false, 2) }, 900),
+            "skeleton planner rejects duplicate keys");
+
         // Verified Android 1.0 callback exception policy: report one failure and continue.
         string callbackOrder = "";
         int reportedCallbackErrors = 0;
