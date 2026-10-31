@@ -10,6 +10,10 @@
 - Decode: `ImageConversion.LoadImage(texture, bytes, true)`.
 - False return: `InvalidDataException` with the recovered message prefix.
 
+## Filesystem adapter
+
+`BackgroundImageDecoder.DecodeFile(path)` reads a custom image file synchronously and delegates to `Decode`. Call it only on Unity's main thread because it creates a Texture2D. The file read itself is synchronous; callers needing asynchronous I/O should read bytes off-thread and marshal only the Decode call back to the Unity main thread.
+
 ## Status
 This is candidate Unity C# source, not an integrated game patch. It has **not** been compiled against UnityEngine assemblies, run in Unity, or tested on iOS. Unity texture creation and destruction must occur on the Unity main thread. The cleanup behavior on decoder exceptions is a conservative implementation choice; the corresponding original IL contains unresolved decompiler regions.
 
