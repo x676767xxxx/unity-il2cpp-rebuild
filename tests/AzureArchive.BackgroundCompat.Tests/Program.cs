@@ -34,7 +34,14 @@ internal static class Program
         AssertFalse(BackgroundOverrideResolver.TryResolve(local, global, x => x == "missing", out selected), "no matching override");
         AssertThrows<ArgumentNullException>(() => BackgroundOverrideResolver.TryResolve(local, global, null!, out selected), "null predicate");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks");
+        var pages = SpineAtlasPageNames.Parse("page-one.png\nsize: 1024, 1024\nformat: RGBA8888\nfilter: Linear,Linear\nrepeat: none\n\nregion-one\n  rotate: false\n  xy: 0, 0\n  size: 64, 64\n\nnested/page-two.png\nsize: 512, 512\nformat: RGBA8888\n");
+        AssertEqual("page-one.png", pages[0], "first Spine atlas page");
+        AssertEqual("nested/page-two.png", pages[1], "second Spine atlas page");
+        AssertEqual("2", pages.Count.ToString(), "Spine atlas page count");
+        AssertThrows<InvalidDataException>(() => SpineAtlasPageNames.Parse(""), "empty Spine atlas");
+        AssertThrows<InvalidDataException>(() => SpineAtlasPageNames.Parse("region\n  rotate: false\n  xy: 0, 0\n"), "atlas without page metadata");
+
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks");
         return 0;
     }
 
