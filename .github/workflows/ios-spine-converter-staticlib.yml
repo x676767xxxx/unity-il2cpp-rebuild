@@ -6,6 +6,8 @@ on:
       - "scripts/prepare-ios-spine-converter.py"
       - "scripts/azurearchive_spine_converter_abi.h"
       - "scripts/ios_abi_smoke_test.cpp"
+      - "scripts/check-spine-ios-pinvoke-abi.py"
+      - "src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs"
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,6 +24,8 @@ jobs:
           repository: wang606/SpineSkeletonDataConverter
           ref: 5ecb2139b0a1af266974f95abeec6bb8562d1249
           path: external/SpineSkeletonDataConverter
+      - name: Check managed P/Invoke against native C ABI
+        run: python3 scripts/check-spine-ios-pinvoke-abi.py
       - name: Prepare iOS ABI and CMake target
         run: python3 scripts/prepare-ios-spine-converter.py
       - name: Configure for iPhoneOS ARM64
