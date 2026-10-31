@@ -311,3 +311,12 @@ New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/act
 - CI [41199007745](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41199007745) passed the full compatibility and Unity adapter stub tests before the latest callback error-handling cleanup; the newest revision is in a follow-up run.
 - Still not integrated into the game's actual `ScenarioResourceManager` or presenter. The correct `CorrectPath` delegate and scene lifecycle hookup must be provided by the recovered game runtime; the repo has no full Unity project.
 - Detailed evidence: `analysis/android-static-background-image-runtime-path-2026-10-31.md`.
+
+
+### Native image runtime binding refinement
+
+- Native background loading now uses Unity `Texture` (the game's recovered `GetBackgroundTexture(BackgroundResource)` returns Texture), while custom file decoding remains Texture2D.
+- Added reflection binding to the live `ScenarioResourceManager.CorrectPath(string)` instance method and a singleton-based factory that resolves inherited `Singleton<ScenarioResourceManager>.Instance`.
+- Tests verify real method binding, singleton resolution, native Addressables in-flight release after cache disposal, and the custom/native cache ownership split.
+- Final current CI [41199317839](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41199317839) passed all compatibility and Unity adapter stub tests.
+- This removes the need to reimplement the game's manifest path correction, but still requires the runtime cache to be called by the actual game background presenter; that hookup and a full Unity project remain missing.
