@@ -27,7 +27,7 @@ namespace AzureArchive.UnityCompat
         private readonly Dictionary<string, Texture2D> customTextures =
             new Dictionary<string, Texture2D>(StringComparer.Ordinal);
         private readonly Dictionary<string, AddressableAssetLease<AsyncOperationHandle<Texture>, Texture>> nativeLeases =
-            new Dictionary<string, AddressableAssetLease<AsyncOperationHandle<Texture2D>, Texture2D>>(StringComparer.Ordinal);
+            new Dictionary<string, AddressableAssetLease<AsyncOperationHandle<Texture>, Texture>>(StringComparer.Ordinal);
         private readonly Dictionary<string, PendingNativeLoad> pendingNative =
             new Dictionary<string, PendingNativeLoad>(StringComparer.Ordinal);
         private bool disposed;
@@ -72,7 +72,7 @@ namespace AzureArchive.UnityCompat
 
         public void Load(
             BackgroundResourceDescriptor resource,
-            Action<Texture2D> onLoaded,
+            Action<Texture> onLoaded,
             Action<Exception>? onFailed = null)
         {
             ThrowIfDisposed();
@@ -115,7 +115,7 @@ namespace AzureArchive.UnityCompat
 
         private void LoadCustom(
             BackgroundResourceDescriptor resource,
-            Action<Texture2D> onLoaded,
+            Action<Texture> onLoaded,
             Action<Exception>? onFailed)
         {
             Texture2D texture;
@@ -150,7 +150,7 @@ namespace AzureArchive.UnityCompat
 
         private void LoadNative(
             BackgroundResourceDescriptor resource,
-            Action<Texture2D> onLoaded,
+            Action<Texture> onLoaded,
             Action<Exception>? onFailed)
         {
             string originalPath = resource.Path ??
@@ -186,7 +186,7 @@ namespace AzureArchive.UnityCompat
         private void CompleteNativeSuccess(
             string key,
             PendingNativeLoad pending,
-            AddressableAssetLease<AsyncOperationHandle<Texture2D>, Texture2D> lease)
+            AddressableAssetLease<AsyncOperationHandle<Texture>, Texture> lease)
         {
             if (!pendingNative.TryGetValue(key, out PendingNativeLoad? current) ||
                 !ReferenceEquals(current, pending))
@@ -204,7 +204,7 @@ namespace AzureArchive.UnityCompat
 
             nativeLeases.Add(key, lease);
             Exception? callbackFailure = null;
-            foreach (Action<Texture2D> callback in pending.Success)
+            foreach (Action<Texture> callback in pending.Success)
             {
                 try { callback(lease.Asset); }
                 catch (Exception exception) { if (callbackFailure == null) callbackFailure = exception; }
