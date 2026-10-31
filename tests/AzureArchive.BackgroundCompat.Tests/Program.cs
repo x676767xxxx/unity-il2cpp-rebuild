@@ -141,8 +141,8 @@ internal static class Program
             "scene.png", root, BackgroundResourceOrigin.Native), "image override rejects native origin");
 
         var spineRecord = new SpineBackgroundOverrideRecord(
-            "scene-spine", @"spine\\night\\night.skel", "Idle", false, "Night",
-            @"preview\\night.png", 2.5f, 1.25f, -12f, 8f);
+            "scene-spine", @"spine\night\night.skel", "Idle", false, "Night",
+            @"preview\night.png", 2.5f, 1.25f, -12f, 8f);
         var spineDescriptor = SpineBackgroundOverrideFactory.Create(
             spineRecord, root, BackgroundResourceOrigin.LocalCustom);
         AssertEqual(BackgroundResourceIdHash.Calculate("scene-spine").ToString(), spineDescriptor.Id.ToString(),
