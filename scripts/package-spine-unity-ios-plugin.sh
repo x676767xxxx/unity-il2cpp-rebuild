@@ -11,6 +11,10 @@ test -s "$LIB"
 test -s "$HEADER"
 test -s "$LICENSE"
 test -s "$BRIDGE"
+xcrun lipo -verify_arch arm64 "$LIB"
+xcrun nm -gU "$LIB" | grep -q "AzureArchiveSpineJsonToBinary"
+xcrun nm -gU "$LIB" | grep -q "AzureArchiveSpineConvertBuffer"
+xcrun nm -gU "$LIB" | grep -q "AzureArchiveSpineFreeBuffer"
 rm -rf "$OUT"
 mkdir -p "$OUT/Assets/Plugins/iOS" "$OUT/Assets/Scripts"
 cp "$LIB" "$OUT/Assets/Plugins/iOS/"
@@ -20,6 +24,7 @@ cp "$ROOT/scripts/azurearchive_spine_converter_abi.h.meta" "$OUT/Assets/Plugins/
 cp "$ROOT/scripts/libazurearchive_spine_converter_ios.a.meta" "$OUT/Assets/Plugins/iOS/libazurearchive_spine_converter_ios.a.meta"
 cp "$LICENSE" "$OUT/LICENSE"
 cp "$ROOT/scripts/azurearchive-spine-unity-ios-plugin-README.md" "$OUT/README.md"
+(cd "$OUT" && shasum -a 256 Assets/Plugins/iOS/libazurearchive_spine_converter_ios.a > SHA256SUMS.txt)
 rm -f "$ZIP"
 (cd "$OUT" && zip -qr "$ZIP" .)
 echo "Created Unity iOS plugin package: $ZIP"
