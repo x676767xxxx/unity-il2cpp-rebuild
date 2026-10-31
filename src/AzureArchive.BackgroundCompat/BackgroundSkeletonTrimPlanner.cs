@@ -42,7 +42,6 @@ namespace AzureArchive.BackgroundCompat
         {
             if (candidates == null) throw new ArgumentNullException(nameof(candidates));
             if (totalBytes < 0) throw new ArgumentOutOfRangeException(nameof(totalBytes));
-            if (totalBytes <= MemoryThresholdBytes) return Array.Empty<string>();
 
             var seen = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < candidates.Count; i++)
@@ -52,6 +51,8 @@ namespace AzureArchive.BackgroundCompat
                 if (!seen.Add(candidate.Key))
                     throw new ArgumentException("Trim candidate keys must be unique.", nameof(candidates));
             }
+
+            if (totalBytes <= MemoryThresholdBytes) return Array.Empty<string>();
 
             var selected = new List<string>();
             foreach (Candidate candidate in candidates
