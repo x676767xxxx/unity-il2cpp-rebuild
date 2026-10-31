@@ -1,0 +1,50 @@
+name: Decompile AzureArchive recovered IL
+on:
+  workflow_dispatch:
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Cpp2IL recovery artifact
+        run: |
+          mkdir -p work/in work/out
+          curl -fL --retry 3 -o work/in/recovery.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41169615291/artifacts/13030995280"
+          unzip -q work/in/recovery.zip -d work/in/recovery
+      - name: Install ILSpy command line
+        run: |
+          dotnet tool install ilspycmd --tool-path work/tools
+      - name: Decompile Android and Windows Assembly-CSharp
+        run: |
+          mkdir -p work/out/android work/out/windows
+          work/tools/ilspycmd -p -o work/out/android work/in/recovery/cpp2il-android/Assembly-CSharp.dll > work/out/android-ilspy.log 2>&1
+          work/tools/ilspycmd -p -o work/out/windows work/in/recovery/cpp2il-windows/Assembly-CSharp.dll > work/out/windows-ilspy.log 2>&1
+          find work/out/android -type f | wc -l > work/out/android-file-count.txt
+          find work/out/windows -type f | wc -l > work/out/windows-file-count.txt
+      - name: Compare target source files
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,difflib
+          root=pathlib.Path("work/out")
+          targets=["ScenarioResourceManager","AuthoringResourceCatalog","CharacterManager","Character"]
+          report=[]
+          for target in targets:
+              report.append("\n## "+target)
+              for platform in ["android","windows"]:
+                  matches=list((root/platform).rglob("*.cs"))
+                  hits=[]
+                  for p in matches:
+                      s=p.read_text(errors="ignore")
+                      if re.search(r"\b(class|struct)\s+"+re.escape(target)+r"\b",s):
+                          hits.append(p)
+                  report.append(f"{platform}: "+(", ".join(str(x.relative_to(root/platform)) for x in hits) if hits else "not found"))
+                  for p in hits:
+                      s=p.read_text(errors="ignore")
+                      report.append(f"--- {platform}/{p.name} ({len(s)} chars) ---")
+                      report.extend(s.splitlines()[:350])
+          (root/"target-source-extracts.txt").write_text("\n".join(report))
+          PY
+      - name: Upload decompiled source
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-decompiled-source
+          path: work/out/
