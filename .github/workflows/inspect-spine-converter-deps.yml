@@ -1,0 +1,93 @@
+name: Inspect Spine converter native dependencies
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/inspect-spine-converter-deps.yml"
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y unzip file binutils
+      - name: Download and extract platform builds
+        run: |
+          set -euo pipefail
+          mkdir -p work/{ios,android,windows,out}
+          curl -fL --retry 3 -o work/ios/old.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          curl -fL --retry 3 -o work/windows/windows.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
+          unzip -q work/ios/old.ipa -d work/ios/unpacked
+          unzip -q work/android/base.apk -d work/android/unpacked
+          unzip -q work/windows/windows.zip -d work/windows/unpacked
+      - name: Inspect native converter binaries and compare catalog hashes
+        run: |
+          set -euo pipefail
+          A=work/android/unpacked/lib/arm64-v8a/libSpineSkeletonDataConverterLib.so
+          W=$(find work/windows/unpacked -type f -name SpineSkeletonDataConverterLib.dll | head -1)
+          I=$(find work/ios/unpacked/Payload -type f -name UnityFramework | head -1)
+          test -f "$A"; test -f "$W"; test -f "$I"
+          {
+            echo "## Android ARM64 converter"
+            file "$A"
+            sha256sum "$A"
+            readelf -h "$A"
+            readelf -d "$A"
+            readelf -Ws "$A" | head -250
+            echo "### Dynamic exports"
+            nm -D --defined-only "$A" | head -250
+            echo "### Strings"
+            strings -a "$A" | grep -Ei 'spine|skeleton|atlas|convert|binary|json|version|error' | sort -u | head -400 || true
+            echo "## Windows converter"
+            file "$W"
+            sha256sum "$W"
+            objdump -p "$W" | head -250
+            echo "### Export symbols"
+            objdump -T "$W" | head -250 || true
+            echo "### Strings"
+            strings -a "$W" | grep -Ei 'spine|skeleton|atlas|convert|binary|json|version|error' | sort -u | head -400 || true
+            echo "## iOS UnityFramework Spine converter string cross-check"
+            strings -a "$I" | grep -Ei 'SpineSkeletonDataConverter|SkeletonDataConverter|RuntimeSpineAsset|Spine\.SkeletonBinary|Spine\.SkeletonJson' | sort -u | head -200 || true
+          } > work/out/spine-native-dependency-inspection.txt 2>&1
+          python3 - <<'PY'
+          import zipfile,hashlib,json,pathlib
+          root=pathlib.Path("work")
+          specs={"ios":(root/"ios/old.ipa","Payload/AzureArchive.app/Data/Raw/aa/catalog.json","Payload/AzureArchive.app/Data/Raw/aa/settings.json"),
+                 "android":(root/"android/base.apk","assets/aa/catalog.json","assets/aa/settings.json"),
+                 "windows":(root/"windows/windows.zip","AzureArchive_Win_1.0.1/AzureArchive_Data/StreamingAssets/aa/catalog.json","AzureArchive_Win_1.0.1/AzureArchive_Data/StreamingAssets/aa/settings.json")}
+          result={}
+          for platform,(archive,catpath,setpath) in specs.items():
+              with zipfile.ZipFile(archive) as z:
+                  c=z.read(catpath); s=z.read(setpath)
+                  obj=json.loads(c)
+                  result[platform]={"catalog_sha256":hashlib.sha256(c).hexdigest(),"settings_sha256":hashlib.sha256(s).hexdigest(),"catalog_bytes":len(c),"internal_ids_count":len(obj.get("m_InternalIds",[])),"internal_ids_sha256":hashlib.sha256("\n".join(obj.get("m_InternalIds",[])).encode()).hexdigest(),"entry_data_chars":len(obj.get("m_EntryDataString","")),"bucket_data_chars":len(obj.get("m_BucketDataString","")),"key_data_chars":len(obj.get("m_KeyDataString","")),"extra_data_chars":len(obj.get("m_ExtraDataString","")),"build_hash":obj.get("m_BuildResultHash"),"locator_id":obj.get("m_LocatorId")}
+          (root/"out/catalog-hash-comparison.json").write_text(json.dumps(result,indent=2))
+          PY
+      - name: Write summary and upload
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          o=Path("work/out")
+          lines=["# Spine native dependency and catalog comparison","", "Native library presence is evidence of a platform-specific dependency candidate, not proof that every gameplay path requires it.", "", "## Catalog hashes"]
+          p=o/"catalog-hash-comparison.json"
+          if p.exists():
+              d=json.loads(p.read_text())
+              for k,v in d.items(): lines += [f"### {k}",f"- Catalog SHA256: {v['catalog_sha256']}",f"- Settings SHA256: {v['settings_sha256']}",f"- Internal IDs: {v['internal_ids_count']} (hash {v['internal_ids_sha256']})",f"- Encoded key/bucket/entry/extra chars: {v['key_data_chars']} / {v['bucket_data_chars']} / {v['entry_data_chars']} / {v['extra_data_chars']}",f"- Build hash: {v['build_hash']}",""]
+          else: lines += ["Catalog comparison not generated."]
+          lines += ["## Native dependency inspection"]
+          q=o/"spine-native-dependency-inspection.txt"
+          if q.exists(): lines += q.read_text(errors="replace").splitlines()[:2500]
+          else: lines += ["NOT GENERATED"]
+          (o/"spine-native-dependency-report.md").write_text("\n".join(lines))
+          PY
+          cat work/out/spine-native-dependency-report.md
+      - name: Upload dependency inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-spine-native-dependency
+          path: work/out/
