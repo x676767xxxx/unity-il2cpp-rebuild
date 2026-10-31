@@ -198,3 +198,11 @@ Direct inspection of Android ARM64 artifact azurearchive-android-arm64-disassemb
 5. Keep the existing Addressables bootstrap adapters unchanged until the source value and initialization order are proven.
 
 No C# source files were added or modified in this checkpoint.
+
+## Additional verified distinction: customSource is not AddrLoadUrl
+
+The Android source-change callback was disassembled in successful run [41196234346](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196234346), artifact ID `13040812483`. It writes the submitted source string into `UserSettings.SettingData.customSource` (managed field offset `0x90`) and then calls the UI confirmation popup. This is not a write to static `ScenarioResourceManager.AddrLoadUrl`; using `customSource` as the gameplay CDN would be an unsupported assumption.
+
+The callback's native body resolves the previously opaque helper call at RVA `0x325A46C` to `PopupManager.ShowPopupOk(...)`. `catalogUrlOverride` is a separate SettingData field at offset `0x18`; its runtime call sites are not yet established.
+
+The existing native-disassembly workflow has been extended to inspect settings persistence/initialization and the Addressables manager's Awake/Initialize/UpdateAddressable methods. New run: [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783). No C# implementation was added; existing URL resolver and bootstrap remain unchanged pending proof of the actual URL provider.
