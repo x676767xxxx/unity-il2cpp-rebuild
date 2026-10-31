@@ -67,7 +67,7 @@ namespace AzureArchive.UnityCompat
                 string fullPath = resource.FullPath ??
                     throw new InvalidDataException("Custom background resource has no resolved path.");
 
-                if (customTextures.TryGetValue(fullPath, out Texture2D cached) && cached != null)
+                if (customTextures.TryGetValue(fullPath, out Texture2D? cached) && cached != null)
                 {
                     onLoaded(cached);
                     return;
