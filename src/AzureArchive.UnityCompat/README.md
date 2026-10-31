@@ -12,7 +12,7 @@
 
 ## Filesystem adapter
 
-`BackgroundImageDecoder.DecodeFile(path)` reads a custom image file synchronously and delegates to `Decode`. Call it only on Unity's main thread because it creates a Texture2D. The file read itself is synchronous; callers needing asynchronous I/O should read bytes off-thread and marshal only the Decode call back to the Unity main thread.
+`BackgroundImageDecoder.DecodeFile(path)` reads a custom image file synchronously and delegates to `Decode`. The overload `DecodeFile(resourceRoot, relativePath)` first confines manifest/override-provided paths with `SafeResourcePath.ResolveUnderRoot`, then reads and decodes the file. Prefer the root-confined overload for any path originating outside trusted code. Call either overload only on Unity's main thread because it creates a Texture2D. The file read itself is synchronous; callers needing asynchronous I/O should read bytes off-thread and marshal only the Decode call back to the Unity main thread.
 
 ## Status
 This is candidate Unity C# source, not an integrated game patch. It has **not** been compiled against UnityEngine assemblies, run in Unity, or tested on iOS. Unity texture creation and destruction must occur on the Unity main thread. The cleanup behavior on decoder exceptions is a conservative implementation choice; the corresponding original IL contains unresolved decompiler regions.
