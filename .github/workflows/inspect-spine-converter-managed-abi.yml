@@ -15,27 +15,24 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Download recovered Android and Windows assemblies
-        uses: actions/download-artifact@v4
-        with:
-          name: azurearchive-cpp2il-recovery-test
-          path: work/in/recovery
-          repository: x676767xxxx/unity-il2cpp-rebuild
-          run-id: 41169615291
-          github-token: \${{ secrets.GITHUB_TOKEN }}
+      - name: Download Windows release and extract interop assemblies
+        run: |
+          set -euo pipefail
+          mkdir -p work/in/windows
+          curl -fsSL --retry 3 -o work/in/windows/windows.zip https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip
+          unzip -q work/in/windows/windows.zip -d work/in/windows/unpacked
+          test -f work/in/windows/unpacked/AzureArchive_Win_1.0.1/BepInEx/interop/spine-unity.dll
+          test -f work/in/windows/unpacked/AzureArchive_Win_1.0.1/BepInEx/interop/spine-csharp.dll
       - name: Install ILSpy
         run: dotnet tool install ilspycmd --tool-path work/tools
       - name: Export converter wrapper and Spine version enum
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p work/out/{android,windows}
-          for platform in android windows; do
-            asm="work/in/recovery/cpp2il-$platform/spine-unity.dll"
-            test -f "$asm"
-            work/tools/ilspycmd --ilcode --type Native.SpineConverter.Converter "$asm" > "work/out/$platform/Converter.il" 2> "work/out/$platform/Converter.log"
-            work/tools/ilspycmd --ilcode --type Native.SpineConverter.SpineVersion "$asm" > "work/out/$platform/SpineVersion.il" 2> "work/out/$platform/SpineVersion.log" || true
-          done
+          mkdir -p work/out/windows
+          asm="work/in/windows/unpacked/AzureArchive_Win_1.0.1/BepInEx/interop/spine-unity.dll"
+          work/tools/ilspycmd --ilcode --type Native.SpineConverter.Converter "$asm" > work/out/windows/Converter.il 2> work/out/windows/Converter.log
+          work/tools/ilspycmd --ilcode --type Native.SpineConverter.SpineVersion "$asm" > work/out/windows/SpineVersion.il 2> work/out/windows/SpineVersion.log || true
       - name: Generate exact PInvoke report and commit
         run: |
           python3 - <<'PY'
@@ -44,7 +41,7 @@ jobs:
           root=Path("work/out")
           report=["# Spine converter managed P/Invoke ABI (2026-10-31)","","Input: Cpp2IL recovered Android 1.0 and Windows 1.0.1 spine-unity assemblies, inspected with ILSpy. This report records managed declarations and native library names only; it is not a substitute for the original converter source or an iOS build.",""]
           fence=chr(96)*3
-          for platform in ["android","windows"]:
+          for platform in ["windows"]:
             report.append("## "+platform)
             for name in ["Converter","SpineVersion"]:
               p=root/platform/f"{name}.il"
