@@ -81,17 +81,20 @@ header = Path(__file__).resolve().parents[1] / "scripts" / "azurearchive_spine_c
 cmake_text = cmake.read_text(encoding="utf-8")
 marker = "add_executable(SpineAtlasDowngrade"
 if "azurearchive_spine_converter_ios" not in cmake_text:
-    block = r'''
-file(GLOB SPINE_CONVERTER_CORE_SOURCES CONFIGURE_DEPENDS "\${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+    dollar = chr(36)
+    block = """
+# iOS ARM64 static library: the CLI entry point is compiled out in ios_abi.cpp.
+file(GLOB SPINE_CONVERTER_CORE_SOURCES CONFIGURE_DEPENDS "@DOLLAR@{CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 list(REMOVE_ITEM SPINE_CONVERTER_CORE_SOURCES
-    "\${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
-    "\${CMAKE_CURRENT_SOURCE_DIR}/src/SpineAtlasDowngrade.cpp")
+    "@DOLLAR@{CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    "@DOLLAR@{CMAKE_CURRENT_SOURCE_DIR}/src/SpineAtlasDowngrade.cpp")
 add_library(azurearchive_spine_converter_ios STATIC
-    "\${CMAKE_CURRENT_SOURCE_DIR}/src/ios_abi.cpp"
-    \${SPINE_CONVERTER_CORE_SOURCES})
-target_include_directories(azurearchive_spine_converter_ios PRIVATE "\${CMAKE_CURRENT_SOURCE_DIR}/include")
+    "@DOLLAR@{CMAKE_CURRENT_SOURCE_DIR}/src/ios_abi.cpp"
+    @DOLLAR@{SPINE_CONVERTER_CORE_SOURCES})
+target_include_directories(azurearchive_spine_converter_ios PRIVATE "@DOLLAR@{CMAKE_CURRENT_SOURCE_DIR}/include")
 set_target_properties(azurearchive_spine_converter_ios PROPERTIES POSITION_INDEPENDENT_CODE ON OUTPUT_NAME "azurearchive_spine_converter_ios")
-'''
-    if marker not in cmake_text: raise SystemExit("Could not locate CMake target insertion point")
-    cmake.write_text(cmake_text.replace(marker, block + "\n" + marker, 1), encoding="utf-8")
+""".replace("@DOLLAR@", dollar)
+    if marker not in cmake_text:
+        raise SystemExit("Could not locate CMake target insertion point")
+    cmake.write_text(cmake_text.replace(marker, block + "\\n" + marker, 1), encoding="utf-8")
 print("Prepared iOS static-library target and custom buffer C ABI.")
