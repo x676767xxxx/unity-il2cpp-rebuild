@@ -27,8 +27,9 @@ abi = r'''#define SPINE_CONVERTER_NO_MAIN
 namespace {
 int convertBuffer(const uint8_t* input, int32_t inputLength, int32_t dstVersion,
                   bool inputIsJson, uint8_t** output, int32_t* outputLength) noexcept {
-    if (!input || inputLength <= 0 || !output || !outputLength) return -1;
+    if (!output || !outputLength) return -1;
     *output = nullptr; *outputLength = 0;
+    if (!input || inputLength <= 0) return -1;
     if (dstVersion < -1 || dstVersion > 6) return -2;
     try {
         std::string pattern = (std::filesystem::temp_directory_path() / "azspine-XXXXXX").string();
