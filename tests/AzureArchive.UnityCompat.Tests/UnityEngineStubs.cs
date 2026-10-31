@@ -18,7 +18,8 @@ namespace UnityEngine
     }
     public enum TextureFormat { RGBA32 = 4 }
     public enum TextureWrapMode { Clamp = 1 }
-    public sealed class Texture2D : Object
+    public class Texture : Object { }
+    public sealed class Texture2D : Texture
     {
         public Texture2D(int width, int height, TextureFormat format, bool mipChain)
         { Width=width; Height=height; Format=format; MipChain=mipChain; }
