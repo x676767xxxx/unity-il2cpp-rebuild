@@ -60,3 +60,49 @@ Both `GetBackgroundPreviewAsync` methods construct a key, query `backgroundPrevi
 - No full Unity project/source tree or macOS/Xcode build host is available.
 - No signed or device-verified AzureArchive 1.0 IPA has been produced.
 - No Android RVA or machine code is proposed for iOS reuse.
+
+
+## Native ARM64 preview coroutine and cache lifecycle — verified 2026-10-31
+
+Source: Android 1.0 ARM64 `libil2cpp.so`, matching Il2CppDumper metadata and the corrected disassembly artifact from run [41200411309](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200411309). The native target is `ScenarioResourceManager.<CoLoadBackgroundPreview>d__28.MoveNext` at Android RVA `0x3270D7C`; this is not an iOS address.
+
+### Coroutine state and branch evidence
+The Android dump gives the generated iterator fields:
+- `Texture texture`, `bool addressable`, `string full`;
+- `AsyncOperationHandle<Texture> handle`;
+- `Task<byte[]> read`;
+- `Task<RuntimeSpineLoader.Files> read`;
+- original resource, owner, thumbnail preference and preview key.
+
+The ARM64 body has a six-state dispatch (states 0–5). Native call targets resolve to:
+- `ScenarioResourceManager.CorrectPath(string)`;
+- `File.Exists(string)` and `File.ReadAllBytesAsync(string, CancellationToken)`;
+- `ScenarioResourceManager.DecodeBackgroundImage(byte[], string)`;
+- `RuntimeSpineLoader.ReadAsync(string)` and `RuntimeSpineLoader.Create(...)`;
+- `SpineBackgroundVisual.RenderPreview(resource, asset, 1024)`;
+- `BackgroundPreviewCachePath(resource)` and `SaveBackgroundPreview(RenderTexture, path)`;
+- `Graphics.Blit(Texture, RenderTexture)`;
+- `LimitBackgroundPreviewSize(ref Texture, ref bool, 1024)`;
+- `ReleaseBackgroundPreview(Object)` on a cleanup path;
+- `ReportBackgroundError(Exception)` on an error path.
+
+This establishes that preview generation is not just a single static-image decode: the coroutine contains separate static-image, Addressables-handle and Spine-preview paths, and it uses async file reads. It also confirms a 1024-pixel maximum-size argument at the observed preview render/limit call sites. Exact ordering of every await/error branch still needs careful state-by-state review before writing replacement C#.
+
+### Cache ownership and eviction
+The Android `ScenarioResourceManager.BackgroundPreview` metadata declares:
+- `Texture` at offset 0x10;
+- `Addressable` at 0x18;
+- `Users` at 0x1C;
+- `LastUse` at 0x20;
+- `Resource` at 0x28;
+- `PreferThumbnail` at 0x30.
+
+Native helper disassembly verifies:
+- `ReleaseBackgroundPreview` finds the preview record for the supplied texture, updates the user count and last-use bookkeeping, and calls `TrimBackgroundPreviews(false)`.
+- The trim filter is exactly `Users == 0`.
+- The trim sort key is `LastUse`, supporting least-recently-used eviction among unused previews.
+- `TrimBackgroundPreviews` contains a 0x02000000 (32 MiB) size threshold and also tests a count threshold of 25; precise threshold/forced-trim branch behavior should be retained from the raw disassembly rather than simplified into a guessed policy.
+- `DestroyBackgroundPreview` branches on the `Addressable` flag, using the Addressables release path for addressable textures and the Unity object-destruction path for owned textures.
+
+### Implementation consequence
+The tested `BackgroundPreviewRequestCoalescer<TTexture>` covers only the pending-key/callback-list part of `QueueBackgroundPreview`. A real adapter still needs the recovered six-state coroutine flow, both async read types, native handle ownership, RenderTexture lifecycle, 1024 sizing, preview cache record/ref-count/last-use fields, LRU trim and error cleanup. Do not replace those with a generic image-only cache.
