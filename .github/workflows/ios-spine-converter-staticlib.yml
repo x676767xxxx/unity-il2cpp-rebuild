@@ -1,0 +1,52 @@
+name: Build Spine converter for iOS ARM64
+on:
+  push:
+    paths:
+      - ".github/workflows/ios-spine-converter-staticlib.yml"
+      - "scripts/prepare-ios-spine-converter.py"
+      - "scripts/azurearchive_spine_converter_abi.h"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios-arm64:
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - name: Checkout analysis repository
+        uses: actions/checkout@v4
+      - name: Checkout pinned converter source
+        uses: actions/checkout@v4
+        with:
+          repository: wang606/SpineSkeletonDataConverter
+          ref: 5ecb2139b0a1af266974f95abeec6bb8562d1249
+          path: external/SpineSkeletonDataConverter
+      - name: Prepare iOS ABI and CMake target
+        run: python3 scripts/prepare-ios-spine-converter.py
+      - name: Configure for iPhoneOS ARM64
+        run: |
+          set -euxo pipefail
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          cmake -S external/SpineSkeletonDataConverter -B build/ios-arm64 \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
+            -DCMAKE_BUILD_TYPE=Release
+      - name: Build static library
+        run: |
+          set -euxo pipefail
+          cmake --build build/ios-arm64 --config Release --target azurearchive_spine_converter_ios --parallel 3
+          test -s build/ios-arm64/libazurearchive_spine_converter_ios.a
+          file build/ios-arm64/libazurearchive_spine_converter_ios.a
+          xcrun nm -gU build/ios-arm64/libazurearchive_spine_converter_ios.a | grep -E 'AzureArchiveSpine(ConvertBuffer|JsonToBinary|FreeBuffer)'
+      - name: Upload iOS static library and ABI header
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-spine-converter-ios-arm64
+          path: |
+            build/ios-arm64/libazurearchive_spine_converter_ios.a
+            external/SpineSkeletonDataConverter/include/azurearchive_spine_converter_abi.h
+            external/SpineSkeletonDataConverter/LICENSE
+          if-no-files-found: error
