@@ -83,3 +83,9 @@ A follow-up workflow now adds a host-side functional C ABI smoke test (JSON to S
 - Added `azurearchive-spine-unity-ios-plugin` as a separate Actions artifact in the iOS ARM64 workflow. The packaging step is part of the same workflow after the host ABI smoke test.
 - Packaging workflow [41185979412](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185979412) was still running at this checkpoint; no plugin ZIP or artifact ID is claimed until upload completes.
 - The package is a reusable converter plugin only. It is not a full AzureArchive Unity project, does not supply the Spine 4.2 C# runtime or game assets, and cannot produce an IPA by itself.
+
+
+- First complete package workflow [41185950423](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41185950423) succeeded, including iOS ARM64 build, host C ABI smoke test, Unity plugin packaging and both artifact uploads.
+- Unity plugin artifact ID: `13035873997` (1,842,358 bytes); static-library artifact ID: `13035859101` (1,938,910 bytes).
+- Downloaded and inspected the plugin artifact ZIP. The nested Unity package contains the 8,195,192-byte static archive, iOS PluginImporter metadata, ABI header, managed bridge, README and upstream LICENSE. This confirms the packaging layout is present; it is not yet tested by importing into a Unity project.
+- A follow-up hardening check was added to verify the archive's ARM64 slice and three exported symbols before packaging. The first attempt exposed incorrect `lipo -verify_arch` argument order; corrected in commit `23fa33f`. The corrected run [41186109443](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41186109443) was still in progress at this note.
