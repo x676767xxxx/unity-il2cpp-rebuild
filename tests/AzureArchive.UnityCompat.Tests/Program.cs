@@ -29,6 +29,24 @@ internal static class Program
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
 
+        string resourceRoot = Path.Combine(Path.GetTempPath(), "azurearchive-resource-root-" + Guid.NewGuid().ToString("N"));
+        string nestedDirectory = Path.Combine(resourceRoot, "backgrounds");
+        Directory.CreateDirectory(nestedDirectory);
+        string rootedImage = Path.Combine(nestedDirectory, "scene.png");
+        try
+        {
+            File.WriteAllBytes(rootedImage, new byte[] { 4, 3, 2, 1 });
+            ImageConversion.Reset();
+            Texture2D rootedDecoded = BackgroundImageDecoder.DecodeFile(resourceRoot, "backgrounds/scene.png");
+            Assert(rootedDecoded.name == "scene.png", "root-confined file decode");
+            AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, "../outside.png"), "reject parent traversal");
+            AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(resourceRoot, rootedImage), "reject absolute resource path");
+        }
+        finally
+        {
+            if (Directory.Exists(resourceRoot)) Directory.Delete(resourceRoot, recursive: true);
+        }
+
         AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.DecodeFile(""), "empty file path");
         AssertThrows<FileNotFoundException>(() => BackgroundImageDecoder.DecodeFile(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".png")), "missing file");
 
@@ -88,7 +106,7 @@ internal static class Program
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>(null!, lease => { }), "null Addressables key");
         AssertThrows<ArgumentNullException>(() => AddressablesRuntimeAdapter.Load<object>("bundle://key", null!), "null Addressables success callback");
 
-        Console.WriteLine("PASS: 10 Unity decoder checks; 4 Spine bridge argument checks; 11 Addressables async adapter checks");
+        Console.WriteLine("PASS: 13 Unity decoder checks; 4 Spine bridge argument checks; 11 Addressables async adapter checks");
         return 0;
     }
 
