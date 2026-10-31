@@ -432,6 +432,37 @@ internal static class Program
         AssertThrows<ArgumentException>(() => previewLedger.TryGet("", out _),
             "preview ledger lookup requires key");
 
+        // Android 1.0 trim branch: forced trim, strict 32 MiB threshold, and >=25 entries.
+        var trimCandidates = new[]
+        {
+            new BackgroundPreviewTrimPlanner.Candidate("oldest", 8L * 1024L * 1024L),
+            new BackgroundPreviewTrimPlanner.Candidate("middle", 8L * 1024L * 1024L),
+            new BackgroundPreviewTrimPlanner.Candidate("newest", 8L * 1024L * 1024L)
+        };
+        AssertEqual("0", BackgroundPreviewTrimPlanner.Plan(trimCandidates,
+            BackgroundPreviewTrimPlanner.MemoryThresholdBytes, 24, false).Length.ToString(),
+            "normal trim does not start at exactly 32 MiB with fewer than 25 entries");
+        AssertEqual("oldest,middle", string.Join(",", BackgroundPreviewTrimPlanner.Plan(
+            trimCandidates, BackgroundPreviewTrimPlanner.MemoryThresholdBytes + 1, 24, false)),
+            "normal trim evicts LRU candidates until memory is no longer over 32 MiB");
+        AssertEqual("oldest", string.Join(",", BackgroundPreviewTrimPlanner.Plan(
+            trimCandidates, 1, 25, false)),
+            "normal trim starts at 25 entries and stops below count threshold");
+        AssertEqual("oldest,middle,newest", string.Join(",", BackgroundPreviewTrimPlanner.Plan(
+            trimCandidates, 0, 0, true)),
+            "forced trim selects every unused candidate");
+        AssertEqual("0", BackgroundPreviewTrimPlanner.Plan(
+            Array.Empty<BackgroundPreviewTrimPlanner.Candidate>(), 64L * 1024L * 1024L, 30, true).Length.ToString(),
+            "forced trim safely handles empty candidate list");
+        AssertThrows<ArgumentOutOfRangeException>(() => BackgroundPreviewTrimPlanner.Plan(
+            trimCandidates, -1, 0, false), "trim planner rejects negative memory total");
+        AssertThrows<ArgumentOutOfRangeException>(() => BackgroundPreviewTrimPlanner.Plan(
+            trimCandidates, 0, -1, false), "trim planner rejects negative cache count");
+        AssertThrows<ArgumentException>(() => BackgroundPreviewTrimPlanner.Plan(
+            new[] { new BackgroundPreviewTrimPlanner.Candidate("same", 1),
+                    new BackgroundPreviewTrimPlanner.Candidate("same", 2) }, 64, 30, false),
+            "trim planner rejects duplicate candidate keys");
+
         Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks");
         return 0;
     }
