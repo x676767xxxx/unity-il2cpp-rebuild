@@ -37,11 +37,15 @@ jobs:
         run: |
           set -euo pipefail
           IOS="work/pkg/ios/unpacked/Payload/AzureArchive.app/Frameworks/UnityFramework.framework/UnityFramework"
-          META="work/pkg/ios/unpacked/Payload/AzureArchive.app/Data/Managed/Metadata/global-metadata.dat"
+          META_IOS="work/pkg/ios/unpacked/Payload/AzureArchive.app/Data/Managed/Metadata/global-metadata.dat"
+          META_ANDROID=$(find work/pkg/android/unpacked -type f -name global-metadata.dat | head -1)
+          META_WINDOWS=$(find work/pkg/windows/unpacked -type f -name global-metadata.dat | head -1)
           ANDROID="work/pkg/android/unpacked/lib/arm64-v8a/libil2cpp.so"
           WINDOWS=$(find work/pkg/windows/unpacked -type f -iname GameAssembly.dll | head -1)
-          test -f "$IOS"; test -f "$META"; test -f "$ANDROID"; test -n "$WINDOWS"
-          cp "$META" work/pkg/ios/global-metadata.dat
+          test -f "$IOS"; test -f "$META_IOS"; test -f "$META_ANDROID"; test -f "$META_WINDOWS"; test -f "$ANDROID"; test -n "$WINDOWS"
+          cp "$META_IOS" work/pkg/ios/global-metadata.dat
+          cp "$META_ANDROID" work/pkg/android/global-metadata.dat
+          cp "$META_WINDOWS" work/pkg/windows/global-metadata.dat
           cp "$ANDROID" work/pkg/android/libil2cpp.so
           cp "$WINDOWS" work/pkg/windows/GameAssembly.dll
           file "$IOS" "$ANDROID" "$WINDOWS" > work/out/binary-file-types.txt
@@ -71,14 +75,14 @@ jobs:
         run: |
           set +e
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
-          dotnet "$DLL" "$PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
+          dotnet "$DLL" $PWD/work/pkg/android/libil2cpp.so" "$PWD/work/pkg/android/global-metadata.dat" "$PWD/work/out/android" > work/out/android-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/android-dumper.log
       - name: Run Windows metadata dump
         continue-on-error: true
         run: |
           set +e
           DLL=$(find work/tools/dumper -maxdepth 2 -iname Il2CppDumper.dll | head -1)
-          dotnet "$DLL" "$PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/ios/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
+          dotnet "$DLL" $PWD/work/pkg/windows/GameAssembly.dll" "$PWD/work/pkg/windows/global-metadata.dat" "$PWD/work/out/windows" > work/out/windows-dumper.log 2>&1
           echo "EXIT_CODE=$?" >> work/out/windows-dumper.log
       - name: Compare target type and method names
         if: always()
