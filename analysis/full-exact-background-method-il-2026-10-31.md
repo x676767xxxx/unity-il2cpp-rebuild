@@ -7438,3 +7438,240 @@ Source lines 13016-13448:
 - Android and Windows bodies are compared independently; do not merge platform-specific differences.
 - The method declaration and call sites are evidence, but do not establish successful runtime behavior on old iOS.
 - No C# compatibility code, Unity build, signing, or IPA is produced.
+## Compiler-generated preview coroutine
+### android
+#### MoveNext: 2 declarations
+Source lines 57-114:
+```il
+	.method private final hidebysig newslot virtual 
+		instance bool MoveNext () cil managed 
+	{
+		.override method instance bool [mscorlib]System.Collections.IEnumerator::MoveNext()
+		// Method begins at RVA 0x6840d0
+		// Header size: 12
+		// Code size: 93 (0x5d)
+		.maxstack 0
+		.locals init (
+			[0] int32,
+			[1] bool,
+			[2] object,
+			[3] object,
+			[4] class ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28',
+			[5] native int,
+			[6] object,
+			[7] object,
+			[8] object,
+			[9] object,
+			[10] object,
+			[11] object,
+			[12] object,
+			[13] object,
+			[14] object,
+			[15] object
+		)
+
+		IL_0000: br IL_0034
+		// loop start (head: IL_0034)
+			IL_0005: ldc.i4 18476600
+			IL_000a: stloc 2
+			IL_000e: ldstr "Unmanaged memory load: [v70 @ rcx_v1+v53 @ rax_v2 (System.Int32)*4]"
+			IL_0013: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+			IL_0018: ldc.i4.0
+			IL_0019: conv.i
+			IL_001a: ldc.i4 18476600
+			IL_001f: add
+			IL_0020: stloc 3
+			IL_0024: ldstr "Indirect jump: v72 @ rax_v5 (should have been resolved before IL gen)"
+			IL_0029: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+
+			IL_002e: ldc.i4 0
+			IL_0033: ret
+
+			IL_0034: ldarg.0
+			IL_0035: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_003a: stloc 0
+			IL_003e: ldarg.0
+			IL_003f: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_0044: ldc.i4 5
+			IL_0049: cgt
+			IL_004b: stloc 1
+			IL_004f: ldloc 1
+			IL_0053: brtrue IL_002e
+
+			IL_0058: br IL_0005
+		// end loop
+	} // end of method '<CoLoadBackgroundPreview>d__28'::MoveNext
+```
+Source lines 57-114:
+```il
+	.method private final hidebysig newslot virtual 
+		instance bool MoveNext () cil managed 
+	{
+		.override method instance bool [mscorlib]System.Collections.IEnumerator::MoveNext()
+		// Method begins at RVA 0x6840d0
+		// Header size: 12
+		// Code size: 93 (0x5d)
+		.maxstack 0
+		.locals init (
+			[0] int32,
+			[1] bool,
+			[2] object,
+			[3] object,
+			[4] class ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28',
+			[5] native int,
+			[6] object,
+			[7] object,
+			[8] object,
+			[9] object,
+			[10] object,
+			[11] object,
+			[12] object,
+			[13] object,
+			[14] object,
+			[15] object
+		)
+
+		IL_0000: br IL_0034
+		// loop start (head: IL_0034)
+			IL_0005: ldc.i4 18476600
+			IL_000a: stloc 2
+			IL_000e: ldstr "Unmanaged memory load: [v70 @ rcx_v1+v53 @ rax_v2 (System.Int32)*4]"
+			IL_0013: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+			IL_0018: ldc.i4.0
+			IL_0019: conv.i
+			IL_001a: ldc.i4 18476600
+			IL_001f: add
+			IL_0020: stloc 3
+			IL_0024: ldstr "Indirect jump: v72 @ rax_v5 (should have been resolved before IL gen)"
+			IL_0029: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+
+			IL_002e: ldc.i4 0
+			IL_0033: ret
+
+			IL_0034: ldarg.0
+			IL_0035: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_003a: stloc 0
+			IL_003e: ldarg.0
+			IL_003f: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_0044: ldc.i4 5
+			IL_0049: cgt
+			IL_004b: stloc 1
+			IL_004f: ldloc 1
+			IL_0053: brtrue IL_002e
+
+			IL_0058: br IL_0005
+		// end loop
+	} // end of method '<CoLoadBackgroundPreview>d__28'::MoveNext
+```
+### windows
+#### MoveNext: 2 declarations
+Source lines 57-108:
+```il
+	.method private final hidebysig newslot virtual 
+		instance bool MoveNext () cil managed 
+	{
+		.override method instance bool [mscorlib]System.Collections.IEnumerator::MoveNext()
+		// Method begins at RVA 0x4a1834
+		// Header size: 12
+		// Code size: 101 (0x65)
+		.maxstack 0
+		.locals init (
+			[0] int32,
+			[1] bool,
+			[2] object,
+			[3] object,
+			[4] class ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28',
+			[5] object,
+			[6] object,
+			[7] object,
+			[8] object,
+			[9] object
+		)
+
+		IL_0000: br IL_0036
+		// loop start (head: IL_0036)
+			IL_0005: ldc.i8 6442450944
+			IL_000e: stloc 2
+			IL_0012: ldstr "Unmanaged memory load: [v70 @ rdx_v1+7D6E94+v52 @ rax_v3 (System.Int32)*4]"
+			IL_0017: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+			IL_001c: ldc.i4.0
+			IL_001d: conv.i
+			IL_001e: ldc.i8 6442450944
+			IL_0027: add
+			IL_0028: stloc 3
+			IL_002c: ldstr "Indirect jump: v72 @ rcx_v3 (should have been resolved before IL gen)"
+			IL_0031: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+
+			IL_0036: ldarg.0
+			IL_0037: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_003c: stloc 0
+			IL_0040: ldarg.0
+			IL_0041: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_0046: ldc.i4 5
+			IL_004b: cgt
+			IL_004d: stloc 1
+			IL_0051: ldloc 1
+			IL_0055: brtrue IL_005f
+
+			IL_005a: br IL_0005
+		// end loop
+
+		IL_005f: ldc.i4 0
+		IL_0064: ret
+	} // end of method '<CoLoadBackgroundPreview>d__28'::MoveNext
+```
+Source lines 57-108:
+```il
+	.method private final hidebysig newslot virtual 
+		instance bool MoveNext () cil managed 
+	{
+		.override method instance bool [mscorlib]System.Collections.IEnumerator::MoveNext()
+		// Method begins at RVA 0x4a1834
+		// Header size: 12
+		// Code size: 101 (0x65)
+		.maxstack 0
+		.locals init (
+			[0] int32,
+			[1] bool,
+			[2] object,
+			[3] object,
+			[4] class ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28',
+			[5] object,
+			[6] object,
+			[7] object,
+			[8] object,
+			[9] object
+		)
+
+		IL_0000: br IL_0036
+		// loop start (head: IL_0036)
+			IL_0005: ldc.i8 6442450944
+			IL_000e: stloc 2
+			IL_0012: ldstr "Unmanaged memory load: [v70 @ rdx_v1+7D6E94+v52 @ rax_v3 (System.Int32)*4]"
+			IL_0017: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+			IL_001c: ldc.i4.0
+			IL_001d: conv.i
+			IL_001e: ldc.i8 6442450944
+			IL_0027: add
+			IL_0028: stloc 3
+			IL_002c: ldstr "Indirect jump: v72 @ rcx_v3 (should have been resolved before IL gen)"
+			IL_0031: call void Cpp2ILInjected.Cpp2ILHelpers::NoteDecompilerIssue(string)
+
+			IL_0036: ldarg.0
+			IL_0037: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_003c: stloc 0
+			IL_0040: ldarg.0
+			IL_0041: ldfld int32 ScenarioResourceManager/'<CoLoadBackgroundPreview>d__28'::'<>1__state'
+			IL_0046: ldc.i4 5
+			IL_004b: cgt
+			IL_004d: stloc 1
+			IL_0051: ldloc 1
+			IL_0055: brtrue IL_005f
+
+			IL_005a: br IL_0005
+		// end loop
+
+		IL_005f: ldc.i4 0
+		IL_0064: ret
+	} // end of method '<CoLoadBackgroundPreview>d__28'::MoveNext
+```
