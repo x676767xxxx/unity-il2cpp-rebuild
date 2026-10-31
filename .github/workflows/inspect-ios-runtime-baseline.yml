@@ -1,0 +1,71 @@
+name: Inspect iOS 0.7.9.2 resource bootstrap
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-ios-runtime-baseline.yml'
+permissions:
+  contents: read
+jobs:
+  inspect-ios:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download iOS release IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/ios work/out
+          curl -fL --retry 3 --retry-delay 2 -o work/ios/AzureArchive_IOS_0.7.9.2.ipa 'https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa'
+          unzip -q work/ios/AzureArchive_IOS_0.7.9.2.ipa -d work/ios/extracted
+      - name: Locate UnityFramework and disassemble baseline methods
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="$(find work/ios/extracted/Payload -type f -path '*/UnityFramework.framework/UnityFramework' -print -quit)"
+          if [ -z "$BIN" ]; then
+            echo 'UnityFramework binary not found in IPA' >&2
+            find work/ios/extracted/Payload -maxdepth 5 -type f | head -100
+            exit 1
+          fi
+          file "$BIN" | tee work/out/ios-binary-info.txt
+          llvm-objdump --macho --private-headers "$BIN" > work/out/ios-mach-o-headers.txt
+          python3 - "$BIN" <<'PY'
+          import pathlib, re, subprocess, sys
+          binary=sys.argv[1]
+          lines=pathlib.Path("work/out/ios-mach-o-headers.txt").read_text(errors="replace").splitlines()
+          base=None
+          for i,line in enumerate(lines):
+              if "segname __TEXT" in line:
+                  for candidate in lines[i+1:i+8]:
+                      m=re.search(r"vmaddr\s+(0x[0-9a-fA-F]+)",candidate)
+                      if m:
+                          base=int(m.group(1),16)
+                          break
+                  break
+          if base is None:
+              raise SystemExit("Could not determine __TEXT vmaddr")
+          methods=[
+              ("ScenarioResourceManager.CheckForUpdate",0x3D6931C,0x3D693C8),
+              ("ScenarioResourceManager.Awake",0x3D693C8,0x3D69690),
+              ("ScenarioResourceManager.Initialize",0x3D69690,0x3D697C8),
+              ("ScenarioResourceManager.CheckForUpdate.MoveNext",0x3D746AC,0x3D751A0),
+              ("ScenarioResourceManager.OnUpdateComplete.MoveNext",0x3D776C0,0x3D77BE4),
+          ]
+          out=[]
+          out.append("Mach-O binary: "+binary)
+          out.append("UnityFramework __TEXT vmaddr: "+hex(base))
+          for name,start,end in methods:
+              cmd=["llvm-objdump","--macho","--disassemble","--arch=arm64",
+                   "--start-address="+hex(base+start),
+                   "--stop-address="+hex(base+end),binary]
+              p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+              out += ["", "## "+name, "RVA="+hex(start)+".."+hex(end), p.stdout]
+              if p.returncode:
+                  raise SystemExit(p.stdout)
+          pathlib.Path("work/out/ios-runtime-baseline-disassembly.txt").write_text("\n".join(out),encoding="utf-8")
+          print("\n".join(out)[:18000])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-ios-runtime-baseline-disassembly
+          path: work/out/
