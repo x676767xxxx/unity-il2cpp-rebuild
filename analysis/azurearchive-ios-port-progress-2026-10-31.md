@@ -206,3 +206,14 @@ The Android source-change callback was disassembled in successful run [411962343
 The callback's native body resolves the previously opaque helper call at RVA `0x325A46C` to `PopupManager.ShowPopupOk(...)`. `catalogUrlOverride` is a separate SettingData field at offset `0x18`; its runtime call sites are not yet established.
 
 The existing native-disassembly workflow has been extended to inspect settings persistence/initialization and the Addressables manager's Awake/Initialize/UpdateAddressable methods. New run: [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783). No C# implementation was added; existing URL resolver and bootstrap remain unchanged pending proof of the actual URL provider.
+
+## Additional native checkpoint: settings persistence and Addressables manager initialization
+
+Successful run [41196441783](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196441783), artifact ID `13040553305`, confirms:
+- `UserSettings.WriteUserSettings` serializes the current SettingData and writes settings; it does not itself establish the gameplay CDN URL.
+- `SettingData.set_catalogUrlOverride` only stores an instance field at offset `0x18`; no direct static `AddrLoadUrl` write is present.
+- `ScenarioResourceManager.Awake` starts `InitializeAfterSplash`.
+- `ScenarioResourceManager.Initialize` configures runtime resources and calls Addressables-related methods, but the inspected body does not prove an `AddrLoadUrl` assignment.
+- `ScenarioResourceManager.UpdateAddressable` is a single `ret` stub in this Android build and is not a URL provider.
+
+The exact URL writer remains unproven. Next focus: generated settings iterator bodies, `InitializeAfterSplash.MoveNext`, and cross-references to the IL2CPP static-field storage after metadata correlation. Existing URL resolver/bootstrap code remains unchanged; no speculative C# file was added.
