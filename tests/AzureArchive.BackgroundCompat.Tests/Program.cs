@@ -207,7 +207,7 @@ internal static class Program
         AssertEqual("Spine", mixedOverrides[1].Kind.ToString(), "Spine overrides follow image overrides");
         AssertEqual("GlobalCustom", mixedOverrides[1].Origin.ToString(), "mixed override source preserved");
         AssertTrue(BackgroundOverrideResolver.TryResolve(
-            42u,
+            spineDescriptor.Id,
             new[] { spineDescriptor },
             Array.Empty<BackgroundResourceDescriptor>(),
             out var spineSelected) && spineSelected.Kind == BackgroundResourceKind.Spine,
