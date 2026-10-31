@@ -91,3 +91,12 @@ Earlier direct BL scan found 1 call site to this method.
 5. Defer AuthoringResourceCatalog import/staging until its actual UI/gameplay callers are identified.
 
 Do not transplant Android ARM64 RVAs or native instructions into iOS. These are Android-only addresses and platform-specific code.
+
+
+## 7. Native preview coroutine/cache findings (run 41200411309)
+
+The exact compiler-generated iterator has Android ARM64 RVA `0x3270D7C`. Its metadata fields include an Addressables `AsyncOperationHandle<Texture>`, a `Task<byte[]>`, a `Task<RuntimeSpineLoader.Files>`, a texture, an addressable flag and a full path. Native call resolution confirms calls to `File.ReadAllBytesAsync`, `DecodeBackgroundImage`, `RuntimeSpineLoader.ReadAsync/Create`, `SpineBackgroundVisual.RenderPreview(..., 1024)`, `BackgroundPreviewCachePath`, `SaveBackgroundPreview`, `Graphics.Blit`, `LimitBackgroundPreviewSize(..., 1024)`, and cleanup/error helpers.
+
+The `BackgroundPreview` record has Texture, Addressable, Users, LastUse, Resource and PreferThumbnail fields. The native trim predicate is `Users == 0`; its sort selector returns `LastUse`. The trim body contains a 32 MiB threshold and a 25-entry count check. Destroy branches on Addressable to choose release vs Unity destruction. These findings establish a reference-counted, last-use-aware preview cache; the exact trim condition should be preserved from the native disassembly when implementing it.
+
+This is Android-only behavioral evidence. The generated ILSpy `MoveNext` pseudo-IL remains incomplete; native ARM64 instructions were used to resolve the call targets. No Android RVA or machine code is suitable for reuse in iOS.
