@@ -1,0 +1,67 @@
+name: Export AzureArchive raw IL for iOS port
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "analysis/run-raw-il-export.txt"
+      - ".github/workflows/ios-raw-il-export.yml"
+jobs:
+  export-il:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Cpp2IL recovery artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/in/recovery
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169615291
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install ILSpy command line
+        run: dotnet tool install ilspycmd --tool-path work/tools
+      - name: Export type list and selected raw IL
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/out/android work/out/windows
+          for platform in android windows; do
+            DLL=$(find work/in/recovery -type f -path "*cpp2il-$platform*" -iname 'Assembly-CSharp.dll' | head -1)
+            if [ -z "$DLL" ]; then echo "DLL not found for $platform" > "work/out/$platform/error.txt"; continue; fi
+            work/tools/ilspycmd -l c "$DLL" > "work/out/$platform/types.txt"
+            for type in ScenarioResourceManager Character CharacterManager; do
+              work/tools/ilspycmd --ilcode --type "$type" "$DLL" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log" || true
+            done
+            grep -i 'AuthoringResourceCatalog' "work/out/$platform/types.txt" > "work/out/$platform/authoring-type-candidates.txt" || true
+            while IFS= read -r line; do
+              type_name=$(printf '%s' "$line" | sed -E 's/^[[:space:]]*[A-Z][[:space:]]+//')
+              [ -z "$type_name" ] && continue
+              safe_name=$(printf '%s' "$type_name" | tr '+./<> ' '______' | tr -cd '[:alnum:]_-')
+              work/tools/ilspycmd --ilcode --type "$type_name" "$DLL" > "work/out/$platform/Authoring-$safe_name.il" 2> "work/out/$platform/Authoring-$safe_name.log" || true
+            done < "work/out/$platform/authoring-type-candidates.txt"
+          done
+      - name: Extract target methods and call operands
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          out=Path("work/out")
+          names=["ResolveBackground","GetBackgroundTexture","GetBackgroundPreviewAsync","InitializeAuthoringResources","Search","Resolve","Import","StageReferencedResources","ApplyDisplayRank","GetSkeletonDataAssetAtPath"]
+          report=["# Raw IL export inspection summary",""]
+          for platform in ["android","windows"]:
+              report += [f"## {platform}",""]
+              for p in sorted((out/platform).glob("*.il")):
+                  txt=p.read_text(errors="ignore")
+                  for name in names:
+                      if name in txt:
+                          hits=[x.strip() for x in txt.splitlines() if name in x]
+                          report.append(f"- {p.name}: {name} ({len(hits)} matching IL lines)")
+                          report.extend("  "+x[:240] for x in hits[:8])
+              report.append("")
+          (out/"raw-il-inspection-summary.md").write_text("\n".join(report))
+          PY
+      - name: Upload raw IL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-raw-il-ios-port
+          path: work/out/
