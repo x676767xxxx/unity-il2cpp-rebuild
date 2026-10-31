@@ -1,6 +1,7 @@
 #if UNITY_2021_3_OR_NEWER
 using System;
 using System.IO;
+using AzureArchive.BackgroundCompat;
 using UnityEngine;
 
 namespace AzureArchive.UnityCompat
@@ -23,6 +24,18 @@ namespace AzureArchive.UnityCompat
 
             byte[] bytes = File.ReadAllBytes(path);
             return Decode(bytes, Path.GetFileName(path));
+        }
+
+        /// <summary>
+        /// Resolves a game-relative resource path beneath the trusted override root
+        /// before reading it. Use this overload for paths originating in manifests,
+        /// atlas metadata, or user-provided override data.
+        /// </summary>
+        public static Texture2D DecodeFile(string resourceRoot, string relativePath)
+        {
+            string safePath = SafeResourcePath.ResolveUnderRoot(resourceRoot, relativePath);
+            byte[] bytes = File.ReadAllBytes(safePath);
+            return Decode(bytes, Path.GetFileName(safePath));
         }
 
         public static Texture2D Decode(byte[] bytes, string name)
