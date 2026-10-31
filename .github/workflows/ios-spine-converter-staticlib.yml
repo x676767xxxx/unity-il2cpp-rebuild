@@ -5,6 +5,7 @@ on:
       - ".github/workflows/ios-spine-converter-staticlib.yml"
       - "scripts/prepare-ios-spine-converter.py"
       - "scripts/azurearchive_spine_converter_abi.h"
+      - "scripts/ios_abi_smoke_test.cpp"
   workflow_dispatch:
 permissions:
   contents: read
