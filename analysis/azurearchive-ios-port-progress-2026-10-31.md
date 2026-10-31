@@ -231,3 +231,21 @@ The existing Android disassembly workflow was then extended in place to inspect 
 - `ScenarioResourceManager.InitializeAfterSplash.MoveNext` at RVA `0x32771DC`
 
 New CI run [41196544855](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41196544855) was triggered by this workflow-only change and was in progress at this checkpoint. No runtime C# implementation or duplicate source file was added.
+
+
+## Android 1.0 background resource descriptor implementation checkpoint
+
+- Added `src/AzureArchive.BackgroundCompat/BackgroundResourceDescriptor.cs` to the existing compatibility library; no duplicate loader or project was created.
+- The new immutable descriptor records the Android 1.0 resource identity fields: ID, name, kind, origin, root, path and whether Spine override metadata is present.
+- Enum values were copied from the Android 1.0 IL2CPP metadata: background kinds `None=0, Image=1, BlurRT=2, Spine=3, Hide=4`; origins `Native=0, GlobalCustom=1, LocalCustom=2`.
+- `FullPath` follows the recovered IL: Native resources return the stored path unchanged; GlobalCustom/LocalCustom resources resolve the relative path beneath the trusted root using the existing `SafeResourcePath` guard. The native path remains nullable to preserve the original field-return behavior.
+- `IsCustomSpine` follows the recovered predicate: it is true when Spine override metadata is present. It is intentionally independent of the kind enum.
+- Regression coverage includes enum numeric values, Native/custom path behavior, custom Spine metadata and traversal rejection.
+- CI run [41197164541](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41197164541) succeeded: source-include uniqueness check, .NET Standard 2.1 library build, background compatibility tests, Unity decoder stub tests and artifact upload. Artifact: `azurearchive-background-path-compat-library` (ID `13041292935`).
+- Validation boundary: this is a portable compatibility model, not yet linked into the actual Unity player. It does not implement Addressables acquisition, preview rendering, Spine playback, or produce an IPA.
+
+### Next implementation slice
+
+1. Recover the exact Android override enumeration iterator and ID predicate; then extend the existing resolver only where the source-specific behavior is proven.
+2. Reuse the old iOS 0.7.9.2 texture/Addressables path for native resources where the method-body diff supports it.
+3. Add the resource descriptor adapter to the actual iOS integration point only after a buildable Unity/Xcode base is established.
