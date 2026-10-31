@@ -33,7 +33,7 @@ jobs:
             root="work/in/recovery/cpp2il-$platform"
             asm="$root/Assembly-CSharp.dll"
             test -f "$asm"
-            for type in RuntimeSpineLoader RuntimeSpineAsset RuntimeAtlasTexture BackgroundResource ScenarioResourceManager CharacterManager; do
+            for type in RuntimeSpineLoader RuntimeSpineAsset RuntimeAtlasTexture BackgroundResource ResourceOverrideData SpineBackgroundVisual ScenarioResourceManager CharacterManager; do
               work/tools/ilspycmd --ilcode --type "$type" "$asm" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log" || true
             done
             for pair in "spine-csharp.dll:Spine.SkeletonBinary" "spine-csharp.dll:Spine.Atlas" "spine-unity.dll:Spine.Unity.SkeletonDataAsset" "spine-unity.dll:Spine.Unity.BlendModeMaterials"; do
@@ -51,7 +51,7 @@ jobs:
           import re, hashlib
           root=Path("work/out")
           report=["# Targeted Android/Windows Spine and background runtime IL inspection","","Source: Cpp2IL recovery artifact from run 41169615291; ILSpy raw IL export. This is recovered IL, not original source or a compilable Unity project.",""]
-          names=["RuntimeSpineLoader","RuntimeSpineAsset","RuntimeAtlasTexture","BackgroundResource","ScenarioResourceManager","CharacterManager","Spine__SkeletonBinary","Spine__Atlas","Spine__Unity__SkeletonDataAsset","Spine__Unity__BlendModeMaterials"]
+          names=["RuntimeSpineLoader","RuntimeSpineAsset","RuntimeAtlasTexture","BackgroundResource","ResourceOverrideData","SpineBackgroundVisual","ScenarioResourceManager","CharacterManager","Spine__SkeletonBinary","Spine__Atlas","Spine__Unity__SkeletonDataAsset","Spine__Unity__BlendModeMaterials"]
           for name in names:
               report += [f"## {name}"]
               for platform in ["android","windows"]:
