@@ -11,41 +11,76 @@ jobs:
           curl -fL --retry 3 -o inspect/AzureArchive_IOS_0.7.9.2.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
           curl -fL --retry 3 -o inspect/AzureArchive_Win_1.0.1.zip "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_Win_1.0.1.zip"
           curl -fL --retry 3 -o inspect/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
-      - name: Compare Unity content and addressables
+      - name: Compare native binaries, metadata and catalogs
         run: |
           python3 - <<'PY'
-          import zipfile, pathlib, hashlib, json, re
+          import zipfile, pathlib, hashlib, json, struct, plistlib, re, collections
+          files = {
+            "iOS": "inspect/AzureArchive_IOS_0.7.9.2.ipa",
+            "Android": "inspect/base.apk",
+            "Windows": "inspect/AzureArchive_Win_1.0.1.zip"
+          }
+          zs={k:zipfile.ZipFile(v) for k,v in files.items()}
           out=[]
-          for p in pathlib.Path("inspect").iterdir():
-              if p.suffix.lower() not in ('.ipa','.apk','.zip'): continue
-              z=zipfile.ZipFile(p); names=z.namelist()
-              out.append(f"## {p.name}")
-              for n in names:
-                  low=n.lower()
-                  if low.endswith(('boot.config','build_info','unity_app_guid','assets/aa/catalog.json','streamingassets/aa/catalog.json','assets/aa/settings.json','streamingassets/aa/settings.json','scriptingassemblies.json')):
-                      b=z.read(n)
-                      out.append(f"### {n} ({len(b)} bytes) sha256={hashlib.sha256(b).hexdigest()}")
-                      if len(b)<200000: out.append(b.decode('utf-8','replace')[:12000])
-                      else:
-                          try:
-                              d=json.loads(b); out.append("JSON top keys: "+str(list(d)[:80]))
-                          except: pass
-              for n in names:
-                  if n.lower().endswith(('data.unity3d','.bundle','.assetbundle')):
-                      i=z.getinfo(n); out.append(f"ASSETFILE {n} size={i.file_size}")
-                      if i.file_size<300000000:
-                          raw=z.read(n)
-                          versions=sorted(set(x.decode('ascii','ignore') for x in re.findall(rb'\d{4}\.\d+\.\d+[abfp]?\d*',raw)))
-                          if versions: out.append(f"VERSION STRINGS: {versions[:30]}")
-                          for pat in (b'UnityFS',b'UnityWeb',b'UnityRaw',b'Addressables',b'AssetBundle'):
-                              if pat in raw: out.append(f"MARKER {pat.decode()}: yes")
-              for n in names:
-                  low=n.lower()
-                  if any(x in low for x in ('streamingassets','addressables','assetbundle')) and not low.endswith(('.dll','.pdb')):
-                      out.append("RESOURCE "+n)
-          pathlib.Path("inspect/resource-report.txt").write_text("\n".join(out))
+          def add(s=""): out.append(str(s))
+          def readmatch(z, suffix):
+            return next((n for n in z.namelist() if n.endswith(suffix)),None)
+          for platform,z in zs.items():
+            add("## "+platform)
+            names=z.namelist()
+            # Managed assembly inventory
+            sn=readmatch(z,"ScriptingAssemblies.json")
+            if sn:
+              d=json.loads(z.read(sn)); asm=d.get("names",[])
+              add(f"ScriptingAssemblies: {len(asm)} entries")
+              add("  "+", ".join(x for x in asm if x in ("Assembly-CSharp.dll","BestHTTP.dll","UniTask.dll","UniTask.Addressables.dll","spine-csharp.dll","spine-unity.dll","Unity.Addressables.dll","Unity.ResourceManager.dll")))
+              if platform=="iOS": ios_asm=set(asm)
+              elif platform=="Android": android_asm=set(asm)
+              else: windows_asm=set(asm)
+            # metadata headers
+            candidates=[n for n in names if n.endswith("global-metadata.dat")]
+            for n in candidates[:3]:
+              b=z.read(n); add(f"Metadata {n}: {len(b)} bytes sha256={hashlib.sha256(b).hexdigest()}")
+              if len(b)>=16 and struct.unpack_from("<I",b)[0]==0xFAB11BAF:
+                ver=struct.unpack_from("<I",b,4)[0]; add(f"  magic=FAB11BAF version={ver}")
+                pairs=[]
+                for i in range(31):
+                  off,cnt=struct.unpack_from("<II",b,8+i*8)
+                  pairs.append((off,cnt))
+                add("  31 offset/count pairs: "+repr(pairs))
+            # native binaries
+            for n in names:
+              l=n.lower()
+              if l.endswith(("unityframework","gameassembly.dll","libil2cpp.so")) or (platform=="iOS" and l.endswith("/azurearchive")):
+                b=z.read(n); add(f"Native {n}: {len(b)} bytes sha256={hashlib.sha256(b).hexdigest()}")
+                if b[:4] in (b"\xce\xfa\xed\xfe",b"\xcf\xfa\xed\xfe",b"\xfe\xed\xfa\xce",b"\xfe\xed\xfa\xcf"):
+                  magic=b[:4].hex(); add(f"  Mach-O magic={magic}")
+                elif b[:4]==b"\x7fELF":
+                  cls=b[4]; machine=struct.unpack_from("<H",b,18)[0]; add(f"  ELF class={cls} machine={machine}")
+                elif b[:2]==b"MZ" and len(b)>0x40:
+                  pe=struct.unpack_from("<I",b,0x3c)[0]
+                  if pe+6<len(b): add(f"  PE machine=0x{struct.unpack_from('<H',b,pe+4)[0]:04x}")
+            # Addressables catalog summary
+            cn=next((n for n in names if n.endswith("/catalog.json") and ("/aa/" in n or "/StreamingAssets/aa/" in n)),None)
+            if cn:
+              try:
+                c=json.loads(z.read(cn))
+                add(f"Catalog {cn}: {len(z.read(cn))} bytes; keys={list(c.keys())}")
+                for key in ("m_InternalIds","m_KeyDataString","m_BucketDataString","m_EntryDataString","m_ExtraDataString"):
+                  v=c.get(key)
+                  if isinstance(v,list): add(f"  {key}: list length={len(v)} sample={v[:4]}")
+                  elif isinstance(v,str): add(f"  {key}: string length={len(v)} sample={v[:180]!r}")
+                ids=c.get("m_InternalIds",[])
+                if isinstance(ids,list):
+                  hosts=collections.Counter(re.sub(r"^(https?://[^/]+).*",r"\1",str(x)) for x in ids)
+                  add("  InternalId count="+str(len(ids))+" prefixes="+repr(hosts.most_common(12)))
+              except Exception as e: add("Catalog parse error: "+repr(e))
+          add("## Assembly comparison")
+          for a,b,label in ((ios_asm,android_asm,"iOS vs Android"),(ios_asm,windows_asm,"iOS vs Windows"),(android_asm,windows_asm,"Android vs Windows")):
+            add(label+": common="+str(len(a&b))+" only-left="+repr(sorted(a-b))+" only-right="+repr(sorted(b-a)))
+          pathlib.Path("inspect/deep-report.txt").write_text("\n".join(out))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: azurearchive-resource-comparison
-          path: inspect/resource-report.txt
+          name: azurearchive-deep-native-metadata
+          path: inspect/deep-report.txt
