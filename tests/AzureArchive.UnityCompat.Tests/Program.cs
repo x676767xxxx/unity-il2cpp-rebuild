@@ -1,0 +1,43 @@
+using System;
+using System.IO;
+using AzureArchive.UnityCompat;
+using UnityEngine;
+
+internal static class Program
+{
+    private static int Main()
+    {
+        ImageConversion.Reset();
+        Texture2D decoded = BackgroundImageDecoder.Decode(new byte[] { 1, 2, 3 }, "scene");
+        Assert(decoded.Width == 2 && decoded.Height == 2, "initial dimensions");
+        Assert(decoded.Format == TextureFormat.RGBA32 && !decoded.MipChain, "texture format/mips");
+        Assert(decoded.wrapMode == TextureWrapMode.Clamp && decoded.name == "scene", "texture metadata");
+        Assert(!decoded.Destroyed, "successful texture remains alive");
+
+        ImageConversion.Reset();
+        ImageConversion.ReturnValue = false;
+        AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.Decode(new byte[] { 1 }, "bad"), "false decoder result");
+        Assert(ImageConversion.LastTexture != null && ImageConversion.LastTexture.Destroyed, "false result destroys texture");
+
+        ImageConversion.Reset();
+        ImageConversion.ThrowOnLoad = true;
+        AssertThrows<InvalidOperationException>(() => BackgroundImageDecoder.Decode(new byte[] { 1 }, "throws"), "decoder exception");
+        Assert(ImageConversion.LastTexture != null && ImageConversion.LastTexture.Destroyed, "exception destroys texture");
+
+        AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.Decode(Array.Empty<byte>(), "empty"), "empty input");
+        Console.WriteLine("PASS: 7 Unity decoder contract checks");
+        return 0;
+    }
+
+    private static void Assert(bool condition, string name)
+    {
+        if (!condition) throw new Exception(name);
+    }
+
+    private static void AssertThrows<T>(Action action, string name) where T : Exception
+    {
+        try { action(); }
+        catch (T) { return; }
+        throw new Exception(name + ": expected " + typeof(T).Name);
+    }
+}
