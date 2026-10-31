@@ -11,7 +11,7 @@ test -s "$LIB"
 test -s "$HEADER"
 test -s "$LICENSE"
 test -s "$BRIDGE"
-xcrun lipo -verify_arch arm64 "$LIB"
+xcrun lipo "$LIB" -verify_arch arm64
 xcrun nm -gU "$LIB" | grep -q "AzureArchiveSpineJsonToBinary"
 xcrun nm -gU "$LIB" | grep -q "AzureArchiveSpineConvertBuffer"
 xcrun nm -gU "$LIB" | grep -q "AzureArchiveSpineFreeBuffer"
