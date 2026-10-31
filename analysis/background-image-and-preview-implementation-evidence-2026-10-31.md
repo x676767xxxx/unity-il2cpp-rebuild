@@ -163,3 +163,15 @@ What is safe to state:
 - No production exception policy should be copied from these handlers until the helper symbols and managed type metadata are resolved.
 
 This clarification supersedes any stronger interpretation in the earlier Callback fan-out and callback-exception handling section. The confirmed callback loop remains evidence of callback iteration; the exception policy remains unresolved.
+
+### State-dispatch addressing formula recovered from ARM64 instructions
+
+A further instruction-level pass resolves the jump-table addressing mechanism even before its six table bytes are extracted:
+
+- The coroutine reads `<>1__state` from object offset `0x10` and rejects values greater than 5.
+- It loads one byte from table base `0x13377E6` using the state as the byte index (`ldrb`).
+- It computes the branch destination as `0x3270F48 + (tableByte * 4)` and performs an indirect branch.
+- Therefore the table is a six-entry byte-offset table, with each unsigned byte scaled by four relative to the dispatch base. The six raw byte values are still needed to map state 0..5 to exact basic blocks.
+- Native code writes state values 1, 2, 3, 4 and 5 at several suspension/continuation points. These writes are observed, but semantic names for each state are intentionally withheld until the table entries and the surrounding await/continuation paths are cross-checked.
+
+This gives an exact decoding formula for the pending CI table dump and prevents guessing state labels from write order alone.
