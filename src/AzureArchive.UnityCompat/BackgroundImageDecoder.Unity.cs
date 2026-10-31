@@ -12,6 +12,19 @@ namespace AzureArchive.UnityCompat
     /// </summary>
     public static class BackgroundImageDecoder
     {
+        /// <summary>
+        /// Reads a custom background image from the app's filesystem and decodes it.
+        /// Invoke on Unity's main thread; Unity texture creation/destruction is not worker-thread safe.
+        /// </summary>
+        public static Texture2D DecodeFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidDataException("Cannot decode background image: path is empty.");
+
+            byte[] bytes = File.ReadAllBytes(path);
+            return Decode(bytes, Path.GetFileName(path));
+        }
+
         public static Texture2D Decode(byte[] bytes, string name)
         {
             if (bytes == null || bytes.Length == 0)
