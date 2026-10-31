@@ -431,7 +431,7 @@ internal static class Program
         AssertThrows<ArgumentException>(() => previewLedger.TryGet("", out _),
             "preview ledger lookup requires key");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 24 preview cache ledger checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 29 preview cache ledger checks");
         return 0;
     }
 
