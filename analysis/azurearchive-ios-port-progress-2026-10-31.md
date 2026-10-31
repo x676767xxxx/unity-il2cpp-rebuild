@@ -47,3 +47,27 @@ Therefore:
 
 ## Commit policy
 This checkpoint is committed on the working branch `progress/azurearchive-ios-port-20261031`. Future progress checkpoints should be committed to this branch, leaving `main` untouched unless explicitly requested.
+
+
+## Controlled implementation checkpoint — duplicate-source guard and remaining gates
+
+Latest branch head at checkpoint: `06769338ac4e11982f334877bcd986535ca32b34`.
+
+### Change-control rule
+- Keep all work on `progress/azurearchive-ios-port-20261031`; do not modify `main`.
+- Before adding a file, inspect the branch tree for the exact path. If it exists, update it using its current blob SHA; never call create-file on an existing path.
+- Prefer extending the existing implementation/specification files. Add a new file only when it represents a genuinely new source module, test, or build asset.
+- A new CI preflight, `scripts/check-project-source-includes.py`, checks every explicit C# `Compile Include` in the three current project files for missing paths, duplicate resolved source paths, and duplicate `Link` names. It is wired into the existing compatibility workflow; it does not create a second build workflow.
+- Existing successful compatibility tests remain limited to .NET and isolated Unity API stubs. They are not Unity/Xcode/device validation.
+
+### Exact remaining work, in dependency order
+1. **Acquire a buildable project base (hard blocker).** Obtain the matching Unity project/source export or a complete reproducible Xcode project/UnityFramework integration source for the target app. The current branch has no `Assets/`, `Packages/`, `ProjectSettings/`, `.xcodeproj`, or `.xcworkspace`; without this, a full app build cannot be run.
+2. **Validate exact runtime/API versions.** Import the compatibility sources into that project and compile against the actual Unity 2023.2.20f1c1 and Addressables assemblies. Confirm the bootstrap is compiled into the player and runs before the game's first catalog-backed load. Verify it chains/restores the existing transform without changing unrelated IDs.
+3. **Complete static-background path first.** Implement the missing Android 1.0 resource resolution/override semantics and static texture load path using verified IL and the existing iOS APIs. Add tests for local/global override precedence, missing files, path traversal, malformed image data, texture ownership, and repeat loads.
+4. **Validate real resource fixtures.** Supply representative Android 1.0 background metadata, image files, Addressables catalog/bundles, and game Spine JSON/binary/atlas/texture assets. Run the converter against these exact assets; resolve or explicitly reject the observed Spine enum/features (point attachments, bone inheritance, physics reset, slot alpha) rather than silently dropping them.
+5. **Spine runtime decision.** Verify whether the target iOS Unity runtime contains a compatible Spine 4.2 managed/native runtime. The current iOS static converter archive and P/Invoke wrapper are not sufficient by themselves. If runtime compatibility is absent, port/link the matching runtime before enabling Spine backgrounds; otherwise defer Spine and keep the first milestone static-only.
+6. **Build and device validation.** Link the native converter archive only if Spine is enabled; build the complete iOS app with the matching Xcode toolchain; verify bundle ID, entitlements, signing, install, startup, catalog update, static backgrounds, and (if enabled) Spine backgrounds on iPhone 13.
+7. **Package release artifact.** Produce and inspect the signed IPA only after the preceding checks pass. Record its SHA-256, artifact URL, build commit, and device-test results.
+
+### Completion definition
+The port is not complete until a signed installable IPA is produced from the real project and successfully installed/launched on the target iPhone with the required Android 1.0 background behavior. Compatibility-library CI success or an analysis artifact does not satisfy this definition.
