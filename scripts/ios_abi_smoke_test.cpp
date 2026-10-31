@@ -6,6 +6,36 @@
 #include <vector>
 
 int main(int argc, char** argv) {
+    // Invalid inputs must fail cleanly and clear output parameters.
+    uint8_t* invalidOutput = reinterpret_cast<uint8_t*>(1);
+    int32_t invalidLength = 99;
+    int invalidRc = AzureArchiveSpineJsonToBinary(nullptr, 1, &invalidOutput, &invalidLength);
+    if (invalidRc != -1 || invalidOutput != nullptr || invalidLength != 0) {
+        std::cerr << "Null JSON input contract failed\\n";
+        return 10;
+    }
+    invalidOutput = reinterpret_cast<uint8_t*>(1);
+    invalidLength = 99;
+    const char emptyJson[] = "";
+    invalidRc = AzureArchiveSpineJsonToBinary(emptyJson, 0, &invalidOutput, &invalidLength);
+    if (invalidRc != -1 || invalidOutput != nullptr || invalidLength != 0) {
+        std::cerr << "Empty JSON input contract failed\\n";
+        return 11;
+    }
+    uint8_t dummy = 0;
+    invalidOutput = nullptr;
+    invalidLength = 99;
+    invalidRc = AzureArchiveSpineConvertBuffer(&dummy, 1, 99, &invalidOutput, &invalidLength);
+    if (invalidRc != -2 || invalidOutput != nullptr || invalidLength != 0) {
+        std::cerr << "Invalid destination version contract failed\\n";
+        return 12;
+    }
+    if (AzureArchiveSpineJsonToBinary(emptyJson, 0, nullptr, &invalidLength) != -1) {
+        std::cerr << "Null output pointer contract failed\\n";
+        return 13;
+    }
+    std::cout << "PASS: 4 invalid-input and output-parameter checks\\n";
+ {
     if (argc != 2) return 2;
     std::ifstream input(argv[1], std::ios::binary);
     if (!input) return 3;
