@@ -101,3 +101,19 @@ A platform-matched Il2CppDumper extraction subsequently succeeded for all three 
 - CharacterManager.GetSkeletonDataAssetAtPath exists on all platforms, but Android/Windows have an extra optional quiet parameter.
 
 Full signatures and limitations: [exact method diff](ios-android-windows-exact-method-diff-2026-10-31.md). These are metadata declarations, not recovered source bodies or proof of runtime behavior. The Android dump completed but logged a protection warning, so native offsets/call paths need independent verification.
+
+## Implementation checkpoint — standalone compatibility primitives (2026-10-31)
+
+- Added a root-confined background image file decoder overload in `BackgroundImageDecoder.Unity.cs`; the overload uses `SafeResourcePath.ResolveUnderRoot` before reading resource-manifest paths.
+- Added the missing `SafeResourcePath.cs` compile include to the Unity compatibility test project and regression tests for normal nested paths, parent traversal and absolute paths.
+- The compatibility CI passed on [run 41191825872](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41191825872): library build, path safety tests, Unity decoder stub tests, Addressables adapter tests and artifact upload all succeeded. Artifact: `azurearchive-background-path-compat-library` (14,814 bytes).
+- This is still a standalone .NET compatibility library tested against isolated Unity API stubs. It is not integrated into the actual UnityFramework or a Unity project, and the tests do not establish runtime behavior on iOS.
+- Addressables token resolver and generic handle-lease adapter exist as separate primitives; the actual Addressables ResourceManager internal-ID transform hook is not yet connected to the game catalog.
+- Spine 4.2 runtime integration remains blocked by the old iOS 0.7.9.2 API gap. The existing native bridge is only an ABI shell; the matching iOS converter implementation and compatible Spine runtime are not present.
+- No iOS 1.0 Unity project/source tree, complete runtime port, Xcode archive or IPA has been produced.
+
+## Next implementation gates
+
+1. Verify the iOS 2023.2 Addressables `InternalIdTransformFunc` API from platform-matched metadata and implement a guarded registration/restore adapter; test that only the verified token is rewritten and all unrelated IDs preserve existing transforms.
+2. Keep the first playable milestone static-background-only; defer Spine backgrounds until a compatible Spine runtime and iOS converter source are available.
+3. Establish an actual iOS integration base: obtain the matching Unity 1.0 project/source or prove a safe, reproducible way to extend the old iOS UnityFramework. Do not call a standalone library an IPA.
