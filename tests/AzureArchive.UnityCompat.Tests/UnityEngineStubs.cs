@@ -33,3 +33,68 @@ namespace UnityEngine
         }
     }
 }
+
+
+namespace UnityEngine.ResourceManagement.AsyncOperations
+{
+    public enum AsyncOperationStatus { None, Succeeded, Failed }
+
+    public sealed class AsyncOperationHandle<T>
+    {
+        public event Action<AsyncOperationHandle<T>>? Completed;
+        public AsyncOperationStatus Status { get; private set; }
+        public T Result { get; private set; } = default!;
+        public Exception? OperationException { get; private set; }
+        public bool Released { get; set; }
+
+        public void Complete(T result)
+        {
+            Result = result;
+            Status = AsyncOperationStatus.Succeeded;
+            Completed?.Invoke(this);
+        }
+
+        public void Fail(Exception exception)
+        {
+            OperationException = exception;
+            Status = AsyncOperationStatus.Failed;
+            Completed?.Invoke(this);
+        }
+    }
+}
+
+namespace UnityEngine.AddressableAssets
+{
+    using UnityEngine.ResourceManagement.AsyncOperations;
+
+    public static class Addressables
+    {
+        public static object? LastOperation { get; private set; }
+        public static int ReleaseCount { get; private set; }
+        public static bool ThrowOnLoad { get; set; }
+
+        public static AsyncOperationHandle<T> LoadAssetAsync<T>(object key)
+        {
+            if (ThrowOnLoad) throw new InvalidOperationException("synthetic Addressables start failure");
+            var operation = new AsyncOperationHandle<T>();
+            LastOperation = operation;
+            return operation;
+        }
+
+        public static void Release<T>(AsyncOperationHandle<T> operation)
+        {
+            ReleaseCount++;
+            operation.Released = true;
+        }
+
+        public static void Reset()
+        {
+            LastOperation = null;
+            ReleaseCount = 0;
+            ThrowOnLoad = false;
+        }
+
+        public static AsyncOperationHandle<T> Last<T>() =>
+            (AsyncOperationHandle<T>)LastOperation!;
+    }
+}
