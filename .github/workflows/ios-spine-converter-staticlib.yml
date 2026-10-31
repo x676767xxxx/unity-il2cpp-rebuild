@@ -8,6 +8,10 @@ on:
       - "scripts/ios_abi_smoke_test.cpp"
       - "scripts/check-spine-ios-pinvoke-abi.py"
       - "src/AzureArchive.UnityCompat/SpineConverterNative.Unity.cs"
+      - "scripts/package-spine-unity-ios-plugin.sh"
+      - "scripts/libazurearchive_spine_converter_ios.a.meta"
+      - "scripts/azurearchive_spine_converter_abi.h.meta"
+      - "scripts/azurearchive-spine-unity-ios-plugin-README.md"
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,6 +57,14 @@ jobs:
           cmake --build build/host-abi --config Release --target azurearchive_spine_converter_ios --parallel 3
           c++ -std=c++20 -Iexternal/SpineSkeletonDataConverter/include scripts/ios_abi_smoke_test.cpp build/host-abi/libazurearchive_spine_converter_ios.a -o build/host-abi/abi_smoke
           build/host-abi/abi_smoke external/SpineSkeletonDataConverter/data/42/alien/export/alien-ess.json
+      - name: Package Unity iOS plugin
+        run: bash scripts/package-spine-unity-ios-plugin.sh
+      - name: Upload Unity iOS plugin package
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-spine-unity-ios-plugin
+          path: build/azurearchive-spine-unity-ios-plugin.zip
+          if-no-files-found: error
       - name: Upload iOS static library and ABI header
         uses: actions/upload-artifact@v4
         with:
