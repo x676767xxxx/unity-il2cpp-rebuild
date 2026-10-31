@@ -101,8 +101,19 @@ jobs:
           sections = [s for s in binary.sections if s.name == "__text"]
           if not sections:
               raise SystemExit("Mach-O __text section not found")
-          image_base = min(s.virtual_address for s in binary.segments
-                           if s.name == "__TEXT")
+          text_segments = [s for s in binary.segments
+                           if getattr(s, "segment_name", "") == "__TEXT"
+                           or getattr(s, "name", "") == "__TEXT"]
+          image_base = min((int(s.virtual_address) for s in text_segments), default=0)
+          print("Mach-O segments:", [(getattr(s, "name", ""),
+                                      getattr(s, "segment_name", ""),
+                                      hex(int(s.virtual_address)),
+                                      hex(int(s.file_offset)),
+                                      hex(int(s.virtual_size)),
+                                      hex(int(s.file_size))) for s in binary.segments])
+          print("Mach-O __text sections:", [(s.name, hex(int(s.virtual_address)),
+                                               hex(int(s.offset)), hex(int(s.size)))
+                                              for s in sections])
           md = Cs(CS_ARCH_ARM64, CS_MODE_ARM)
           raw = thin_path.read_bytes()
           method_ranges = {
@@ -113,18 +124,28 @@ jobs:
           }
           results = []
           for name, (rva, end_rva) in method_ranges.items():
-              candidates = [("RVA-as-VA", rva), ("imagebase-plus-RVA", image_base+rva)]
               mapped = None
-              for mode, va in candidates:
-                  for sec in sections:
-                      sec_va = int(sec.virtual_address)
-                      sec_size = int(sec.size)
-                      if sec_va <= va < sec_va + sec_size:
-                          off = int(sec.offset) + (va - sec_va)
-                          end_va = min(end_rva + (va-rva), sec_va + sec_size)
-                          end_off = off + (end_va-va)
+              for sec in sections:
+                  sec_va = int(sec.virtual_address)
+                  sec_off = int(sec.offset)
+                  sec_size = int(sec.size)
+                  # Il2CppDumper's Mach-O RVA commonly corresponds to the
+                  # section-relative file offset. Resolve both coordinate systems.
+                  if sec_off <= rva < sec_off + sec_size:
+                      off = rva
+                      va = sec_va + (rva - sec_off)
+                      end_off = min(end_rva, sec_off + sec_size)
+                      if 0 <= off < end_off <= len(raw):
+                          mapped = ("section-file-offset", va, off, end_off)
+                          break
+                  for mode, candidate_va in [("RVA-as-VA", rva),
+                                             ("imagebase-plus-RVA", image_base+rva)]:
+                      if sec_va <= candidate_va < sec_va + sec_size:
+                          off = sec_off + (candidate_va-sec_va)
+                          end_va = min(candidate_va + (end_rva-rva), sec_va+sec_size)
+                          end_off = off + (end_va-candidate_va)
                           if 0 <= off < end_off <= len(raw):
-                              mapped = (mode, va, off, end_off)
+                              mapped = (mode, candidate_va, off, end_off)
                               break
                   if mapped:
                       break
