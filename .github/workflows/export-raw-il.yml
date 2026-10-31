@@ -1,0 +1,41 @@
+name: Export AzureArchive raw IL
+on:
+  workflow_dispatch:
+jobs:
+  export-il:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Cpp2IL recovery artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: azurearchive-cpp2il-recovery-test
+          path: work/in/recovery
+          repository: x676767xxxx/unity-il2cpp-rebuild
+          run-id: 41169615291
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install ILSpy command line
+        run: dotnet tool install ilspycmd --tool-path work/tools
+      - name: Export selected types as raw IL
+        shell: bash
+        run: |
+          mkdir -p work/out/android work/out/windows
+          for platform in android windows; do
+            DLL=$(find work/in/recovery -type f -path "*cpp2il-$platform*" -iname 'Assembly-CSharp.dll' | head -1)
+            if [ -z "$DLL" ]; then echo "DLL not found for $platform" > "work/out/$platform/error.txt"; continue; fi
+            for type in ScenarioResourceManager CharacterManager Character; do
+              work/tools/ilspycmd --ilcode --type "$type" "$DLL" > "work/out/$platform/$type.il" 2> "work/out/$platform/$type.log" || true
+            done
+            # AuthoringResourceCatalog is nested in ScenarioResourceManager in the recovered metadata.
+            work/tools/ilspycmd --ilcode --type 'ScenarioResourceManager+AuthoringResourceCatalog' "$DLL" > "work/out/$platform/AuthoringResourceCatalog.il" 2> "work/out/$platform/AuthoringResourceCatalog.log" || true
+          done
+      - name: Create export summary
+        if: always()
+        run: |
+          find work/out -type f -printf '%p %s bytes\n' | sort > work/out/summary.txt
+          cat work/out/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload raw IL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-raw-il
+          path: work/out/
