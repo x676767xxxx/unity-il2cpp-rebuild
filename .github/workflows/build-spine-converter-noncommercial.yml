@@ -1,0 +1,54 @@
+name: Build and test Spine converter (personal noncommercial)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-spine-converter-noncommercial.yml"
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: \${{ matrix.os }}
+    steps:
+      - name: Checkout AzureArchive analysis repository
+        uses: actions/checkout@v4
+      - name: Checkout converter source at reviewed commit
+        uses: actions/checkout@v4
+        with:
+          repository: wang606/SpineSkeletonDataConverter
+          ref: 5ecb2139b0a1af266974f95abeec6bb8562d1249
+          path: external/SpineSkeletonDataConverter
+      - name: Install build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ python3
+      - name: Configure
+        run: cmake -S external/SpineSkeletonDataConverter -B external/SpineSkeletonDataConverter/build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build external/SpineSkeletonDataConverter/build --config Release --parallel 2
+      - name: Verify CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="$PWD/external/SpineSkeletonDataConverter/build/SpineSkeletonDataConverter"
+          test -x "$BIN"
+          "$BIN" --help
+      - name: Spine 4.2 JSON to SKEL to JSON round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/external/SpineSkeletonDataConverter"
+          BIN="$ROOT/build/SpineSkeletonDataConverter"
+          python3 "$ROOT/tools/TestSpineSkeletonDataConverter.py" "$ROOT/data/42" .json .skel.json --exe "$BIN"
+          python3 "$ROOT/tools/json_diff_all.py" "$ROOT/data/42" .json .json.skel.json --summary-only
+      - name: Upload test log and built CLI
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-converter-build-\${{ matrix.os }}
+          path: |
+            external/SpineSkeletonDataConverter/build/SpineSkeletonDataConverter
+            external/SpineSkeletonDataConverter/build/SpineAtlasDowngrade
