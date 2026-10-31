@@ -128,3 +128,29 @@ A follow-up update to the existing iOS method-map workflow adds the exact old-iO
 6. Integrate into the real Unity/Xcode project, then compile and device-test.
 
 No duplicate source file was added in this checkpoint; only the existing workflow and existing progress report were updated.
+
+
+## Latest verified background-method comparison checkpoint
+
+- iOS method-map workflow [41195591074](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41195591074) succeeded against the actual 0.7.9.2 IPA.
+- Artifact ID: `13040971233`, 30,340,597 bytes; contains the iOS IL2CPP dump and bounded ARM64 disassembly.
+- Verified iOS methods: `TryGetBackgroundOverridePath` at `0x3D69A54`, `GetBackgroundTexture` at `0x3D69D1C`, `GetBackgroundTextureAsync` at `0x3D6A1F4`, and `GetBackgroundType` at `0x3D6A908`.
+- Native call edges: both `GetBackgroundTexture` and `GetBackgroundTextureAsync` directly call the same `TryGetBackgroundOverridePath` method. This confirms that the old iOS build already routes both loading paths through an override-path method. It does not, by itself, prove that its Android 1.0 override precedence or file format is identical.
+- The detailed method ranges and instruction-level evidence are recorded in `analysis/ios-0792-il2cpp-method-map-2026-10-31.md`.
+
+### Current execution decision
+
+Do not add another background loader or copy any Android addresses into iOS. The next code change is gated on the Android 1.0 vs iOS 0.7.9.2 behavior diff. In particular, verify:
+1. whether iOS override resolution uses local-first then global-first-match semantics exactly as Android 1.0;
+2. whether iOS texture loading separates custom-file reads from native Addressables loads and uses the same cache key/ownership rules;
+3. whether the async path preserves callback behavior and in-flight request coalescing;
+4. whether Image vs Spine dispatch is compatible.
+
+Only a demonstrated difference should produce a code change. Existing adapters remain isolated candidates until compiled against actual Unity/Addressables assemblies.
+
+### Remaining hard blockers
+
+- The branch still contains no Unity `Assets/`, `Packages/`, `ProjectSettings/`, Xcode project or workspace.
+- No real Android 1.0 background bundle/override fixture has been attached to a Unity integration test.
+- The Spine converter plugin is packaged, but the actual Spine 4.2 runtime/presenter integration is not proven.
+- No full Unity iOS build, signed IPA, or iPhone 13 device test exists.
