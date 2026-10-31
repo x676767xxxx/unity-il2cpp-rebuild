@@ -85,6 +85,17 @@ jobs:
             (" Create(","RuntimeSpineLoader"),
             (" Read(","RuntimeSpineLoader"),
             (" ReadAsync(","RuntimeSpineLoader"),
+            (" DestroyOwned(","RuntimeSpineLoader"),
+            (" AtlasPages(","RuntimeSpineLoader"),
+            (" CanLoadPngAsDxt5(","RuntimeSpineLoader"),
+            (" Own(","RuntimeSpineAsset"),
+            (" get_HasConsumers(","RuntimeSpineAsset"),
+            (" get_EstimatedTextureBytes(","RuntimeSpineAsset"),
+            (" get_Materials(","RuntimeSpineAsset"),
+            (" Load(","PageTextureLoader"),
+            (" Unload(","PageTextureLoader"),
+            (" <ReadAsync>b__0(","<>c__DisplayClass4_0"),
+            (" <Create>b__0(","<>c__DisplayClass6_0"),
           ]
           targets=[]
           report=["# Android ARM64 background runtime call graph","",
