@@ -25,7 +25,13 @@ internal static class Program
         Assert(ImageConversion.LastTexture != null && ImageConversion.LastTexture.Destroyed, "exception destroys texture");
 
         AssertThrows<InvalidDataException>(() => BackgroundImageDecoder.Decode(Array.Empty<byte>(), "empty"), "empty input");
-        Console.WriteLine("PASS: 7 Unity decoder contract checks");
+
+        // These validation paths execute without invoking the iOS-only native symbols.
+        AssertThrows<ArgumentNullException>(() => SpineConverterNative.JsonToSpine42Binary(null!), "null Spine JSON");
+        AssertThrows<ArgumentException>(() => SpineConverterNative.JsonToSpine42Binary(Array.Empty<byte>()), "empty Spine JSON");
+        AssertThrows<ArgumentNullException>(() => SpineConverterNative.ConvertToSpine42Binary(null!), "null Spine skeleton");
+        AssertThrows<ArgumentException>(() => SpineConverterNative.ConvertToSpine42Binary(Array.Empty<byte>()), "empty Spine skeleton");
+        Console.WriteLine("PASS: 7 Unity decoder contract checks; 4 Spine iOS bridge argument checks");
         return 0;
     }
 
