@@ -1,0 +1,76 @@
+name: Inspect iOS 0.7.9.2 baseline for 1.0 port
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/ios-baseline-inspection.yml"
+jobs:
+  inspect-ios:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download iOS baseline IPA
+        run: |
+          mkdir -p work/ipa work/out
+          curl -fL --retry 3 -o work/ipa/base.ipa "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          sha256sum work/ipa/base.ipa > work/out/ipa-sha256.txt
+      - name: Inspect IPA structure and Unity runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q work/ipa/base.ipa -d work/ipa/unpacked
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile, hashlib, re, json, subprocess
+          ipa=Path("work/ipa/base.ipa")
+          root=Path("work/ipa/unpacked")
+          out=[]
+          def add(x=""): out.append(str(x))
+          add("# iOS 0.7.9.2 baseline inspection")
+          add(f"IPA bytes={ipa.stat().st_size}")
+          files=[p for p in root.rglob("*") if p.is_file()]
+          add(f"Unpacked files={len(files)}")
+          for p in sorted(files):
+              rel=p.relative_to(root).as_posix()
+              low=rel.lower()
+              if low.endswith((".app/info.plist","info.plist")):
+                  add(f"PLIST {rel} bytes={p.stat().st_size}")
+                  try:
+                      v=subprocess.check_output(["plutil","-p",str(p)],text=True,stderr=subprocess.STDOUT)
+                      add(v[:12000])
+                  except Exception as e: add(f"PLIST_READ_ERROR {e}")
+          candidates=[]
+          for p in files:
+              low=p.name.lower()
+              if low in ("unityframework","gameassembly","global-metadata.dat","il2cpp_data"):
+                  candidates.append(p)
+              elif p.suffix.lower() in (".dylib",".framework") and ("unity" in low or "il2cpp" in low):
+                  candidates.append(p)
+          add("## Native and metadata candidates")
+          for p in candidates:
+              rel=p.relative_to(root).as_posix()
+              add(f"FILE {rel} bytes={p.stat().st_size} sha256={hashlib.sha256(p.read_bytes()).hexdigest()}")
+              try:
+                  desc=subprocess.check_output(["file",str(p)],text=True).strip()
+                  add("  "+desc)
+              except Exception: pass
+              try:
+                  strings=subprocess.check_output(["strings","-a",str(p)],text=True,errors="replace")
+                  hits=[]
+                  for line in strings.splitlines():
+                      if any(k in line.lower() for k in ("unity version","2023.2","il2cpp","addressables","scenarioresourcemanager","authoringresourcecatalog","background")):
+                          hits.append(line[:300])
+                  for line in hits[:100]: add("  STR "+line)
+              except Exception as e: add(f"  STRINGS_ERROR {e}")
+          add("## Bundle inventory")
+          for p in sorted(files):
+              rel=p.relative_to(root).as_posix()
+              if any(k in rel.lower() for k in ("data/globalgamemanagers","data/managed","data/metadata","data/resources","addressables","streamingassets","aa/")):
+                  add(f"{rel} {p.stat().st_size}")
+          (Path("work/out/ios-baseline-report.md")).write_text("\n".join(out))
+          PY
+          find work/ipa/unpacked -type f \( -iname 'UnityFramework' -o -iname 'global-metadata.dat' -o -iname 'Info.plist' \) -print > work/out/key-file-paths.txt
+      - name: Upload iOS baseline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-ios-0792-baseline-inspection
+          path: work/out/
