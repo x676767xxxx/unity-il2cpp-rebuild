@@ -40,8 +40,16 @@ internal static class Program
         AssertEqual("2", pages.Count.ToString(), "Spine atlas page count");
         AssertThrows<InvalidDataException>(() => SpineAtlasPageNames.Parse(""), "empty Spine atlas");
         AssertThrows<InvalidDataException>(() => SpineAtlasPageNames.Parse("region\n  rotate: false\n  xy: 0, 0\n"), "atlas without page metadata");
+        var resourceKeys = SpineAtlasPageResourceResolver.ResolveResourceKeys(
+            pages, name => name == "page-one.png" ? "bundle://atlas/one" : "bundle://atlas/two");
+        AssertEqual("bundle://atlas/one", resourceKeys["page-one.png"], "first page resource mapping");
+        AssertEqual("bundle://atlas/two", resourceKeys["nested/page-two.png"], "second page resource mapping");
+        AssertThrows<InvalidDataException>(() => SpineAtlasPageResourceResolver.ResolveResourceKeys(
+            pages, name => name == "page-one.png" ? "bundle://atlas/one" : null!), "missing atlas page resource");
+        AssertThrows<InvalidDataException>(() => SpineAtlasPageResourceResolver.ResolveResourceKeys(
+            new[] { "../escape.png" }, name => "bundle://escape"), "unsafe atlas page resource name");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 5 BackgroundOverrideResolver checks; 5 Spine atlas metadata checks; 4 page resource mapping checks");
         return 0;
     }
 
