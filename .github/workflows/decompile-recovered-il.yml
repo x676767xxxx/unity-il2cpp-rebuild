@@ -14,16 +14,34 @@ jobs:
           run-id: 41169615291
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install ILSpy command line
+        run: dotnet tool install ilspycmd --tool-path work/tools
+      - name: Locate assemblies and decompile without stopping on first error
+        shell: bash
         run: |
-          dotnet tool install ilspycmd --tool-path work/tools
-      - name: Decompile Android and Windows Assembly-CSharp
-        run: |
+          set +e
           mkdir -p work/out/android work/out/windows
-          work/tools/ilspycmd -p -o work/out/android work/in/recovery/cpp2il-android/Assembly-CSharp.dll > work/out/android-ilspy.log 2>&1
-          work/tools/ilspycmd -p -o work/out/windows work/in/recovery/cpp2il-windows/Assembly-CSharp.dll > work/out/windows-ilspy.log 2>&1
-          find work/out/android -type f | wc -l > work/out/android-file-count.txt
-          find work/out/windows -type f | wc -l > work/out/windows-file-count.txt
-      - name: Compare target source files
+          find work/in/recovery -type f -iname 'Assembly-CSharp.dll' -print | tee work/out/assembly-paths.txt
+          A=$(find work/in/recovery -type f -path '*android*' -iname 'Assembly-CSharp.dll' | head -1)
+          W=$(find work/in/recovery -type f -path '*windows*' -iname 'Assembly-CSharp.dll' | head -1)
+          if [ -z "$A" ]; then A=$(find work/in/recovery -type f -iname 'Assembly-CSharp.dll' | head -1); fi
+          if [ -n "$A" ]; then
+            echo "ANDROID_ASSEMBLY=$A" > work/out/android-ilspy.log
+            work/tools/ilspycmd -o work/out/android "$A" >> work/out/android-ilspy.log 2>&1
+            echo "ILSPY_EXIT=$?" >> work/out/android-ilspy.log
+          else
+            echo "Assembly-CSharp.dll not found" > work/out/android-ilspy.log
+          fi
+          if [ -n "$W" ]; then
+            echo "WINDOWS_ASSEMBLY=$W" > work/out/windows-ilspy.log
+            work/tools/ilspycmd -o work/out/windows "$W" >> work/out/windows-ilspy.log 2>&1
+            echo "ILSPY_EXIT=$?" >> work/out/windows-ilspy.log
+          else
+            echo "Windows Assembly-CSharp.dll not found" > work/out/windows-ilspy.log
+          fi
+          find work/out -type f | sort > work/out/output-files.txt
+          exit 0
+      - name: Extract target classes and method snippets
+        if: always()
         run: |
           python3 - <<'PY'
           import pathlib,re
@@ -33,20 +51,20 @@ jobs:
           for target in targets:
               report.append("\n## "+target)
               for platform in ["android","windows"]:
-                  matches=list((root/platform).rglob("*.cs"))
                   hits=[]
-                  for p in matches:
+                  for p in (root/platform).rglob("*.cs"):
                       s=p.read_text(errors="ignore")
                       if re.search(r"\b(class|struct)\s+"+re.escape(target)+r"\b",s):
                           hits.append(p)
                   report.append(f"{platform}: "+(", ".join(str(x.relative_to(root/platform)) for x in hits) if hits else "not found"))
                   for p in hits:
-                      s=p.read_text(errors="ignore")
-                      report.append(f"--- {platform}/{p.name} ({len(s)} chars) ---")
-                      report.extend(s.splitlines()[:350])
+                      lines=p.read_text(errors="ignore").splitlines()
+                      report.append(f"--- {platform}/{p.name} ---")
+                      report.extend(lines[:500])
           (root/"target-source-extracts.txt").write_text("\n".join(report))
           PY
-      - name: Upload decompiled source
+      - name: Upload decompiled source and diagnostic logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: azurearchive-decompiled-source
