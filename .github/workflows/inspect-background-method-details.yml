@@ -6,6 +6,7 @@ on:
       - ".github/workflows/inspect-background-method-details.yml"
 permissions:
   contents: write
+  actions: read
 jobs:
   inspect:
     runs-on: ubuntu-latest
@@ -21,7 +22,7 @@ jobs:
           path: work/in/recovery
           repository: x676767xxxx/unity-il2cpp-rebuild
           run-id: 41169615291
-          github-token: \${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install ILSpy
         run: dotnet tool install ilspycmd --tool-path work/tools
       - name: Export exact managed types
