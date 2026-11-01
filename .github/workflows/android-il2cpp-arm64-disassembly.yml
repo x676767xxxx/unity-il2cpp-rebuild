@@ -24,7 +24,13 @@ jobs:
           if [ -z "$LIB" ]; then LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"; fi
           test -n "$LIB"
           cp "$LIB" work/out/libil2cpp.so
-          sha256sum work/out/libil2cpp.so > work/out/libil2cpp-sha256.txt
+          METADATA="$(find work/android/unpacked -type f -name global-metadata.dat | head -n 1)"
+          if [ -z "$METADATA" ]; then
+            echo "global-metadata.dat was not found inside the Android APK" >&2
+            exit 1
+          fi
+          cp "$METADATA" work/out/global-metadata.dat
+          sha256sum work/out/libil2cpp.so work/out/global-metadata.dat > work/out/input-sha256.txt
           readelf -h work/out/libil2cpp.so > work/out/elf-header.txt
           readelf -l work/out/libil2cpp.so > work/out/elf-program-headers.txt
       - name: Install ARM64 analysis libraries
