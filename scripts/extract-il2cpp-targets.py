@@ -51,4 +51,4 @@ md=["# Android IL2CPP target evidence","","Generated from Il2CppDumper dump.cs. 
 for h in hits:
     md += [f"## dump.cs:{h['line']}","\x60\x60\x60csharp",*h["context"],"\x60\x60\x60",""]
 (out.with_suffix(".md")).write_text("\n".join(md))
-print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump)}))
+print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"script_metadata_preview":[{"path":m.get("path"),"keys":list(m.get("record",{}).keys())[:20],"values":{k:v for k,v in m.get("record",{}).items() if isinstance(v,str)} } for m in metadata_matches[:30]]},ensure_ascii=False))
