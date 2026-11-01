@@ -44,3 +44,15 @@ This workflow uses only the Android 1.0 APK already referenced by the existing r
 - Evidence reports metadata version 29 and includes both artifact hashes.
 - The metadata and native binary pair pass REA's structural registration/method mapping checks; any fallback/inferred linkage is explicitly identified.
 - Selected recovered methods are cross-checked against the existing analysis before being used to change port code.
+
+## First execution findings and budget adjustment — 2026-11-01
+
+- The first attempt (run 41306973067) failed before analysis because setup-node was incorrectly configured to require a root npm lockfile. This was corrected by removing npm cache setup; Node 24.22.1 then installed successfully.
+- The next attempt (run 41307004885) extracted both Android inputs and ran REA, but REA refused to retain a complete metadata report because the 17.1 MB metadata file expands beyond its fixed 64 MiB report budget. This is not an unsupported metadata version or malformed file.
+- REA's partial source observation independently confirmed metadata SHA-256 717236ea9c650b4fcd373e0afc7c03c25d5949726bebe251d3e8301e4da7a144, metadata version 29, and validated section counts: 77 images, 16,912 types, 152,789 methods, 77,092 fields, 28,462 properties, 284 events, 182,036 parameters and 22,462 string literals. It also observed the paired ELF SHA-256 7f15b8e7557eb7948f8bea746c629fb15d442d05c649ab2db3667ae08aa2c9b6 (120,315,032 bytes). No complete method inventory or linked method-address table was retained in that attempt.
+- To reduce report size and isolate the limitation, the workflow was changed to run metadata-only (without binary linking or generic-instance expansion) and to keep raw input binaries outside the uploaded evidence directory. This avoids uploading 137 MB of source binaries as an artifact.
+- Metadata-only retry: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41307085864. At the time of this note, the APK extraction step had passed and the REA metadata inventory step was still running. Its final result is not yet verified.
+
+## Current accurate boundary
+
+REA has independently validated the IL2CPP metadata source and key structural counts. It has not yet delivered the complete metadata inventory, method address mapping, or Ghidra pseudocode for this title. Native decompilation still requires a configured Ghidra/Hopper/IDA provider and successful method seed export. The current metadata-only retry deliberately does not claim address linking.
