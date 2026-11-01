@@ -85,3 +85,22 @@ The previously generated Android ARM64 disassembly artifact from workflow [41200
 No production URL has been established. Keep the URL provider injectable and do not hard-code the authoring CLI fallback `https://filev2.foxxlight.top/aares/`. The next useful reverse-engineering step is a metadata/native cross-reference of the static field itself (including reflection/native field writes), not another guessed URL adapter.
 
 No C# source was changed in this checkpoint because the required runtime value and precedence are still unknown. Existing compatibility modules remain intact; no duplicate files were added. This checkpoint does not produce a Unity/Xcode build or IPA.
+
+
+## Field-reference narrowing — 2026-11-01
+
+A second pass inspected the complete recovered Android `Assembly-CSharp.full.il`, the native `TryGetStartupUrl` body and the settings-field layout rather than treating the call site alone as proof of the runtime URL source.
+
+### New evidence
+
+- In the complete Android `Assembly-CSharp.full.il`, the only two managed uses of the `ScenarioResourceManager.AddrLoadUrl` field are in generated delegates `AuthoringOfflineResources/<>c::<ValidateDirectory>b__5_2` and `<ValidateDirectory>b__5_3`. Both use the value only to recognize/strip the `{AddrLoadUrl}/` prefix while validating offline resource paths.
+- The native `CheckForUpdate` coroutine does call `AuthoringOfflineResources.TryGetStartupUrl(out string)` at RVA `0x33C5E00`, but the helper's recovered managed IL enumerates command-line arguments and explicitly looks for `--aap-offline-resources`. Its generated predicate `<TryGetStartupUrl>b__4_1` compares each argument with that exact flag. The call site therefore does not establish that the offline mode is active during ordinary gameplay.
+- `AuthoringOfflineResources.get_IsActive()` at RVA `0x33C5D68` returns an internal static active-state flag. The helper is an authoring/offline integration, not a proven normal mobile CDN provider.
+- The Android `UserSettings.SettingData` class contains both `catalogUrlOverride` (field offset `0x18`) and `customSource` (field offset `0x90`). The `UIPatchDownload` submit callback writes the submitted string into the settings object at offset `0x90` and then calls `UserSettings.WriteUserSettings()`; this proves persistence of the custom source setting, but not that it is copied into `AddrLoadUrl` during normal mobile startup.
+- `UserSettings.WriteUserSettings()` serializes the settings data. The recovered IL/native evidence still does not show a verified mobile-runtime assignment from `customSource` or `catalogUrlOverride` to `ScenarioResourceManager.AddrLoadUrl`.
+
+### Corrected conclusion
+
+The earlier wording that the offline URL helper is simply part of the ordinary mobile URL initialization path was too strong. The native update coroutine calls the helper, but the helper is gated by an explicit authoring/offline command-line mode. The ordinary gameplay URL source remains unresolved.
+
+Do not use `https://filev2.foxxlight.top/aares/` as a presumed production default, and do not assume `customSource` or `catalogUrlOverride` is the effective source until the native startup dataflow proves the precedence and assignment. No runtime source code was changed because a guessed assignment would risk breaking catalog and bundle resolution.
