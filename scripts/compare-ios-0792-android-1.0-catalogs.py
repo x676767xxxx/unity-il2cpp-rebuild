@@ -32,7 +32,7 @@ def logical_bundles(obj):
         data = base64.b64decode(encoded)
     except Exception:
         return {}
-    tokens = set(x.decode("ascii", "ignore") for x in re.findall(rb"[0-9a-fA-F]{32}_[A-Za-z0-9_.-]+\\.bundle", data))
+    tokens = set(x.decode("ascii", "ignore") for x in re.findall(rb"[0-9a-fA-F]{32}_[A-Za-z0-9_.-]+\.bundle", data))
     result = {}
     for token in tokens:
         prefix, logical = token.split("_", 1)
@@ -78,5 +78,5 @@ report += ["## Interpretation", "",
            "This compares Android 1.0 against the iOS 0.7.9.2 catalog. Identical Internal IDs do not make platform bundles interchangeable. Different packed data and bundle hashes must be preserved as platform-specific outputs; do not rename or overwrite the legacy iOS bundles with Android files.",
            ""]
 out_path.parent.mkdir(parents=True, exist_ok=True)
-out_path.write_text("\\n".join(report), encoding="utf-8")
+out_path.write_text("\n".join(report), encoding="utf-8")
 print(f"Wrote {out_path}; changed bundle hashes: {len(changed)}")
