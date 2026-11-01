@@ -45,9 +45,33 @@ bool convertFixture(const std::filesystem::path& path) {
         return false;
     }
 
+    // A second SKEL -> SKEL pass proves the first output can be parsed again
+    // as a real Spine 4.2 skeleton, rather than merely returning non-empty bytes.
+    uint8_t* secondPass = nullptr;
+    int32_t secondPassLength = 0;
+    rc = AzureArchiveSpineConvertBuffer(
+        roundTrip, roundTripLength, 6, &secondPass, &secondPassLength);
+    if (rc != 0 || !secondPass || secondPassLength <= 0) {
+        std::cerr << "Second SKEL -> SKEL parse failed for "
+                  << path << ": " << rc << "\\n";
+        AzureArchiveSpineFreeBuffer(roundTrip);
+        AzureArchiveSpineFreeBuffer(secondPass);
+        return false;
+    }
+    const bool stable = secondPassLength == roundTripLength &&
+        std::equal(roundTrip, roundTrip + roundTripLength, secondPass);
+    AzureArchiveSpineFreeBuffer(secondPass);
+    if (!stable) {
+        std::cerr << "Spine 4.2 SKEL conversion is not byte-stable for "
+                  << path << "\\n";
+        AzureArchiveSpineFreeBuffer(roundTrip);
+        return false;
+    }
+
     std::cout << "PASS " << path.filename().string() << " (JSON "
               << json.size() << " -> SKEL " << binaryLength
-              << " -> SKEL " << roundTripLength << " bytes)\\n";
+              << " -> SKEL " << roundTripLength
+              << " -> stable SKEL " << secondPassLength << " bytes)\\n";
     AzureArchiveSpineFreeBuffer(roundTrip);
     return true;
 }
