@@ -104,3 +104,16 @@ A second pass inspected the complete recovered Android `Assembly-CSharp.full.il`
 The earlier wording that the offline URL helper is simply part of the ordinary mobile URL initialization path was too strong. The native update coroutine calls the helper, but the helper is gated by an explicit authoring/offline command-line mode. The ordinary gameplay URL source remains unresolved.
 
 Do not use `https://filev2.foxxlight.top/aares/` as a presumed production default, and do not assume `customSource` or `catalogUrlOverride` is the effective source until the native startup dataflow proves the precedence and assignment. No runtime source code was changed because a guessed assignment would risk breaking catalog and bundle resolution.
+
+
+## Follow-up: classify the customSource references — 2026-11-01
+
+The full-IL offsets for `customSource` were mapped back to their enclosing method. All three reads at IL offsets `0x07E9`, `0x0863`, and `0x088F` belong to `AzureArchive.Automation.AuthoringCliHost.Bootstrap()` (method RVA `0x5D32C8`), not to `UserSettings.InitializeSettings` or the ordinary game startup coroutine.
+
+This materially narrows the earlier result:
+
+- The recovered Android IL shows `customSource` being consumed by the authoring CLI bootstrap path, alongside the CLI's authoring/offline setup and the literal fallback `https://filev2.foxxlight.top/aares/`.
+- It does not show ordinary gameplay startup reading `customSource` and assigning it to `ScenarioResourceManager.AddrLoadUrl`.
+- The managed IL still contains no `ldsfld` or `stsfld` instruction for `ScenarioResourceManager.AddrLoadUrl`; only its declaration and the two authoring offline path-prefix string uses are visible.
+
+**Updated conclusion:** `customSource` is now positively classified as an authoring CLI input in the recovered managed path. It must not be used as the iOS gameplay URL provider by assumption. The production mobile resource URL source and assignment remain unresolved; the next useful evidence is the Android native field/static-storage cross-reference or an observed runtime configuration response. No production URL adapter was changed.
