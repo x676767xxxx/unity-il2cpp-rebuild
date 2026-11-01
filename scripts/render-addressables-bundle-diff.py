@@ -18,6 +18,32 @@ same_hash_size_diff = [
     if row["hash_equal"] and row["ios"]["size"] != row["android"]["size"]
 ]
 
+def category(path):
+    logical = path.split("}/", 1)[-1].lower()
+    if "characters_assets" in logical:
+        return "characters"
+    if "unitybuiltinshaders" in logical or "shaders_assets" in logical:
+        return "built-in/shaders"
+    if "avatars_assets" in logical:
+        return "avatars"
+    if "effects_assets" in logical:
+        return "effects"
+    if "popups_assets" in logical:
+        return "popups"
+    if "defaultlocalgroup_assets_uis" in logical:
+        return "UI/backgrounds"
+    if "defaultlocalgroup_assets_audio" in logical:
+        return "audio"
+    return "other"
+
+category_totals = {}
+for row in changed:
+    name = category(row["ios"]["internal_id"])
+    totals = category_totals.setdefault(name, [0, 0, 0])
+    totals[0] += 1
+    totals[1] += row["ios"]["size"]
+    totals[2] += row["android"]["size"]
+
 def cell(value):
     return str(value).replace("|", r"\|")
 
@@ -43,6 +69,18 @@ lines = [
     "| Same catalog hash | " + str(counts["same_hash"]) + " |",
     "| Different catalog hash | " + str(counts["different_hash"]) + " |",
     "| Same hash, different declared size | " + str(len(same_hash_size_diff)) + " |",
+    "",
+    "## Changed-hash categories",
+    "",
+    "| Category | Changed bundles | iOS declared bytes | Android declared bytes |",
+    "|---|---:|---:|---:|",
+]
+for name, totals in sorted(category_totals.items()):
+    lines.append(
+        "| " + name + " | " + str(totals[0]) + " | "
+        + str(totals[1]) + " | " + str(totals[2]) + " |"
+    )
+lines += [
     "",
     "## Same-hash rows with declared-size differences",
     "",
