@@ -8,6 +8,8 @@ on:
       - "scripts/decode-addressables-bundle-map.py"
       - "scripts/export-addressables-bundle-manifests.py"
       - "scripts/scan-release-endpoint-strings.py"
+      - "scripts/scan-release-endpoint-strings-bounded.py"
+      - "scripts/scan-il2cpp-runtime-strings.py"
       - "scripts/match-legacy-ios-resource-archive.py"
 permissions:
   contents: read
@@ -90,6 +92,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/scan-release-endpoint-strings-bounded.py work/android/base.apk work/windows/windows.zip work/out/endpoint-string-scan.json
+      - name: Targeted IL2CPP runtime metadata and binary string scan
+        run: |
+          set -euo pipefail
+          python3 scripts/scan-il2cpp-runtime-strings.py work/android/base.apk work/windows/windows.zip work/out/il2cpp-runtime-string-scan.json
       - name: Install Addressables catalog parser
         run: python3 -m pip install --disable-pip-version-check addressablestools
       - name: Decode complete Addressables bundle metadata
