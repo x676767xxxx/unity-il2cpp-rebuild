@@ -145,3 +145,12 @@ A targeted scan of the Android full IL and both Android/iOS IL2CPP metadata dump
 4. These are bounded negative findings from the recovered managed IL and metadata symbol inventory. They do not exclude native/reflection/server-driven writes, stripped methods, or runtime-generated catalog configuration.
 
 **Porting consequence:** neither setting is currently a verified gameplay catalog source. The iOS player does have the static `AddrLoadUrl` field, but the assignment site is still not identified. Do not bind the new iOS Addressables transform to either setting until an actual runtime assignment/consumer is established. Next investigate native references to the static field and catalog-load callsites, plus the iOS startup binary's resource configuration.
+
+
+## iOS player metadata layout confirmation — 2026-11-01
+
+The exact iOS IL2CPP dump confirms `ScenarioResourceManager.AddrLoadUrl` is present as a public static string field in the iOS player metadata. The iOS `ScenarioResourceManager` instance layout differs from Android (for example, Android has the background-skeleton/preview cache fields before the query fields; iOS does not), so Android instance offsets must not be reused when interpreting iOS native code. The static field is reported at metadata offset `0x0`, which is not its runtime static-storage address.
+
+The iOS dump contains no `AuthoringCliHost` class, while the Android dump does. Therefore the Windows/Android authoring CLI implementation is not available as an iOS player class. This confirms that the iOS player needs its own assignment mechanism or server/config-driven initialization. Static field presence alone does not prove the field is assigned before Addressables requests.
+
+No gameplay URL was guessed or inserted. No code was changed in this checkpoint; it records verified metadata facts for the next native cross-reference pass.
