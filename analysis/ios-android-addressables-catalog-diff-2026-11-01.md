@@ -24,7 +24,7 @@ Additional detail: four rows have the same catalog hash but a different declared
 The 453 changed-hash entries are fully enumerated in the JSON artifact. A repeatable Markdown renderer has been added at `scripts/render-addressables-bundle-diff.py`; run it with the decoded JSON and an output path:
 
 ```bash
-python3 scripts/render-addressables-bundle-diff.py addressables-bundle-map.json ios-android-addressables-catalog-diff.md
+python3 scripts/render-addressables-bundle-diff.py addressables-bundle-map.json ios-android-addressables-catalog-diff.md --legacy-archive-match legacy-ios-archive-match.json
 ```
 
 ## Changed-bundle classification
