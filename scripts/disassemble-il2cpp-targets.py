@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trace selected IL2CPP ARM64 methods, callees, direct BL callers and global page references."""
+"""Trace selected IL2CPP ARM64 methods, callees, direct BL callers and ADRP-based memory accesses."""
 import json,pathlib,struct,sys
 from elftools.elf.elffile import ELFFile
 from capstone import Cs,CS_ARCH_ARM64,CS_MODE_ARM
@@ -33,11 +33,8 @@ with elf_path.open("rb") as f:
      if d==a:xrefs[k].append({"caller":hex(pc),"destination":hex(d)})
    if w&0x9F000000==0x90000000:
     imm=((w>>5)&0x7FFFF)<<2|((w>>29)&3); pg=(pc&~0xFFF)+(sx(imm,21)<<12)
-    if pg in pages:
-     refs.append({"address":hex(pc),"page":hex(pg),"register":f"x{w&31}","next_words":[hex(struct.unpack_from("<I",blob,q)[0]) for q in (p+4,p+8,p+12) if q<end-3]})
+    if pg in pages: refs.append({"address":hex(pc),"page":hex(pg),"register":f"x{w&31}","next_words":[hex(struct.unpack_from("<I",blob,q)[0]) for q in (p+4,p+8,p+12) if q<end-3]})
  report["direct_bl_xrefs"]=xrefs; report["global_page_refs"]=refs
- # Narrow data-flow hints: inspect ADRP bases only inside selected methods/callbacks.
- # Nearby memory operations are candidates, not proof of managed static-field mapping.
  targeted=[]
  for sec in ("targets","callees"):
   for name,win in report[sec].items():
@@ -49,13 +46,20 @@ with elf_path.open("rb") as f:
     reg=parts[0].strip()
     try: page=int(parts[1].strip().lstrip("#"),16)
     except ValueError: continue
-    nearby=[]
-    for nxt in ins[idx+1:idx+9]:
-     if "["+reg in nxt["op_str"]:
-      nearby.append({"address":nxt["address"],"mnemonic":nxt["mnemonic"],"op_str":nxt["op_str"]})
-    if nearby: targeted.append({"section":sec,"method":name,"adrp_address":insn["address"],"register":reg,"page":hex(page),"nearby_memory_ops":nearby})
+    accesses=[]
+    for nxt in ins[idx+1:idx+17]:
+     mnemonic=nxt["mnemonic"]; operands=nxt["op_str"]
+     if "["+reg in operands:
+      kind="write" if mnemonic.startswith("str") or mnemonic in ("stp","stur","stxr","stlxr") else "read"
+      accesses.append({"address":nxt["address"],"mnemonic":mnemonic,"op_str":operands,"access":kind})
+     # Stop when an instruction overwrites the ADRP register; preserve a load/store
+     # that uses it as the base before clobbering it.
+     dest=operands.split(",",1)[0].strip() if operands else ""
+     writes_dest=(mnemonic not in ("str","strb","strh","stp","sturb","sturh","stxr","stlxr","cmp","cmn","tst","tbz","tbnz","cbz","cbnz","b","bl","br","blr","ret","nop","dmb"))
+     if dest==reg and writes_dest: break
+    if accesses: targeted.append({"section":sec,"method":name,"adrp_address":insn["address"],"register":reg,"page":hex(page),"memory_accesses":accesses})
  report["targeted_global_accesses"]=targeted
- report["limits"]="Direct BL and ADRP scans cover file-backed executable PT_LOAD segments. ADRP next_words are raw instructions, not complete data-flow; indirect calls and runtime-resolved pointers remain unresolved."
+ report["limits"]="ADRP-based accesses stop when the base register is overwritten. Read/write labels describe instruction direction only; class-static field identity is not proven. Direct BL scans cover file-backed executable PT_LOAD segments; indirect calls and runtime-resolved pointers remain unresolved."
 (out/"arm64-il2cpp-disassembly.json").write_text(json.dumps(report,indent=2))
 lines=["# ARM64 IL2CPP trace","","Direct BL callers are scanned across executable file-backed PT_LOAD segments.",""]
 for sec in ("targets","callees"):
@@ -65,10 +69,12 @@ for sec in ("targets","callees"):
   lines.append("")
 lines += ["## Direct BL callers"]
 for k,v in xrefs.items(): lines += [f"### {k}"]+[f"- {z['caller']}" for z in v] if v else [f"### {k}","- None found"]
-lines += ["## Global ADRP page references"]+[f"- {z['address']} → {z['page']} ({z['register']}), next words {z['next_words']}" for z in refs]
+lines += ["## Targeted ADRP memory accesses"]
+for z in targeted:
+ lines.append(f"- {z['method']} {z['adrp_address']} page {z['page']} ({z['register']}): "+", ".join(f"{a['address']} {a['access']} {a['mnemonic']} {a['op_str']}" for a in z["memory_accesses"]))
 lines += ["",report["limits"]]
 (out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
-summary={"elf":report["elf_header"],"mapped_targets":sum(bool(v["file_offset"]) for v in report["targets"].values()),"mapped_callees":sum(bool(v["file_offset"]) for v in report["callees"].values()),"bl_callers":{k:len(v) for k,v in xrefs.items()},"global_page_refs":len(refs)}
+summary={"elf":report["elf_header"],"mapped_targets":sum(bool(v["file_offset"]) for v in report["targets"].values()),"mapped_callees":sum(bool(v["file_offset"]) for v in report["callees"].values()),"bl_callers":{k:len(v) for k,v in xrefs.items()},"global_page_refs":len(refs),"targeted_access_groups":len(targeted),"targeted_reads":sum(a["access"]=="read" for z in targeted for a in z["memory_accesses"]),"targeted_writes":sum(a["access"]=="write" for z in targeted for a in z["memory_accesses"])}
 print(json.dumps(summary)); print("TARGETED_GLOBAL_ACCESSES",json.dumps(targeted))
 for sec in ("targets","callees"):
  for k,v in report[sec].items():
