@@ -42,3 +42,13 @@ The official Spine documentation states that a Spine license is required to inte
 - https://esotericsoftware.com/spine-unity-installation
 - https://esotericsoftware.com/spine-runtime-architecture
 - https://github.com/EsotericSoftware/spine-runtimes/tree/5cb78e77d3711ddcd80c7bd043bb11cf70fcc88c
+
+## Verified iOS converter build milestone — 2026-11-01
+
+- GitHub Actions run: [41304639881](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41304639881), completed successfully.
+- iPhoneOS ARM64 static library compiled; CI checked the ARM64 archive and all three exported C ABI symbols.
+- C ABI invalid-input/output-parameter checks: 4 passed.
+- Pinned upstream Spine 4.2 sample fixtures: 25 JSON files passed JSON → SKEL → SKEL conversion through the custom C ABI. The test log reports 25/25 passed.
+- Unity plugin artifact: `azurearchive-spine-unity-ios-plugin`, ID `13082956987`, ZIP digest `f27ef24c930000f6cb9b85db81ce764415346f0eb3adec0ebceb4a7d4c3cecea`.
+- This verifies converter compilation and generic upstream fixtures only. It does not validate real AzureArchive skeleton/atlas/page assets, Spine C# Runtime integration, Unity linking, or iPhone playback.
+
