@@ -135,7 +135,7 @@ import struct
 elf_mapping={"path":str(elf_path) if elf_path else None,"literal_va":"0x7096470","segments":[]}
 if elf_path:
     blob=elf_path.read_bytes()
-    if blob[:4]==b"\\x7fELF" and blob[4]==2:
+    if blob[:4]==b"\x7fELF" and blob[4]==2:
         endian="<" if blob[5]==1 else ">"
         eh=struct.unpack_from(endian+"HHIQQQIHHHHHH",blob,16)
         phoff,phentsize,phnum=eh[4],eh[8],eh[9]
@@ -151,4 +151,4 @@ report["named_metadata_records"]=named_records[:200]
 report["il2cpp_header_hits"]=header_hits[:100]
 report["elf_literal_mapping"]=elf_mapping
 out.write_text(json.dumps(report,indent=2))
-print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys,"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]],"script_metadata_type_preview":top_array_preview("ScriptMetadata"),"script_metadata_method_preview":top_array_preview("ScriptMetadataMethod"),"scenario_resource_manager_methods":srm_methods,"related_script_methods":related_methods[:200]},ensure_ascii=False))
+print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:20]],"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys,"script_array_schemas":array_schemas,"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]],"script_metadata_type_preview":top_array_preview("ScriptMetadata"),"script_metadata_method_preview":top_array_preview("ScriptMetadataMethod"),"scenario_resource_manager_methods":srm_methods,"related_script_methods":related_methods[:200],"elf_literal_mapping":elf_mapping,"il2cpp_header_hit_count":len(header_hits),"il2cpp_header_preview":header_hits[:30]},ensure_ascii=False))
