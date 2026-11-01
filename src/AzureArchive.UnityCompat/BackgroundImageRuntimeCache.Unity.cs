@@ -202,19 +202,20 @@ namespace AzureArchive.UnityCompat
                 return;
             }
 
+            // The cache owns the successful Addressables lease independently of
+            // individual consumers. One faulty callback must not invalidate the
+            // asset for other waiters or evict a valid cache entry.
             nativeLeases.Add(key, lease);
-            Exception? callbackFailure = null;
             foreach (Action<Texture> callback in pending.Success)
             {
-                try { callback(lease.Asset); }
-                catch (Exception exception) { if (callbackFailure == null) callbackFailure = exception; }
-            }
-
-            if (callbackFailure != null)
-            {
-                nativeLeases.Remove(key);
-                lease.Dispose();
-                throw callbackFailure;
+                try
+                {
+                    callback(lease.Asset);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("AzureArchive native background success callback failed: " + exception);
+                }
             }
         }
 
@@ -233,8 +234,19 @@ namespace AzureArchive.UnityCompat
             if (pending.Failure.Count == 0)
                 throw exception;
 
+            // Notify every waiter even if another consumer's failure callback
+            // throws. Callback faults are not Addressables load failures.
             foreach (Action<Exception> callback in pending.Failure)
-                callback(exception);
+            {
+                try
+                {
+                    callback(exception);
+                }
+                catch (Exception callbackException)
+                {
+                    Debug.LogError("AzureArchive native background failure callback failed: " + callbackException);
+                }
+            }
         }
 
         private void ThrowIfDisposed()
