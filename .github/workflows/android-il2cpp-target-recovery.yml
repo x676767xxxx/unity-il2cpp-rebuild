@@ -25,12 +25,9 @@ jobs:
           curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
           unzip -q work/android/base.apk -d work/android/unpacked
           LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' | head -n 1)"
-          if [ -z "$LIB" ]; then
-            LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"
-          fi
+          if [ -z "$LIB" ]; then LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"; fi
           META="$(find work/android/unpacked -type f -name global-metadata.dat | head -n 1)"
-          test -n "$LIB"
-          test -n "$META"
+          test -n "$LIB"; test -n "$META"
           printf '%s\n' "$LIB" > work/out/libil2cpp-path.txt
           printf '%s\n' "$META" > work/out/global-metadata-path.txt
           sha256sum "$LIB" "$META" > work/out/input-sha256.txt
@@ -45,31 +42,29 @@ jobs:
           test -f work/tools/dumper/Il2CppDumper.dll
       - name: Recover IL2CPP metadata and method RVAs
         run: |
-          set -euo pipefail
+          set -uo pipefail
           LIB="$(cat work/out/libil2cpp-path.txt)"
           META="$(cat work/out/global-metadata-path.txt)"
-          set +e
-          printf '\n' | script -q -e -c "dotnet work/tools/dumper/Il2CppDumper.dll \"$LIB\" \"$META\" work/out/dump" /dev/null 2>&1 | tee work/out/il2cpp-dumper.log
-          DUMPER_STATUS=${PIPESTATUS[1]:-${PIPESTATUS[0]}}
-          set -e
-          printf '%s\n' "$DUMPER_STATUS" > work/out/il2cpp-dumper-exit-code.txt
-          find work/out -maxdepth 4 -type f -printf '%p %s bytes\\n' > work/out/generated-files.txt
-          if [ ! -f work/out/dump/dump.cs ]; then
-            FOUND="$(find work/out -type f -name dump.cs | head -n 1)"
-            if [ -n "$FOUND" ]; then cp "$FOUND" work/out/dump.cs; fi
-          else
-            cp work/out/dump/dump.cs work/out/dump.cs
-          fi
-          if [ ! -f work/out/dump.cs ]; then
-            echo "Il2CppDumper did not produce dump.cs" >&2
+          OUT="$GITHUB_WORKSPACE/work/out/dump"
+          mkdir -p "$OUT"
+          printf '\n' | script -q -e -c "dotnet \"$GITHUB_WORKSPACE/work/tools/dumper/Il2CppDumper.dll\" \"$GITHUB_WORKSPACE/$LIB\" \"$GITHUB_WORKSPACE/$META\" \"$OUT\"" /dev/null 2>&1 | tee work/out/il2cpp-dumper.log
+          STATUS=${PIPESTATUS[1]:-0}
+          printf '%s\n' "$STATUS" > work/out/il2cpp-dumper-exit-code.txt
+          echo "=== Dumper output tree ===" | tee work/out/dumper-output-tree.txt
+          find "$GITHUB_WORKSPACE" -type f \( -name dump.cs -o -name script.json -o -name il2cpp.h -o -name stringliteral.json \) -printf '%p %s bytes\\n' | tee -a work/out/dumper-output-tree.txt
+          FOUND="$(find "$GITHUB_WORKSPACE" -type f -name dump.cs -not -path '*/work/out/dump.cs' | head -n 1)"
+          if [ -z "$FOUND" ]; then
+            echo "dump.cs missing. Dumper output listing:" >&2
+            find "$OUT" -maxdepth 3 -printf '%y %p\\n' >&2
             exit 1
           fi
-          python3 scripts/extract-il2cpp-targets.py work/out work/out/android-il2cpp-targets.json
-          for f in script.json il2cpp.h; do
-            FOUND="$(find work/out -type f -name "$f" | head -n 1)"
-            if [ -n "$FOUND" ] && [ "$FOUND" != "work/out/$f" ]; then cp "$FOUND" "work/out/$f"; fi
+          cp "$FOUND" work/out/dump.cs
+          for f in script.json il2cpp.h stringliteral.json; do
+            FOUND_FILE="$(find "$GITHUB_WORKSPACE" -type f -name "$f" | head -n 1)"
+            if [ -n "$FOUND_FILE" ]; then cp "$FOUND_FILE" "work/out/$f"; fi
           done
-          echo "Il2CppDumper output recovered; exit code: $DUMPER_STATUS"
+          python3 scripts/extract-il2cpp-targets.py work/out work/out/android-il2cpp-targets.json
+          echo "Recovered dump.cs from $FOUND"
       - name: Upload Android IL2CPP analysis
         if: always()
         uses: actions/upload-artifact@v4
