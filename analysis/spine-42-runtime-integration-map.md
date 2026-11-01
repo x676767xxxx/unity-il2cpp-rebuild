@@ -62,3 +62,14 @@ The official Spine documentation states that a Spine license is required to inte
 - Artifacts: Unity iOS plugin ID 13082434942 (1,843,690 bytes; SHA-256 `ac51f9c8017a8219cdc504a0cac0a4c2d458b6c16735c4178761d7b500aaf4d4`); iOS ARM64 archive/ABI package ID 13082514570 (1,938,912 bytes; SHA-256 `af1a39911960d53c9a8078c9bd94f72f1b6f1b9d230dafc1d38ed4379a2a3088`).
 - Build emits switch-enum warnings in the pinned converter's multi-version reader/writer sources (including older 3.5-4.1 paths and some 4.2 cases). They did not fail this build. Do not suppress or patch them blindly: inspect the exact converter switch semantics and determine whether each warning is relevant to the Spine 4.2 path before changing upstream code.
 - Scope boundary: this remains a converter/ABI milestone using upstream sample JSON fixtures. It does not prove that AzureArchive's own `.skel` assets parse, that atlas pages/texture formats resolve, or that Spine 4.2 C# runtime and Unity rendering are integrated. The uploaded `Natsu.zip` has not yet been inspected; keep that file-analysis task queued until the analysis allowance is available.
+
+
+## Explicit Spine 4.2 switch handling and verified CI — 2026-11-01
+
+- Patch commit: [d3ecfc7cf30b47a56db28197a731b97c767d5b91](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/d3ecfc7cf30b47a56db28197a731b97c767d5b91).
+- Patch script: `scripts/patch-spine42-exhaustive-switches.py`; it pins exact source contexts and fails on missing or ambiguous matches. It makes already-special-cased `BONE_INHERIT` / `PHYSICS_RESET` reader cases and the no-extra-flags `AttachmentType_Point` writer case explicit. It does not suppress compiler warnings or change the handled binary encoding.
+- Verified run: [41306413553](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41306413553), completed successfully. Patch step, 11 P/Invoke checks, iPhoneOS ARM64 static library build, host ABI tests, package and both artifact uploads all passed.
+- The build log still shows enum warnings in legacy Spine 3.5–4.1 converter translation units. The Spine 4.2 reader/writer translation units no longer appear in the warning list. Legacy warnings are intentionally left untouched until their version-specific semantics are reviewed.
+- All 25 upstream Spine 4.2 JSON fixtures passed JSON → SKEL → SKEL → SKEL; the second SKEL conversion was byte-identical to the previous SKEL output for every fixture. Four invalid-input/output-parameter tests also passed.
+- Artifacts: Unity iOS plugin ID `13083850484` (1,843,483 bytes; SHA-256 `f5cf10712860cc27dc42801d65621381471fb1354f0706cae15c83c729f358ac`); iOS ARM64 converter/ABI package ID `13083204583` (1,938,913 bytes; SHA-256 `fe7f9fd0ee571124b0ad5505c82d5833b522c4af716676ba4511fdb9a8293246`).
+- Scope boundary remains unchanged: no AzureArchive-owned skeleton sample has been verified, no runtime/atlas rendering has been integrated, and no full Unity project, IPA, or device test exists yet.
