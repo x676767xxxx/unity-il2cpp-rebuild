@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/android-il2cpp-target-recovery.yml"
       - "scripts/extract-il2cpp-targets.py"
+      - "scripts/find-srm-static-ctor.py"
 permissions:
   contents: read
 jobs:
@@ -65,6 +66,9 @@ jobs:
           done
           python3 scripts/extract-il2cpp-targets.py work/out work/out/android-il2cpp-targets.json
           echo "Recovered dump.cs from $FOUND"
+      - name: Locate ScenarioResourceManager static constructor
+        if: success()
+        run: python3 scripts/find-srm-static-ctor.py work/out
       - name: Upload Android IL2CPP analysis
         if: always()
         uses: actions/upload-artifact@v4
