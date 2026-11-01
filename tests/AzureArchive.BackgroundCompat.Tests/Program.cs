@@ -333,6 +333,52 @@ internal static class Program
         independentB.Dispose();
         independentCache.Dispose();
 
+        // Concurrent acquisitions of one atlas page must share one loaded texture
+        // and the final concurrent release must invoke the releaser exactly once.
+        int concurrentLoads = 0;
+        int concurrentReleases = 0;
+        var concurrentPageCache = new SpineAtlasPageCache<object>(
+            key => { System.Threading.Interlocked.Increment(ref concurrentLoads); return new object(); },
+            texture => System.Threading.Interlocked.Increment(ref concurrentReleases));
+        var concurrentPageLeases = new System.Collections.Concurrent.ConcurrentBag<SpineAtlasPageCache<object>.Lease>();
+        System.Threading.Tasks.Parallel.For(0, 64, _ =>
+            concurrentPageLeases.Add(concurrentPageCache.Acquire("atlas/shared.png")));
+        object sharedPageTexture = concurrentPageLeases.First().Value;
+        AssertEqual("1", concurrentLoads.ToString(), "concurrent atlas page acquisition loads once");
+        AssertTrue(concurrentPageLeases.All(lease => ReferenceEquals(sharedPageTexture, lease.Value)),
+            "concurrent atlas page leases share the same texture");
+        System.Threading.Tasks.Parallel.ForEach(concurrentPageLeases, lease => lease.Dispose());
+        AssertEqual("1", concurrentReleases.ToString(), "concurrent final atlas page release runs once");
+        concurrentPageCache.Dispose();
+
+        // A transient loader exception must not leave a poisoned cache entry.
+        int retryLoads = 0;
+        int retryReleases = 0;
+        var retryPageCache = new SpineAtlasPageCache<object>(
+            key =>
+            {
+                retryLoads++;
+                if (retryLoads == 1) throw new IOException("synthetic atlas page read failure");
+                return new object();
+            },
+            texture => retryReleases++);
+        AssertThrows<IOException>(() => retryPageCache.Acquire("atlas/retry.png"),
+            "atlas page loader exception is surfaced");
+        using (var retryLease = retryPageCache.Acquire("atlas/retry.png"))
+            AssertTrue(retryLease.Value != null, "atlas page load can retry after loader exception");
+        AssertEqual("2", retryLoads.ToString(), "atlas page retry invokes loader again");
+        AssertEqual("1", retryReleases.ToString(), "retried atlas page is released after final lease");
+        retryPageCache.Dispose();
+
+        // Cache keys are ordinal/case-sensitive: distinct atlas page names are not aliased.
+        var caseSensitivePageCache = new SpineAtlasPageCache<object>(
+            key => new object(), texture => { });
+        using (var upperPage = caseSensitivePageCache.Acquire("atlas/Page.png"))
+        using (var lowerPage = caseSensitivePageCache.Acquire("atlas/page.png"))
+            AssertFalse(ReferenceEquals(upperPage.Value, lowerPage.Value),
+                "atlas page cache keys preserve ordinal case sensitivity");
+        caseSensitivePageCache.Dispose();
+
         int handleReleases = 0;
         var addressableAsset = new object();
         var addressableLease = new AddressableAssetLease<int, object>(
@@ -581,7 +627,7 @@ internal static class Program
             BackgroundPreviewCallbackDispatcher.Dispatch(Array.Empty<Action<int>>(), 0, null!),
             "callback dispatcher requires error reporter");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 12 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks; 15 Spine construction ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 18 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks; 15 Spine construction ownership checks");
         return 0;
     }
 
