@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Match the legacy iOS resource archive's actual bundle files to parsed Addressables metadata."""
-import json, pathlib, sys, zipfile, hashlib
+import json, pathlib, sys, zipfile, hashlib, tempfile, os
 map_path=pathlib.Path(sys.argv[1]); chunks=[pathlib.Path(x) for x in sys.argv[2:6]]; out=pathlib.Path(sys.argv[6])
 out.parent.mkdir(parents=True,exist_ok=True)
 missing=[str(p) for p in chunks if not p.is_file()]
 if missing: raise SystemExit("Missing archive chunks: "+", ".join(missing))
-archive=out.parent/"IOS_202408202213.6.reassembled.zip"
+archive=pathlib.Path(tempfile.gettempdir())/"IOS_202408202213.6.reassembled.zip"
 h=hashlib.sha256()
 with archive.open("wb") as dst:
     for p in chunks:
