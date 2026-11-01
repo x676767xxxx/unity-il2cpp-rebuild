@@ -24,10 +24,18 @@ if args.legacy_archive_match:
     archive_data = json.loads(args.legacy_archive_match.read_text(encoding="utf-8"))
     archive_by_name = {row["bundle_name"]: row for row in archive_data["matches"]}
     matched = [(row, archive_by_name.get(row["bundle_name"])) for row in changed]
+    same_rows = [row for row in rows if row["hash_equal"]]
+    same_matched = [(row, archive_by_name.get(row["bundle_name"])) for row in same_rows]
     archive_match_stats = {
         "matched": sum(item is not None for _, item in matched),
         "ios_size": sum(item is not None and item["archive_bytes"] == row["ios"]["size"] for row, item in matched),
         "android_size": sum(item is not None and item["archive_bytes"] == row["android"]["size"] for row, item in matched),
+        "same_matched": sum(item is not None for _, item in same_matched),
+        "same_ios_size": sum(item is not None and item["archive_bytes"] == row["ios"]["size"] for row, item in same_matched),
+        "same_android_size": sum(item is not None and item["archive_bytes"] == row["android"]["size"] for row, item in same_matched),
+        "same_both_sizes": sum(item is not None and item["archive_bytes"] == row["ios"]["size"] == row["android"]["size"] for row, item in same_matched),
+        "same_archive_mismatch": sum(item is not None and item["archive_bytes"] != row["ios"]["size"] and item["archive_bytes"] != row["android"]["size"] for row, item in same_matched),
+        "same_candidate_bytes": sum(item["archive_bytes"] for row, item in same_matched if item is not None and item["archive_bytes"] == row["ios"]["size"] == row["android"]["size"]),
     }
 
 def category(path):
@@ -105,6 +113,14 @@ if archive_match_stats is not None:
         "| Archive size equals Android 1.0 catalog size | " + str(archive_match_stats["android_size"]) + " |",
         "",
         "This is a size comparison, not a byte-level content hash. It establishes which catalog's declared sizes the supplied archive matches; it does not prove payload byte identity.",
+        "",
+        "Same-hash cross-check:",
+        "- Same-hash rows found in archive: " + str(archive_match_stats["same_matched"]),
+        "- Archive size equals both iOS and Android catalog sizes: " + str(archive_match_stats["same_both_sizes"]),
+        "- Archive size equals iOS catalog size: " + str(archive_match_stats["same_ios_size"]),
+        "- Archive size equals Android catalog size: " + str(archive_match_stats["same_android_size"]),
+        "- Same-hash archive rows matching neither declared size: " + str(archive_match_stats["same_archive_mismatch"]),
+        "- Uncompressed bytes in the same-hash, same-size candidate set: " + str(archive_match_stats["same_candidate_bytes"]),
     ]
 
 lines += [
