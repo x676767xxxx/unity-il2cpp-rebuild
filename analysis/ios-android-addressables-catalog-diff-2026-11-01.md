@@ -27,6 +27,21 @@ The 453 changed-hash entries are fully enumerated in the JSON artifact. A repeat
 python3 scripts/render-addressables-bundle-diff.py addressables-bundle-map.json ios-android-addressables-catalog-diff.md
 ```
 
+## Changed-bundle classification
+
+The 453 different-hash rows were grouped by their decoded logical paths:
+
+| Category | Changed bundles | iOS declared bytes | Android declared bytes |
+|---|---:|---:|---:|
+| Characters | 448 | 221,412,571 | 222,551,769 |
+| UI / built-in shaders | 1 | 46,705 | 97,903 |
+| Avatars | 1 | 45,060,290 | 45,039,642 |
+| Effects | 1 | 2,922,907 | 2,585,707 |
+| Popups | 1 | 197,919,040 | 197,767,330 |
+| Shaders | 1 | 73,370 | 133,367 |
+
+The character bundles account for 448/453 changed hashes. The five remaining entries are shared/global bundles, so resource recovery should prioritize the Android 1.0 character payload set first, while also retaining the changed avatars, effects, popups, and shader bundles. These are catalog-declared sizes, not verified local payload sizes.
+
 ## Correct interpretation
 
 - Same logical names mean the catalogs refer to the same logical bundle paths.
