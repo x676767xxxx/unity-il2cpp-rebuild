@@ -1,0 +1,95 @@
+name: REA Ghidra decompile Android Spine loader
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/rea-ghidra-spine-decompile.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Linux Ghidra runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y procps xvfb unzip
+
+      - name: Download and install Ghidra 12.1.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tools
+          curl -fL --retry 3 -o tools/ghidra.zip "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip"
+          unzip -q tools/ghidra.zip -d tools
+          test -x tools/ghidra_12.1.4_PUBLIC/support/launch.sh
+
+      - name: Download Android 1.0 APK and extract native analysis inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/android work/input work/rea
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -q work/android/base.apk -d work/android/unpacked
+          LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' -print -quit)"
+          METADATA="$(find work/android/unpacked -type f -name global-metadata.dat -print -quit)"
+          test -n "$LIB" || { echo "libil2cpp.so not found" >&2; exit 1; }
+          test -n "$METADATA" || { echo "global-metadata.dat not found" >&2; exit 1; }
+          cp "$LIB" work/input/libil2cpp.so
+          cp "$METADATA" work/input/global-metadata.dat
+          sha256sum work/input/libil2cpp.so work/input/global-metadata.dat | tee work/rea/input-sha256.txt
+
+      - name: Generate REA Ghidra method seeds
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes rea-agents@latest inspect-il2cpp-metadata work/input/global-metadata.dat \
+            --binary work/input/libil2cpp.so \
+            --detail summary \
+            --evidence_output work/rea/linked-evidence.json \
+            --ghidra-seeds work/input/ghidra-method-seeds.txt \
+            --json 2>&1 | tee work/rea/metadata-link.log
+          test -s work/input/ghidra-method-seeds.txt
+
+      - name: Check REA Ghidra provider
+        shell: bash
+        env:
+          GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
+          REA_GHIDRA_SEED_FILE: ${{ github.workspace }}/work/input/ghidra-method-seeds.txt
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
+        run: |
+          set -euo pipefail
+          npx --yes rea-agents@latest doctor --provider ghidra --json | tee work/rea/ghidra-doctor.json
+
+      - name: Decompile RuntimeSpineLoader.Load
+        shell: bash
+        env:
+          GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
+          REA_GHIDRA_SEED_FILE: ${{ github.workspace }}/work/input/ghidra-method-seeds.txt
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
+          REA_GHIDRA_DECOMPILE_TIMEOUT_SECONDS: "180"
+        run: |
+          set -euo pipefail
+          npx --yes rea-agents@latest decompile work/input/libil2cpp.so 0x335f2dc --provider ghidra --json \
+            2>&1 | tee work/rea/runtime-spine-loader-load-decompile.json
+
+      - name: Upload REA Ghidra decompilation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-rea-ghidra-spine-decompile
+          path: work/rea/
+          if-no-files-found: warn
