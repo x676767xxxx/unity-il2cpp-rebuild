@@ -133,3 +133,15 @@ This is now direct evidence for the Windows authoring-tool URL rule, not a guess
 ### Porting consequence
 
 Do not port the Windows `/win` suffix or its default URL into the iOS player. The remaining target is to identify the Android/iOS gameplay-side resource root and catalog selection path independently. The Windows CLI method is useful as a reference for the authoring tool only. No runtime URL code was changed.
+
+
+## iOS-vs-Android field and settings reference audit — 2026-11-01
+
+A targeted scan of the Android full IL and both Android/iOS IL2CPP metadata dumps adds the following constraints:
+
+1. Android full IL references to `catalogUrlOverride` resolve to its generated getter/setter, the settings-data constructor/serialization region, and the UI patch-source completion callback. No recovered ordinary-startup method reads the property to select an Addressables catalog. The generated getter/setter existing is not evidence that the value is consumed.
+2. Android `customSource` references resolve to its generated getter/setter, settings-data serialization, and `AuthoringCliHost.Bootstrap()`. The authoring CLI bootstrap is the previously identified consumer; no ordinary startup consumer was found in the managed IL.
+3. Android and iOS metadata dumps both contain `ScenarioResourceManager.AddrLoadUrl` and the `SettingData.catalogUrlOverride` / `customSource` properties. However, the iOS metadata dump contains no `AuthoringCliHost` type, consistent with that authoring CLI path being absent from the iOS player.
+4. These are bounded negative findings from the recovered managed IL and metadata symbol inventory. They do not exclude native/reflection/server-driven writes, stripped methods, or runtime-generated catalog configuration.
+
+**Porting consequence:** neither setting is currently a verified gameplay catalog source. The iOS player does have the static `AddrLoadUrl` field, but the assignment site is still not identified. Do not bind the new iOS Addressables transform to either setting until an actual runtime assignment/consumer is established. Next investigate native references to the static field and catalog-load callsites, plus the iOS startup binary's resource configuration.
