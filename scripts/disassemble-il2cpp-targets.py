@@ -36,6 +36,24 @@ with elf_path.open("rb") as f:
     if pg in pages:
      refs.append({"address":hex(pc),"page":hex(pg),"register":f"x{w&31}","next_words":[hex(struct.unpack_from("<I",blob,q)[0]) for q in (p+4,p+8,p+12) if q<end-3]})
  report["direct_bl_xrefs"]=xrefs; report["global_page_refs"]=refs
+ # Narrow data-flow hints: inspect ADRP bases only inside selected methods/callbacks.
+ # Nearby memory operations are candidates, not proof of managed static-field mapping.
+ import re
+ targeted=[]
+ for sec in ("targets","callees"):
+  for name,win in report[sec].items():
+   ins=win["instructions"]
+   for idx,insn in enumerate(ins):
+    if insn["mnemonic"]!="adrp": continue
+    m=re.match(r"(x\\d+),\\s*#?(0x[0-9a-fA-F]+)",insn["op_str"])
+    if not m: continue
+    reg,page=m.group(1),int(m.group(2),16)
+    nearby=[]
+    for nxt in ins[idx+1:idx+9]:
+     if re.search(r"\\["+re.escape(reg)+r"(?:,|\\])",nxt["op_str"]):
+      nearby.append({"address":nxt["address"],"mnemonic":nxt["mnemonic"],"op_str":nxt["op_str"]})
+    if nearby: targeted.append({"section":sec,"method":name,"adrp_address":insn["address"],"register":reg,"page":hex(page),"nearby_memory_ops":nearby})
+ report["targeted_global_accesses"]=targeted
  report["limits"]="Direct BL and ADRP scans cover file-backed executable PT_LOAD segments. ADRP next_words are raw instructions, not complete data-flow; indirect calls and runtime-resolved pointers remain unresolved."
 (out/"arm64-il2cpp-disassembly.json").write_text(json.dumps(report,indent=2))
 lines=["# ARM64 IL2CPP trace","","Direct BL callers are scanned across executable file-backed PT_LOAD segments.",""]
@@ -50,7 +68,7 @@ lines += ["## Global ADRP page references"]+[f"- {z['address']} → {z['page']} 
 lines += ["",report["limits"]]
 (out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
 summary={"elf":report["elf_header"],"mapped_targets":sum(bool(v["file_offset"]) for v in report["targets"].values()),"mapped_callees":sum(bool(v["file_offset"]) for v in report["callees"].values()),"bl_callers":{k:len(v) for k,v in xrefs.items()},"global_page_refs":len(refs)}
-print(json.dumps(summary)); print("GLOBAL_PAGE_REFS",json.dumps(refs[:100]))
+print(json.dumps(summary)); print("TARGETED_GLOBAL_ACCESSES",json.dumps(targeted))
 for sec in ("targets","callees"):
  for k,v in report[sec].items():
   print("\\n===",k,v["rva"],"===")
