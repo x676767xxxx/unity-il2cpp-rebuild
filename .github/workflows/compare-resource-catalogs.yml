@@ -82,6 +82,12 @@ jobs:
               lines += [""]
           (out/"resource-catalog-report.md").write_text("\n".join(lines))
           PY
+      - name: Install Addressables catalog parser
+        run: python3 -m pip install --disable-pip-version-check addressablestools
+      - name: Decode complete Addressables bundle metadata
+        run: |
+          set -euo pipefail
+          python3 scripts/decode-addressables-bundle-map.py work/ios/old.ipa work/android/base.apk work/out/addressables-bundle-map.json
       - name: Exact iOS 0.7.9.2 vs Android 1.0 catalog comparison
         run: |
           set -euo pipefail
