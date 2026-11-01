@@ -23,8 +23,8 @@ PATCHES = {
     ],
     "SkeletonData42BinaryWriter.cpp": [
         (
-            "            switch (attachment.type) {\n                case AttachmentType_Region: {",
-            "            switch (attachment.type) {\n                // Point attachments have no optional flags in this flag-discovery pass.\n                case AttachmentType_Point:\n                    break;\n                case AttachmentType_Region: {",
+            "            unsigned char flags = 0; \n            flags |= attachment.type & 0x7; \n            if (attachment.name != attachmentName) flags |= 8; \n            switch (attachment.type) {\n                case AttachmentType_Region: {",
+            "            unsigned char flags = 0; \n            flags |= attachment.type & 0x7; \n            if (attachment.name != attachmentName) flags |= 8; \n            switch (attachment.type) {\n                // Point attachments have no optional flags in this flag-discovery pass.\n                case AttachmentType_Point:\n                    break;\n                case AttachmentType_Region: {",
         ),
         (
             "            switch (timelineType) {\n                case BONE_ROTATE:",
