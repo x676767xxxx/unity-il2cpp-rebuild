@@ -5,7 +5,8 @@ on:
     paths:
       - ".github/workflows/compare-resource-catalogs.yml"
       - "scripts/compare-ios-0792-android-1.0-catalogs.py"
-      - "scripts/decode-addressables-bundle-map.py"\n      - "scripts/export-addressables-bundle-manifests.py"
+      - "scripts/decode-addressables-bundle-map.py"
+      - "scripts/export-addressables-bundle-manifests.py"
       - "scripts/match-legacy-ios-resource-archive.py"
 permissions:
   contents: read
