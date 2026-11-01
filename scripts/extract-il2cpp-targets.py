@@ -26,6 +26,7 @@ for i,line in enumerate(lines):
 # compact parent records around the named type/field to avoid copying the dump.
 script=root/"script.json"
 metadata_matches=[]
+data={}
 if script.exists():
     try:
         data=json.loads(script.read_text(errors="replace"))
@@ -52,13 +53,13 @@ def compact(m):
             "values":{k:v for k,v in rec.items() if isinstance(v,(str,int,float,bool))}}
 
 
-report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods,"script_metadata_matches":len(metadata_matches),"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys}
 # Emit focused source evidence for the exact AddrLoadUrl placeholder.
 addr_dump_lines=[{"line":i+1,"text":line.strip(),
                   "context":lines[max(0,i-12):min(len(lines),i+18)]}
                  for i,line in enumerate(lines)
                  if "AddrLoadUrl" in line]
-script_top_keys=list(data.keys()) if script.exists() and isinstance(data,dict) else []
+script_top_keys=list(data.keys()) if isinstance(data,dict) else []
+report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods,"script_metadata_matches":len(metadata_matches),"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys}
 out.write_text(json.dumps(report,indent=2))
 md=["# Android IL2CPP target evidence","","Generated from Il2CppDumper dump.cs. RVAs are static metadata addresses, not proof of runtime values.","",f"- Source: {dump}","- Hits: {len(hits)}",""]
 for h in hits:
