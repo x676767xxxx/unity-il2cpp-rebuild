@@ -11,6 +11,7 @@ on:
       - "scripts/scan-release-endpoint-strings-bounded.py"
       - "scripts/scan-il2cpp-runtime-strings.py"
       - "scripts/inspect-spine-converter.py"
+      - "scripts/trace-resource-url-source.py"
       - "scripts/match-legacy-ios-resource-archive.py"
 permissions:
   contents: read
@@ -111,7 +112,7 @@ jobs:
           dotnet tool install ilspycmd --tool-path work/tools
           mkdir -p work/out/decompiled
           work/tools/ilspycmd -p -o work/out/decompiled work/windows/unpacked/AzureArchive_Win_1.0.1/BepInEx/interop/Assembly-CSharp.dll
-          python3 -c 'import pathlib,re,json; root=pathlib.Path("work/out/decompiled"); hits=[]; [(hits.append({"file":str(p.relative_to(root)),"line":i+1,"context":"\\n".join(lines[max(0,i-8):i+9])})) for p in root.rglob("*.cs") for lines in [p.read_text(errors="replace").splitlines()] for i,line in enumerate(lines) if re.search(r"AddrLoadUrl|set_AddrLoadUrl",line)]; pathlib.Path("work/out/addrloadurl-callsite-report.json").write_text(json.dumps(hits,indent=2)); pathlib.Path("work/out/addrloadurl-callsite-report.md").write_text("# AddrLoadUrl call sites\\n\\n"+"\\n\\n".join("## "+x["file"]+":"+str(x["line"])+"\\n```csharp\\n"+x["context"]+"\\n```" for x in hits)); print("AddrLoadUrl call-site contexts:",len(hits),flush=True)'
+          python3 scripts/trace-resource-url-source.py work/out/decompiled work/out/resource-url-source-trace.json
       - name: Install Addressables catalog parser
         run: python3 -m pip install --disable-pip-version-check addressablestools
       - name: Decode complete Addressables bundle metadata
