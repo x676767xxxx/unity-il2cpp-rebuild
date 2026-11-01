@@ -90,14 +90,14 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/decode-addressables-bundle-map.py work/ios/old.ipa work/android/base.apk work/out/addressables-bundle-map.json
-      - name: Export decoded bundle manifests and refresh report
-        run: |
-          set -euo pipefail
-          python3 scripts/export-addressables-bundle-manifests.py work/out/addressables-bundle-map.json work/out
       - name: Exact iOS 0.7.9.2 vs Android 1.0 catalog comparison
         run: |
           set -euo pipefail
           python3 scripts/compare-ios-0792-android-1.0-catalogs.py work/ios/old.ipa work/android/base.apk work/out/ios-0792-vs-android-1.0-catalog-diff.md
+      - name: Export decoded bundle manifests and refresh report
+        run: |
+          set -euo pipefail
+          python3 scripts/export-addressables-bundle-manifests.py work/out/addressables-bundle-map.json work/out
       - name: Download and match legacy iOS 0.7.9.2 resource archive
         run: |
           set -euo pipefail
