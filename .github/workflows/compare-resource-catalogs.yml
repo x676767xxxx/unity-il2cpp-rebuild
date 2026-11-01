@@ -89,7 +89,7 @@ jobs:
       - name: Scan APK and Windows binaries for resource endpoint clues
         run: |
           set -euo pipefail
-          python3 scripts/scan-release-endpoint-strings.py work/android/base.apk work/windows/windows.zip work/out/endpoint-string-scan.json
+          python3 scripts/scan-release-endpoint-strings-bounded.py work/android/base.apk work/windows/windows.zip work/out/endpoint-string-scan.json
       - name: Install Addressables catalog parser
         run: python3 -m pip install --disable-pip-version-check addressablestools
       - name: Decode complete Addressables bundle metadata
