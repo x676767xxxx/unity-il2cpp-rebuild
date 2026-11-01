@@ -84,7 +84,7 @@ with elf_path.open("rb") as f:
     nearby.append({"address":hex(nxt.address),"mnemonic":nxt.mnemonic,"op_str":ops})
     # Record any ADD using the exact page offset, or a load/store through
     # the ADRP register; retain context for manual validation.
-    if nxt.mnemonic=="add" and re.search(r"#(?:0x)?"+format(literal_off,"x")+r"(?:\\b|$)",ops,re.I):
+    if nxt.mnemonic=="add" and re.search(r"#(?:0x)?"+format(literal_off,"x")+r"(?:\b|$)",ops,re.I):
      literal_refs.append({"adrp":hex(insn.address),"register":reg,"reference_kind":"adrp_add_literal","instruction":nearby[-1],"context":nearby[:]})
     elif nxt.mnemonic.startswith(("ldr","ldur")) and "["+reg in ops:
      literal_refs.append({"adrp":hex(insn.address),"register":reg,"reference_kind":"adrp_load_from_literal_page","instruction":nearby[-1],"context":nearby[:]})
