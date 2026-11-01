@@ -54,3 +54,29 @@ Representative changed logical names include:
 - Hash differences do not identify which serialized asset changed or prove a particular bundle is incompatible.
 - The separately held 5.73 GB resource package was not available to this Actions job, so its contents have not been verified here.
 - This analysis does not produce a Unity project, Xcode archive, or IPA.
+
+
+## Windows 1.0.1 / APK / legacy iOS file inventory (Actions run 41274012434)
+
+The repeatable cross-package inventory workflow completed successfully:
+- Run: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41274012434
+- Artifact: `azurearchive-resource-catalog-comparison`, ID `13070348155`
+- Artifact ZIP SHA-256: `95e686acebc8496a48ec7974d1cae3e9f669b1d1697c328731c59bc5db745ded`
+
+Observed extracted file counts:
+| Package | Files | Catalogs |
+|---|---:|---:|
+| Legacy iOS 0.7.9.2 IPA | 77 | 1 |
+| Android 1.0 APK | 69 | 1 |
+| Windows 1.0.1 ZIP | 507 | 1 |
+
+Observed resource candidates:
+- Android APK: no standalone `.bundle` files were found by the inventory; the candidate list includes only Unity shared resource files such as `assets/bin/Data/sharedassets0.resource` (1,279,424 bytes), `sharedassets3.resource`, `sharedassets4.resource`, plus Spine converter native libraries.
+- Windows 1.0.1: contains Unity player data including `AzureArchive_Data/sharedassets0.assets` (184,889,776 bytes), `sharedassets0.assets.resS` (60,666,832 bytes), `sharedassets1.assets.resS` (39,902,784 bytes), and other sharedassets/resource files. It also includes `BepInEx/interop/Unity.Addressables.dll`.
+- Legacy iOS 0.7.9.2: contains `Data/sharedassets0.assets` (184,465,336 bytes), `sharedassets1.assets.resS` (26,841,072 bytes), and related Unity sharedassets/resource files. The inspected app bundle did not contain a local directory of Addressables `.bundle` payloads.
+
+Interpretation and limits:
+1. The Android APK's Addressables catalog does not mean all referenced remote bundles are packaged inside the APK. The APK inventory did not reveal standalone bundle payloads.
+2. Windows 1.0.1 is a useful 1.0 Unity data/code reference, but Windows sharedassets files are not interchangeable with iOS files without platform validation/rebuild.
+3. The 5.73 GB iOS resource archive remains the verified 0.7.9.2 baseline. It was not an input to run 41274012434; its 13,086 bundles have not yet been file-by-file matched to Android 1.0's resolved bundle keys.
+4. The comparison script now explicitly marks full per-bundle hash decoding as NOT COMPLETED. Its prior zero-difference output was a parser false negative and must not be used.
