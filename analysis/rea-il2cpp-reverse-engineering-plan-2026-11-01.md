@@ -56,3 +56,18 @@ This workflow uses only the Android 1.0 APK already referenced by the existing r
 ## Current accurate boundary
 
 REA has independently validated the IL2CPP metadata source and key structural counts. It has not yet delivered the complete metadata inventory, method address mapping, or Ghidra pseudocode for this title. Native decompilation still requires a configured Ghidra/Hopper/IDA provider and successful method seed export. The current metadata-only retry deliberately does not claim address linking.
+## Native method linking succeeded — 2026-11-01
+
+- Run: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41307223323
+- Artifact: azurearchive-rea-il2cpp-native-link, ID 13083512223.
+- The no-generic-instances native-link pass fits the 64 MiB REA Evidence limit. It linked all 152,789 metadata methods to the Android ARM64 binary: 136,430 code slots, 16,359 observed no-body slots and 0 unknown slots. It also resolved all 152,789 return types, 77,092 field types and 182,036 parameter types.
+- REA validated 77 code-generation modules, 69,098 native type-table entries, ELF architecture arm64, metadata v29 and both input hashes. This is structural module/name/count/token matching, not cryptographic same-build proof.
+- The artifact contains 136,430 Ghidra function seeds (10,064,435 bytes). The REA seed base is 0x100000 for this ELF, so each seed address equals the observed method RVA plus 0x100000.
+- The REA-derived method and field map is recorded in analysis/rea-android-1-spine-resource-method-index-map-2026-11-01.md. It identifies RuntimeSpineLoader.Load/Create, PageTextureLoader.Load/Unload, RuntimeSpineAsset ownership methods, ScenarioResourceManager.AcquireBackgroundSpine/TrimBackgroundSkeletonCache and SpineBackgroundVisual.ValidatePlayback/Attach/SetColor/Dispose.
+
+## Ghidra decompilation attempt
+
+- Workflow: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41307474271
+- It installs Ghidra 12.1.4 and JDK 21, regenerates the REA method seeds, checks the REA Ghidra provider and attempts to decompile RuntimeSpineLoader.Load. At the time of this note, this run is still in progress; no pseudocode result is claimed yet.
+
+Current boundary: REA has produced complete metadata Evidence, complete method-address/type linking and Ghidra seeds. Ghidra pseudocode/assembly is the next pending analysis layer; none of these steps create a Unity project or IPA.
