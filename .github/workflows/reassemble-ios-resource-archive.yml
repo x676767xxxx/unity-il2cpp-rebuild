@@ -2,6 +2,10 @@ name: Reassemble and verify uploaded iOS resource archive
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/reassemble-ios-resource-archive.yml'
 
 permissions:
   contents: read
