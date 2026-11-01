@@ -5,6 +5,8 @@
 - GitHub Actions run: [41271272492](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41271272492)
 - Artifact: `ios-resource-archive-verification` (ID `13069361713`)
 - Uploaded Release parts were reassembled and verified by the workflow; this report summarizes its generated metadata analysis.
+- **Version attribution:** the user confirms this 5.73 GB archive is the iOS 0.7.9.2 resource package. Treat it as the legacy iOS 0.7.9.2 resource baseline, not as an iOS 1.0 resource package.
+- The latest catalog's SHA-256 (`66c3a0a8...`) and byte size (23,911,858) match the `catalog.json` extracted from the supplied iOS 0.7.9.2 IPA in the earlier catalog comparison. This establishes that the archive's August catalog is the same catalog file used by that legacy IPA.
 - Archive: `IOS_202408202213.6.zip`
 - Reassembled size: 5,738,046,419 bytes
 - Archive SHA-256: `d330920a20262b49bb32f33f517aff43cc9f04544793ad6c6681c377870dadd2`
@@ -38,15 +40,16 @@ A previous independently verified comparison of Android 1.0 against the legacy i
 - Different packed Addressables catalog data and build-result hashes.
 - 13,084 logical bundle names on both sides; 12,631 matching logical names had the same hash and 453 had different hashes.
 
-The August 2024 resource archive's latest catalog also has 32,353 Internal IDs. However, this workflow did not directly compare the August catalog's complete Internal ID array or packed key/bucket/entry payload against the Android 1.0 catalog. Do not claim byte-for-byte or full semantic equivalence based only on the equal count.
+The archive's August catalog is the verified iOS 0.7.9.2 catalog: its file size and SHA-256 match the catalog extracted from the iOS 0.7.9.2 IPA. The earlier Android 1.0 comparison therefore applies to this archive's catalog too: complete Internal ID arrays match, while packed key/bucket/entry data and 453 bundle hashes differ.
 
 ## Engineering conclusion
 
-1. The 5.73 GB archive is intact and its latest catalog resolves all bundle references to bundle files in the archive.
-2. The resource archive is a substantial and internally coherent iOS resource set; this removes archive integrity and missing-bundle-reference checks as immediate blockers.
-3. It does not prove that every bundle is compatible with the target Android 1.0 executable, nor that the bundle payloads are interchangeable across platforms.
-4. The next useful comparison is a direct semantic decode of the August catalog against the Android 1.0 catalog, followed by file-level bundle hash/size comparison where both payload sets are available.
-5. The full app build remains blocked by the missing matching Unity project/source or a complete reproducible Xcode/UnityFramework integration base. This archive is resources, not a Unity project, Xcode project, or IPA.
+1. The 5.73 GB archive is intact and is the iOS 0.7.9.2 resource package; its latest catalog is byte-identical to the catalog extracted from the iOS 0.7.9.2 IPA.
+2. Its latest catalog resolves all 13,085 bundle references to 13,084 unique bundle basenames present in the archive.
+3. This archive is a verified iOS 0.7.9.2 resource baseline, not a target-version iOS 1.0 resource set.
+4. The shared Internal ID array does not make Android bundles interchangeable with iOS bundles: 453 logical bundle names have differing hashes, and settings/build-target metadata are platform-specific.
+5. The next useful comparison is file-level bundle matching: map the iOS 0.7.9.2 archive's 13,084 logical bundle names and hashes against Android 1.0 catalog/payloads, classify same-hash, changed-hash, missing and extra payloads, and avoid overwriting the iOS baseline.
+6. The full app build remains blocked by the missing matching Unity project/source or a complete reproducible Xcode/UnityFramework integration base. This archive is resources, not a Unity project, Xcode project, or IPA.
 
 ## Change-control note
 
