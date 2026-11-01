@@ -10,6 +10,9 @@ jobs:
   compare:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y unzip file binutils
       - name: Download release inputs
