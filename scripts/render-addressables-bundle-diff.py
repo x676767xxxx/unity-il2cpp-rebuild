@@ -92,8 +92,7 @@ for name, totals in sorted(category_totals.items()):
         "| " + name + " | " + str(totals[0]) + " | "
         + str(totals[1]) + " | " + str(totals[2]) + " |"
     )
-lines += [
-    "",
+lines += [""]
 if archive_match_stats is not None:
     lines += [
         "",
@@ -108,6 +107,8 @@ if archive_match_stats is not None:
         "This is a size comparison, not a byte-level content hash. It establishes which catalog's declared sizes the supplied archive matches; it does not prove payload byte identity.",
     ]
 
+lines += [
+    "",
     "## Same-hash rows with declared-size differences",
     "",
     "| Logical path | Hash | iOS bytes | Android bytes |",
