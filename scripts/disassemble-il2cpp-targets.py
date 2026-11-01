@@ -59,6 +59,16 @@ with elf_path.open("rb") as f:
      if dest==reg and writes_dest: break
     if accesses: targeted.append({"section":sec,"method":name,"adrp_address":insn["address"],"register":reg,"page":hex(page),"memory_accesses":accesses})
  report["targeted_global_accesses"]=targeted
+ # Direct BL xrefs miss delegate/function-pointer dispatch. Preserve BLR/BR
+ # instruction context from each selected ScenarioResourceManager method.
+ indirect_calls={}
+ for name,win in report["targets"].items():
+  ins=win["instructions"]; found=[]
+  for idx,item in enumerate(ins):
+   if item["mnemonic"] in ("blr","br"):
+    found.append({"instruction":item,"context":ins[max(0,idx-5):min(len(ins),idx+4)]})
+  indirect_calls[name]=found
+ report["indirect_call_sites"]=indirect_calls
  # Trace references to the exact IL2CPP string-literal address for
  # "{ScenarioResourceManager.AddrLoadUrl}/" (0x07096470). This is a
  # metadata literal address, not the AddrLoadUrl static-field storage.
@@ -104,6 +114,12 @@ for k,v in xrefs.items(): lines += [f"### {k}"]+[f"- {z['caller']}" for z in v] 
 lines += ["## Targeted ADRP memory accesses"]
 for z in targeted:
  lines.append(f"- {z['method']} {z['adrp_address']} page {z['page']} ({z['register']}): "+", ".join(f"{a['address']} {a['access']} {a['mnemonic']} {a['op_str']}" for a in z["memory_accesses"]))
+lines += ["","## Indirect call sites"]
+for name,sites in indirect_calls.items():
+ lines.append("### "+name)
+ for site in sites:
+  lines.append("- "+site["instruction"]["address"]+" "+site["instruction"]["mnemonic"]+" "+site["instruction"]["op_str"])
+  lines.extend("  - "+x["address"]+" "+x["mnemonic"]+" "+x["op_str"] for x in site["context"])
 lines += ["",report["limits"]]
 (out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
 summary={"elf":report["elf_header"],"mapped_targets":sum(bool(v["file_offset"]) for v in report["targets"].values()),"mapped_callees":sum(bool(v["file_offset"]) for v in report["callees"].values()),"bl_callers":{k:len(v) for k,v in xrefs.items()},"global_page_refs":len(refs),"targeted_access_groups":len(targeted),"targeted_reads":sum(a["access"]=="read" for z in targeted for a in z["memory_accesses"]),"targeted_writes":sum(a["access"]=="write" for z in targeted for a in z["memory_accesses"])}
