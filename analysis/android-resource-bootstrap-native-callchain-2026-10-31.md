@@ -227,3 +227,18 @@ Findings:
 The Android native startup disassembly also shows the normal path entering `ScenarioResourceManager.Initialize()`, then `CheckForUpdate()`; `UpdateAddressable()` is a one-instruction `ret` in this Android build. The `CheckForUpdate` coroutine contains the offline startup helper call, but that helper is gated by `--aap-offline-resources`. Thus neither the update stub nor the authoring/offline branch supplies the ordinary gameplay base URL.
 
 **Current conclusion:** both Android 1.0 and legacy iOS serialize the same Addressables token pattern, but the packaged Android player does not expose a production URL literal or a managed assignment site in the recovered evidence. Do not substitute the CLI fallback, sample URL, or guessed host. The likely remaining avenues are runtime configuration obtained outside the managed field-reference inventory (e.g. a startup service response, native/reflection assignment, or player-side bootstrap data) and direct runtime observation. No production code was changed.
+
+
+## Legacy iOS executable and metadata URL scan — 2026-11-01
+
+The iOS inspection workflow was extended to scan the actual legacy IPA's root executable, embedded `UnityFramework.framework/UnityFramework`, and `Data/Managed/Metadata/global-metadata.dat`. Run [41260154014](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41260154014) completed successfully; artifact `azurearchive-ios-0.7.9.2-addressables-baseline` ID `13064468766`.
+
+The only application-looking URL in the old iOS player's global metadata is again `https://example.com/aares/`, matching the Android 1.0 metadata scan and consistent with a sample authoring/API placeholder. The UnityFramework and app executable yielded generic `http://` / `https://` library strings but no concrete AzureArchive resource host. The metadata contains no different production base URL that could safely initialize `AddrLoadUrl`.
+
+This cross-check further weakens the idea that the old iOS package embeds a static CDN URL in its player binary. It does not exclude a URL delivered dynamically at runtime or injected by a native/reflection path.
+
+### Settings UI cross-check
+
+The recovered Android `UIPatchDownload.CoChangeSource` callback writes the user-entered string to `UserSettings.SettingData.customSource` and persists settings, then displays a success/restart prompt. The recovered Android `catalogUrlOverride` property appears only as its generated getter/setter and settings serialization; no ordinary game startup consumer was recovered. This is consistent with the earlier finding that neither setting is a proven Addressables base-URL source.
+
+**Current safe implementation boundary:** keep the iOS URL transform configurable and fail visibly when no non-empty base URL is supplied. Do not silently substitute `https://example.com/aares/`, the Windows authoring CLI fallback, or an inferred `/ios` suffix. The production URL still needs runtime evidence or an authoritative configuration source.
