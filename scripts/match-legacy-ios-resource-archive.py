@@ -22,15 +22,20 @@ with zipfile.ZipFile(archive) as z:
     byname={pathlib.PurePosixPath(i.filename).name.lower():i for i in bundles}
     matches=[]; missing_names=[]; size_mismatches=[]
     for name,row in sorted(ios.items()):
-        # AddressablesTools exposes the bundle's internal filename stem in bundle_name.
-        candidates=[name, name+".bundle"]
+        # Archive filenames are hash-bearing Addressables keys, not opaque bundle_name IDs.
+        row=ios[name]
+        candidates=[]
+        for field in ("primary_key","key"):
+            value=row.get(field)
+            if isinstance(value,str) and value:
+                candidates.append(pathlib.PurePosixPath(value).name.lower())
         found=next((byname[x] for x in candidates if x in byname),None)
         if found is None:
-            missing_names.append({"bundle_name":row["bundle_name"],"hash":row.get("hash"),"primary_key":row.get("primary_key")})
+            missing_names.append({"bundle_name":row["bundle_name"],"hash":row.get("hash"),"primary_key":row.get("primary_key"),"key":row.get("key")})
         else:
             rec={"bundle_name":row["bundle_name"],"archive_path":found.filename,"archive_bytes":found.file_size,"catalog_bytes":row.get("size"),"catalog_hash":row.get("hash")}
             matches.append(rec)
             if row.get("size") is not None and found.file_size!=row["size"]: size_mismatches.append(rec)
-    result={"source":"legacy iOS 0.7.9.2 resource archive; not Android 1.0","archive_bytes":sum(p.stat().st_size for p in chunks),"archive_sha256":h.hexdigest(),"zip_entries":len(infos),"archive_bundle_files":len(bundles),"catalog_ios_bundle_entries":len(ios),"matched_by_bundle_filename":len(matches),"missing_from_archive":len(missing_names),"matched_size_mismatches":len(size_mismatches),"missing_samples":missing_names[:200],"size_mismatch_samples":size_mismatches[:200],"matches":matches}
+    result={"source":"legacy iOS 0.7.9.2 resource archive; not Android 1.0","archive_bytes":sum(p.stat().st_size for p in chunks),"archive_sha256":h.hexdigest(),"zip_entries":len(infos),"archive_bundle_files":len(bundles),"catalog_ios_bundle_entries":len(ios),"matched_by_addressables_key_or_primary_key":len(matches),"missing_from_archive":len(missing_names),"matched_size_mismatches":len(size_mismatches),"missing_samples":missing_names[:200],"size_mismatch_samples":size_mismatches[:200],"matches":matches}
 out.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
 print(json.dumps({k:v for k,v in result.items() if k not in ("matches","missing_samples","size_mismatch_samples")},ensure_ascii=False))
