@@ -25,6 +25,6 @@ The bridge copies native output into managed memory and releases native buffers 
 
 - This package supplies a converter plugin only. It does not contain Unity's project, the game's scenes/assets, a Spine 4.2 C# runtime, atlas texture loader, or animation renderer.
 - The native converter was built for iPhoneOS ARM64 with an iOS 13.0 deployment target. It is not an iOS Simulator library.
-- The host-side smoke test validates the C ABI and a sample JSON to SKEL to Spine 4.2 conversion. It is not an on-device test.
+- The host-side C ABI suite validates four invalid-input/output-parameter contracts and 25 upstream Spine 4.2 JSON fixtures through JSON → SKEL → SKEL conversion. This is broader converter coverage, but it is not an AzureArchive game-asset test or an on-device test.
 - Upstream compiler warnings about some Spine enum switch cases remain visible. Validate real AzureArchive .skel samples, especially sequences, physics, alpha timelines, inheritance and point attachments.
 - The included third-party LICENSE is preserved. Check its terms and the Spine runtime's separate licensing before distributing a game build.
