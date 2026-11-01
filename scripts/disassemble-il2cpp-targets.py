@@ -6,7 +6,7 @@ from capstone import Cs,CS_ARCH_ARM64,CS_MODE_ARM
 if len(sys.argv)!=3: raise SystemExit("usage: script libil2cpp.so output-dir")
 elf_path=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); out.mkdir(parents=True,exist_ok=True)
 targets={"ScenarioResourceManager.CheckForUpdate":0x32646B0,"ScenarioResourceManager.Awake":0x3264724,"ScenarioResourceManager.InitializeAfterSplash":0x326498C,"ScenarioResourceManager.Initialize":0x3264A00,"ScenarioResourceManager.InitializeAuthoringResources":0x3264CA8,"ScenarioResourceManager.OnAddressablesExceptionRaised":0x32652EC,"ScenarioResourceManager.OnUpdateComplete":0x32654A0,"ScenarioResourceManager.UpdateAddressable":0x3265514,"ScenarioResourceManager..cctor":0x3438D28,"UserSettings.SettingData.get_catalogUrlOverride":0x3287DA4,"UserSettings.SettingData.set_catalogUrlOverride":0x3287DAC}
-callees={"helper_2f2d9f8":0x2F2D9F8,"helper_2f2dc84":0x2F2DC84,"CheckForUpdate_callback":0x326FDC4,"InitializeAfterSplash_callback":0x32771B0,"OnUpdateComplete_callback":0x32773F4,"write_barrier_2f2d9a4":0x2F2D9A4}
+callees={"helper_2f2d9f8":0x2F2D9F8,"helper_2f2dc84":0x2F2DC84,"cctor_string_factory_tail":0x2F699DC,"cctor_gc_write_barrier":0x5CBC718,"CheckForUpdate_callback":0x326FDC4,"InitializeAfterSplash_callback":0x32771B0,"OnUpdateComplete_callback":0x32773F4,"write_barrier_2f2d9a4":0x2F2D9A4}
 pages={0x6E66000,0x6E64000,0x6E65000,0x72C2000,0x07021000,0x0700F000}; md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
 def sx(v,n): return (v^(1<<(n-1)))-(1<<(n-1))
 report={"targets":{},"callees":{},"direct_bl_xrefs":{},"global_page_refs":[]}
@@ -20,7 +20,7 @@ with elf_path.open("rb") as f:
    if b<=a<z:return int(s["p_offset"])+a-b
  def window(a,n):
   o=off_for(a); return {"rva":hex(a),"file_offset":hex(o) if o is not None else None,"instructions":[{"address":hex(i.address),"bytes":i.bytes.hex(),"mnemonic":i.mnemonic,"op_str":i.op_str} for i in md.disasm(blob[o:o+n],a)] if o is not None else []}
- for k,a in targets.items(): report["targets"][k]=window(a,0x240)
+ for k,a in targets.items(): report["targets"][k]=window(a,0x70 if k=="ScenarioResourceManager..cctor" else 0x240)
  for k,a in callees.items(): report["callees"][k]=window(a,0x100)
  xrefs={k:[] for k in list(targets)+list(callees)}; refs=[]
  for s in execs:
@@ -58,6 +58,7 @@ with elf_path.open("rb") as f:
     if dest==reg and nxt.mnemonic not in ("str","strb","strh","stp","stur","sturb","sturh","stxr","stlxr","cmp","cmn","tst","tbz","tbnz","cbz","cbnz","b","bl","br","blr","ret","nop","dmb"): break
    if context: metadata_page_refs.append({"adrp":hex(item.address),"page":hex(pg),"register":reg,"slots":[{"name":name,"va":hex(addr),"page_offset":hex(addr & 0xFFF)} for name,addr in matching.items()],"access_context":context})
  report["metadata_typeinfo_reference_scan"]={"slots":{k:hex(v) for k,v in metadata_slots.items()},"references":metadata_page_refs}
+ # Record the static-constructor dataflow separately; the cctor window is clipped before the next function.\n cctor=report["targets"]["ScenarioResourceManager..cctor"]["instructions"]\n report["cctor_store_trace"]={"instructions":cctor,"observations":["x20 is loaded from the global pointer slot at 0x6e72b70","x0 is returned by the helper at 0x2f2dc84 and copied to x19","x19 is stored at [x8] after loading x8 from [x20,#0xb8]","the helper at 0x5cbc718 is called with x0 still holding the returned object and x1=0; its exact role must be resolved from its own disassembly"]}
  targeted=[]
  for sec in ("targets","callees"):
   for name,win in report[sec].items():
