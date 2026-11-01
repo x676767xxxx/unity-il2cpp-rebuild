@@ -87,4 +87,68 @@ for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
         name=str(item.get("Name",""))
         if any(k.lower() in name.lower() for k in ("AddrLoadUrl","ScenarioResourceManager","SetUrl","Url","Addressable","LoadRemote","Resource")):
             related_methods.append({"index":idx,"name":name,"address":item.get("Address"),"signature":item.get("Signature")})
+# Inspect schema/layout evidence without assuming Il2CppDumper field names.
+def schema_summary(obj):
+    if isinstance(obj, dict):
+        return {"kind":"object","keys":list(obj.keys())[:80],
+                "scalar_sample":{k:v for k,v in obj.items() if isinstance(v,(str,int,float,bool))}}
+    if isinstance(obj, list):
+        sample=obj[:3]
+        return {"kind":"array","length":len(obj),
+                "sample":[schema_summary(x) if isinstance(x,(dict,list)) else x for x in sample]}
+    return {"kind":type(obj).__name__}
+array_schemas={}
+if isinstance(data,dict):
+    for key,value in data.items():
+        if isinstance(value,list):
+            array_schemas[key]=schema_summary(value)
+# Find records that can link type and field metadata by name or index.
+named_records=[]
+def find_named_records(node,path="$"):
+    if isinstance(node,dict):
+        raw=json.dumps(node,ensure_ascii=False)
+        if "ScenarioResourceManager" in raw or "AddrLoadUrl" in raw:
+            named_records.append({"path":path,"record":node})
+        for key,value in node.items():
+            if isinstance(value,(dict,list)): find_named_records(value,path+"."+str(key))
+    elif isinstance(node,list):
+        for n,value in enumerate(node):
+            if isinstance(value,(dict,list)): find_named_records(value,path+"["+str(n)+"]")
+if data: find_named_records(data)
+header=root/"il2cpp.h"
+header_hits=[]
+if header.exists():
+    hlines=header.read_text(errors="replace").splitlines()
+    pats=re.compile(r"Il2CppClass|Il2CppMetadataRegistration|Il2CppCodeRegistration|FieldInfo|Il2CppTypeDefinition|Il2CppFieldDefinition|static_fields|fieldOffsets")
+    for i,line in enumerate(hlines):
+        if pats.search(line):
+            header_hits.append({"line":i+1,"context":hlines[max(0,i-3):min(len(hlines),i+14)]})
+# Check whether the literal VA falls into any file-backed PT_LOAD mapping.
+elf_path_file=root/"libil2cpp-path.txt"
+elf_path=None
+if elf_path_file.exists():
+    raw_path=elf_path_file.read_text().strip()
+    candidate=pathlib.Path(raw_path)
+    if not candidate.is_absolute(): candidate=pathlib.Path.cwd()/candidate
+    if candidate.exists(): elf_path=candidate
+import struct
+elf_mapping={"path":str(elf_path) if elf_path else None,"literal_va":"0x7096470","segments":[]}
+if elf_path:
+    blob=elf_path.read_bytes()
+    if blob[:4]==b"\\x7fELF" and blob[4]==2:
+        endian="<" if blob[5]==1 else ">"
+        eh=struct.unpack_from(endian+"HHIQQQIHHHHHH",blob,16)
+        phoff,phentsize,phnum=eh[4],eh[8],eh[9]
+        for n in range(phnum):
+            p=struct.unpack_from(endian+"IIQQQQQQ",blob,phoff+n*phentsize)
+            p_type,p_flags,p_offset,p_vaddr,p_paddr,p_filesz,p_memsz,p_align=p
+            if p_type==1:
+                va=0x7096470
+                contains=p_vaddr <= va < p_vaddr+p_filesz
+                elf_mapping["segments"].append({"type":"PT_LOAD","flags":p_flags,"offset":hex(p_offset),"vaddr":hex(p_vaddr),"filesz":hex(p_filesz),"memsz":hex(p_memsz),"literal_file_backed":contains,"literal_file_offset":hex(p_offset+va-p_vaddr) if contains else None})
+report["script_array_schemas"]=array_schemas
+report["named_metadata_records"]=named_records[:200]
+report["il2cpp_header_hits"]=header_hits[:100]
+report["elf_literal_mapping"]=elf_mapping
+out.write_text(json.dumps(report,indent=2))
 print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys,"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]],"script_metadata_type_preview":top_array_preview("ScriptMetadata"),"script_metadata_method_preview":top_array_preview("ScriptMetadataMethod"),"scenario_resource_manager_methods":srm_methods,"related_script_methods":related_methods[:200]},ensure_ascii=False))
