@@ -107,3 +107,5 @@ jobs:
         with:
           name: azurearchive-resource-catalog-comparison
           path: work/out/
+
+# Re-run catalog decoding after the native packed-table decoder update.
