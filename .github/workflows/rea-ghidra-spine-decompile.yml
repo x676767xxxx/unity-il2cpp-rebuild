@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: rea-ghidra-spine-decompile
+  cancel-in-progress: true
+
 jobs:
   decompile:
     runs-on: ubuntu-latest
@@ -69,7 +73,7 @@ jobs:
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
           REA_GHIDRA_SEED_FILE: ${{ github.workspace }}/work/input/ghidra-method-seeds.txt
-          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: "1800000"
         run: |
           set -euo pipefail
           npx --yes rea-agents@latest doctor --provider ghidra --json | tee work/rea/ghidra-doctor.json
@@ -79,7 +83,7 @@ jobs:
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
           REA_GHIDRA_SEED_FILE: ${{ github.workspace }}/work/input/ghidra-method-seeds.txt
-          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: "1800000"
           REA_GHIDRA_DECOMPILE_TIMEOUT_SECONDS: "180"
         run: |
           set -euo pipefail
