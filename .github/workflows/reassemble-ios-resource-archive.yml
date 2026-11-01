@@ -70,6 +70,49 @@ jobs:
           print(f"Archive entries: {len(infos)}; bundle entries: {len(bundles)}")
           PY
 
+- name: Analyze catalog and hash metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile, json, os, collections, hashlib
+          p = "work/IOS_202408202213.6.zip"
+          out = "metadata-analysis.txt"
+          with zipfile.ZipFile(p) as z, open(out, "w", encoding="utf-8") as report:
+              names = z.namelist()
+              metadata = [n for n in names if os.path.splitext(n)[1].lower() in (".json", ".hash")]
+              report.write("METADATA FILES\\n")
+              for n in metadata:
+                  info = z.getinfo(n)
+                  raw = z.read(n)
+                  report.write(f"\\nFILE: {n}\\nSIZE: {len(raw)} bytes\\nSHA256: {hashlib.sha256(raw).hexdigest()}\\n")
+                  if n.lower().endswith(".json"):
+                      try:
+                          obj = json.loads(raw.decode("utf-8-sig"))
+                          report.write(f"JSON TYPE: {type(obj).__name__}\\n")
+                          if isinstance(obj, dict):
+                              report.write("TOP-LEVEL KEYS: " + ", ".join(map(str, obj.keys())) + "\\n")
+                              for key in ("m_LocatorId","m_BuildResultHash","m_ProviderIds","m_ResourceTypes","m_InternalIds","m_InternalIdPrefixes","m_Keys","m_Entries","m_Buckets"):
+                                  if key in obj:
+                                      value = obj[key]
+                                      report.write(f"{key}: type={type(value).__name__}")
+                                      if hasattr(value, "__len__"): report.write(f", count={len(value)}")
+                                      report.write("\\n")
+                                      if key in ("m_InternalIds","m_ProviderIds","m_InternalIdPrefixes") and isinstance(value, list):
+                                          report.write("  SAMPLE: " + repr(value[:8]) + "\\n")
+                          elif isinstance(obj, list):
+                              report.write(f"ARRAY LENGTH: {len(obj)}\\n")
+                              report.write("FIRST ITEM: " + repr(obj[:1])[:2000] + "\\n")
+                      except Exception as e:
+                          report.write(f"JSON PARSE ERROR: {e}\\n")
+                  else:
+                      text = raw.decode("utf-8", errors="replace")
+                      lines = text.splitlines()
+                      report.write(f"TEXT LINES: {len(lines)}\\n")
+                      report.write("FIRST 20 LINES:\\n" + "\\n".join(lines[:20]) + "\\n")
+          print("Metadata analysis written")
+          PY
+
       - name: Upload verification report
         uses: actions/upload-artifact@v4
         with:
@@ -77,5 +120,6 @@ jobs:
           path: |
             reassembly-report.txt
             archive-inventory.txt
+            metadata-analysis.txt
           if-no-files-found: error
           retention-days: 30
