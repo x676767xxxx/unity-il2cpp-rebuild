@@ -1,0 +1,79 @@
+name: Inspect legacy iOS IPA Addressables baseline
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-ios-baseline-addressables.yml'
+
+jobs:
+  inspect:
+    runs-on: macos-latest
+    steps:
+      - name: Download legacy iOS IPA
+        run: |
+          set -euo pipefail
+          mkdir -p work/ipa work/out
+          curl -fL --retry 3 --retry-all-errors \
+            -o work/ipa/AzureArchive_IOS_0.7.9.2.ipa \
+            "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/AzureArchive_IOS_0.7.9.2.ipa"
+          unzip -q work/ipa/AzureArchive_IOS_0.7.9.2.ipa -d work/ipa/unpacked
+      - name: Inventory player and Addressables configuration
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, plistlib, re, subprocess
+          root=pathlib.Path("work/ipa/unpacked")
+          out=pathlib.Path("work/out")
+          apps=list((root/"Payload").glob("*.app"))
+          if not apps:
+              raise SystemExit("Payload/*.app not found in legacy IPA")
+          app=apps[0]
+          info=plistlib.loads((app/"Info.plist").read_bytes())
+          lines=[
+            "Legacy IPA baseline: AzureArchive iOS 0.7.9.2",
+            f"App bundle: {app.name}",
+            f"Bundle identifier: {info.get('CFBundleIdentifier')}",
+            f"Bundle version: {info.get('CFBundleVersion')}",
+            f"Minimum iOS: {info.get('MinimumOSVersion')}",
+            "",
+            "Relevant files (Addressables / catalog / streaming assets):"
+          ]
+          patterns=re.compile(r"(addressable|catalog|streamingassets|settings\.json|\.bundle$|\.hash$|\.bin$)",re.I)
+          matches=[]
+          for p in app.rglob("*"):
+              if p.is_file() and patterns.search(str(p.relative_to(app))):
+                  matches.append(p)
+          for p in sorted(matches):
+              lines.append(f"{p.relative_to(app)}\t{p.stat().st_size}")
+          lines += ["", "App executables:"]
+          executables=[]
+          for p in app.iterdir():
+              if p.is_file():
+                  try:
+                      desc=subprocess.run(["file",str(p)],capture_output=True,text=True).stdout.strip()
+                  except Exception:
+                      desc=""
+                  if "Mach-O" in desc:
+                      executables.append((p,desc))
+                      lines.append(f"{p.name}\t{desc}")
+          out.joinpath("ios-addressables-inventory.txt").write_text("\n".join(lines)+"\n")
+          # Copy configuration-like files only; keep the executable out of the artifact.
+          for i,p in enumerate(matches):
+              dest=out/"config"/str(i)/p.name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(p.read_bytes())
+          # Extract printable URLs and Addressables/catalog-related strings from Mach-O images.
+          with out.joinpath("ios-player-string-hits.txt").open("w") as w:
+              for p,desc in executables:
+                  r=subprocess.run(["strings","-a",str(p)],capture_output=True,text=True,errors="replace")
+                  hits=[x for x in r.stdout.splitlines() if re.search(r"https?://|catalog|addressable|streamingassets|\.bundle|\.hash|\.json",x,re.I)]
+                  w.write(f"## {p.name}\n")
+                  w.write("\n".join(hits[:20000])+"\n")
+          PY
+      - name: Upload legacy iOS configuration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-ios-0.7.9.2-addressables-baseline
+          path: work/out/
+          if-no-files-found: error
