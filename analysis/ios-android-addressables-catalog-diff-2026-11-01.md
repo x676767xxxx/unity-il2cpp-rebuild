@@ -1,3 +1,42 @@
+# Latest authoritative decoded bundle comparison — 2026-11-01
+
+> **This section supersedes the older provisional counts and the earlier “full hash comparison not completed” note below.** Use the decoded result from Actions run [41275488274](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41275488274), artifact `azurearchive-resource-catalog-comparison` (ID `13071287556`, ZIP SHA-256 `1b6137c91ac94d291a798505306e646d01c289c8ecaf2647eb83e21f446163c4`). The artifact contains the full machine-readable `addressables-bundle-map.json` (13,085 comparison rows).
+
+## Verified results
+
+| Metric | iOS 0.7.9.2 | Android 1.0 |
+|---|---:|---:|
+| Decoded bundle rows | 13,085 | 13,085 |
+| Common logical bundle names | 13,085 | 13,085 |
+| Platform-only logical names | 0 | 0 |
+| Same Addressables hash | 12,632 | 12,632 |
+| Different Addressables hash | 453 | 453 |
+
+Additional detail: four rows have the same catalog hash but a different declared bundle size (each differs by one byte). Therefore matching catalog hashes must not be treated as proof that all metadata or payload bytes are identical.
+
+| Logical path | Catalog hash | iOS bytes | Android bytes |
+|---|---|---:|---:|
+| defaultlocalgroup_assets_audio/bgm/theme_104.ogg.bundle | abf2696797c856bb092f909f8747ace0 | 1,081,002 | 1,081,001 |
+| characters_assets_np0035_npcall.bundle | ab916db1fb9fa6fbd09d4455175de19f | 35,633 | 35,632 |
+| defaultlocalgroup_assets_audio/voc_jp/jp_maki/maki_cafe_act_5.ogg.bundle | ecbca7fcbc825af2bfcd62cb68a9ceb2 | 13,726 | 13,725 |
+| defaultlocalgroup_assets_audio/voc_jp/jp_tutorial/tutorial_101130104_02.ogg.bundle | 9272489dd3ddf26547f10ea9d3d934b1 | 34,550 | 34,549 |
+
+The 453 changed-hash entries are fully enumerated in the JSON artifact. A repeatable Markdown renderer has been added at `scripts/render-addressables-bundle-diff.py`; run it with the decoded JSON and an output path:
+
+```bash
+python3 scripts/render-addressables-bundle-diff.py addressables-bundle-map.json ios-android-addressables-catalog-diff.md
+```
+
+## Correct interpretation
+
+- Same logical names mean the catalogs refer to the same logical bundle paths.
+- Same catalog hash means the Addressables version identifier matches; it is not a file SHA-256 and does not prove byte identity or cross-platform compatibility.
+- Different hashes require the matching platform/version payload; do not rename or substitute old iOS bundles based only on logical names.
+- The supplied 5.73 GB archive is the legacy iOS 0.7.9.2 resource archive. Its filename/size coverage does not prove it contains Android 1.0 payloads.
+- Android 1.0's APK contains the catalog but not the full set of remote Addressables bundle payloads. The Android 1.0 payload archive/CDN resources are still required to complete byte-level comparison.
+
+---
+
 # Addressables catalog hash comparison — 2026-11-01
 
 ## Scope and provenance
