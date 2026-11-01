@@ -213,3 +213,17 @@ Direct JSON comparison gives a useful split:
 **Strong conclusion:** Android 1.0 and the available legacy iOS player both serialize the same logical Addressables URL-token convention, with `ScenarioResourceManager.AddrLoadUrl` as the base URL substitution token. This is no longer merely an Android inference or a legacy-iOS-only observation.
 
 **Still unresolved:** neither serialized JSON file stores the concrete URL value, and this comparison does not identify the code path that assigns the static field at runtime. It also does not make the old iOS catalog's hashed bundle filenames or timestamp interchangeable with Android 1.0. The iOS port should use the Android 1.0 catalog/build data where appropriate, while resolving the actual runtime base URL from the target game's startup/configuration path. No URL was hardcoded.
+
+
+## Android 1.0 player-binary URL string scan and startup-flow recheck — 2026-11-01
+
+The Addressables inspection workflow was extended to scan Android 1.0's packaged `libil2cpp.so`, `libunity.so`, and `global-metadata.dat` for URL/domain candidates. Run [41260033886](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41260033886) completed successfully; artifact `azurearchive-ios-0.7.9.2-addressables-baseline` ID `13064304021`.
+
+Findings:
+- The only application-looking URL literal recovered from Android `global-metadata.dat` is `https://example.com/aares/`, which is a sample/documentation placeholder in the embedded authoring/API material, not a verified production CDN.
+- Other protocol URLs are Unity/Spine documentation, toolchain source links, or library documentation. The native `libil2cpp.so` / `libunity.so` scan did not reveal a concrete production Addressables base URL.
+- The previous Windows-only `AuthoringCliHost.Bootstrap()` assignment to `ScenarioResourceManager.AddrLoadUrl` remains the only explicit managed assignment recovered in the platform IL exports. Android managed IL has no equivalent field assignment, and the player-binary string scan did not expose an alternate hardcoded endpoint.
+
+The Android native startup disassembly also shows the normal path entering `ScenarioResourceManager.Initialize()`, then `CheckForUpdate()`; `UpdateAddressable()` is a one-instruction `ret` in this Android build. The `CheckForUpdate` coroutine contains the offline startup helper call, but that helper is gated by `--aap-offline-resources`. Thus neither the update stub nor the authoring/offline branch supplies the ordinary gameplay base URL.
+
+**Current conclusion:** both Android 1.0 and legacy iOS serialize the same Addressables token pattern, but the packaged Android player does not expose a production URL literal or a managed assignment site in the recovered evidence. Do not substitute the CLI fallback, sample URL, or guessed host. The likely remaining avenues are runtime configuration obtained outside the managed field-reference inventory (e.g. a startup service response, native/reflection assignment, or player-side bootstrap data) and direct runtime observation. No production code was changed.
