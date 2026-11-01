@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Extract ScenarioResourceManager and AddrLoadUrl evidence from Il2CppDumper output."""
+import json, pathlib, re, sys
+if len(sys.argv) != 3:
+    raise SystemExit("usage: extract-il2cpp-targets.py DUMP_DIR OUTPUT_JSON")
+root=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2])
+dump=root/"dump.cs"
+if not dump.exists():
+    candidates=list(root.rglob("dump.cs"))
+    if not candidates: raise SystemExit("dump.cs not found; Il2CppDumper did not produce a managed dump")
+    dump=candidates[0]
+lines=dump.read_text(errors="replace").splitlines()
+hits=[]
+for i,line in enumerate(lines):
+    if re.search(r"ScenarioResourceManager|AddrLoadUrl",line,re.I):
+        hits.append({"line":i+1,"text":line.strip(),"context":lines[max(0,i-18):min(len(lines),i+25)]})
+methods=[]
+for i,line in enumerate(lines):
+    if re.search(r"ScenarioResourceManager|AddrLoadUrl",line,re.I):
+        start=max(0,i-40); end=min(len(lines),i+80)
+        block="\n".join(lines[start:end])
+        for m in re.finditer(r"// RVA:\s*(0x[0-9A-Fa-f]+).*?// Offset:\s*(0x[0-9A-Fa-f]+).*?// Token:\s*(0x[0-9A-Fa-f]+)",block,re.S):
+            methods.append({"rva":m.group(1),"offset":m.group(2),"token":m.group(3),"near_line":i+1})
+report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods}
+out.write_text(json.dumps(report,indent=2))
+md=["# Android IL2CPP target evidence","","Generated from Il2CppDumper dump.cs. RVAs are static metadata addresses, not proof of runtime values.","",f"- Source: {dump}","- Hits: {len(hits)}",""]
+for h in hits:
+    md += [f"## dump.cs:{h['line']}","\x60\x60\x60csharp",*h["context"],"\x60\x60\x60",""]
+(out.with_suffix(".md")).write_text("\n".join(md))
+print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump)}))
