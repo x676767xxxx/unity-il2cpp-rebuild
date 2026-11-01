@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/compare-resource-catalogs.yml"
       - "scripts/compare-ios-0792-android-1.0-catalogs.py"
+      - "scripts/decode-addressables-bundle-map.py"
+      - "scripts/match-legacy-ios-resource-archive.py"
 permissions:
   contents: read
 jobs:
@@ -92,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/compare-ios-0792-android-1.0-catalogs.py work/ios/old.ipa work/android/base.apk work/out/ios-0792-vs-android-1.0-catalog-diff.md
-      - name: Upload catalog comparison
+      - name: Download and match legacy iOS 0.7.9.2 resource archive\n        run: |\n          set -euo pipefail\n          for part in 001 002 003 004; do\n            curl -fL --retry 3 -o "work/ios/IOS_202408202213.6.zip.$part" "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/IOS_202408202213.6.zip.$part"\n          done\n          python3 scripts/match-legacy-ios-resource-archive.py work/out/addressables-bundle-map.json work/ios/IOS_202408202213.6.zip.001 work/ios/IOS_202408202213.6.zip.002 work/ios/IOS_202408202213.6.zip.003 work/ios/IOS_202408202213.6.zip.004 work/out/legacy-ios-archive-match.json\n      - name: Upload catalog comparison
         if: always()
         uses: actions/upload-artifact@v4
         with:
