@@ -194,3 +194,22 @@ The extracted catalog has 32,353 internal IDs. Remote bundle IDs use the prefix 
 This is direct serialized player-build evidence for the old iOS package's Addressables configuration and confirms the field is operationally significant to its catalog IDs. It does **not** reveal who assigns the static field at runtime, nor does it prove that Android 1.0 or the intended iOS 1.0 port uses the same catalog version, URL, or startup sequence. The old IPA's catalog hash timestamp is `2024.08.25.10.06.35`; do not reuse it as the 1.0 catalog.
 
 The workflow's binary-string pass returned no useful URL hits from the stripped Mach-O executable, so the next pass should inspect the extracted `settings.json` / `catalog.json` against Android 1.0 build outputs and locate the actual field assignment in native code or runtime startup. No production URL was hardcoded and no game runtime source was changed.
+
+
+## Direct serialized catalog comparison: Android 1.0 APK vs legacy iOS IPA — 2026-11-01
+
+The inspection workflow was extended to download the repository's Android `base.apk` (the 1.0 target) and extract `assets/aa/settings.json` and `assets/aa/catalog.json`. The comparison run [41259726479](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41259726479) completed successfully; artifact `azurearchive-ios-0.7.9.2-addressables-baseline` ID `13064313185`.
+
+Direct JSON comparison gives a useful split:
+
+- Both catalogs contain exactly 32,353 `m_InternalIds`, and the entire ordered `m_InternalIds` arrays are byte-for-byte equivalent as parsed values.
+- Both catalogs contain 13,085 internal IDs using the token `{ScenarioResourceManager.AddrLoadUrl}`.
+- The catalog locator ID is `AddressablesMainContentCatalog` on both.
+- The iOS settings target is `iOS`; Android settings target is `Android`.
+- Both settings files use the same three-key catalog layout: remote hash under `{ScenarioResourceManager.AddrLoadUrl}/catalog_<timestamp>.hash`, cached hash under persistentDataPath, and main catalog under Addressables RuntimePath.
+- The remote hash filenames differ: iOS baseline `catalog_2024.08.25.10.06.35.hash`; Android 1.0 `catalog_2024.08.25.09.46.46.hash`. Settings hashes also differ.
+- The catalogs are **not identical**: `m_BuildResultHash`, `m_BucketDataString`, `m_EntryDataString`, `m_ExtraDataString`, and `m_KeyDataString` differ. In particular, hashed bundle names differ in key data even though the logical `m_InternalIds` path templates match.
+
+**Strong conclusion:** Android 1.0 and the available legacy iOS player both serialize the same logical Addressables URL-token convention, with `ScenarioResourceManager.AddrLoadUrl` as the base URL substitution token. This is no longer merely an Android inference or a legacy-iOS-only observation.
+
+**Still unresolved:** neither serialized JSON file stores the concrete URL value, and this comparison does not identify the code path that assigns the static field at runtime. It also does not make the old iOS catalog's hashed bundle filenames or timestamp interchangeable with Android 1.0. The iOS port should use the Android 1.0 catalog/build data where appropriate, while resolving the actual runtime base URL from the target game's startup/configuration path. No URL was hardcoded.
