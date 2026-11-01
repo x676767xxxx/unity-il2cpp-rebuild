@@ -52,3 +52,13 @@ The official Spine documentation states that a Spine license is required to inte
 - Latest Unity plugin artifact: `azurearchive-spine-unity-ios-plugin`, ID `13082656726`, ZIP digest `1ee90d86e267eaf38198f8f63380fe5f739105383518ea4a4a9cf1235c5f422c`.
 - This verifies converter compilation and generic upstream fixtures only. It does not validate real AzureArchive skeleton/atlas/page assets, Spine C# Runtime integration, Unity linking, or iPhone playback.
 
+
+
+## SKEL converter stability milestone — 2026-11-01 (latest)
+
+- Commit: [2c23520564da2c8061263c1687c13f3b1830b69a](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/2c23520564da2c8061263c1687c13f3b1830b69a), which extends the host ABI smoke test with a second SKEL-to-SKEL conversion and byte-for-byte equality check.
+- Workflow: [41305648281](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41305648281), completed successfully on macOS 14; iPhoneOS ARM64 static library build, 11 managed P/Invoke/C ABI contract checks, 4 invalid-input/output-parameter checks, and packaging all passed.
+- All 25 pinned upstream Spine 4.2 JSON fixtures passed JSON -> SKEL -> SKEL -> SKEL. For every fixture, the second SKEL conversion produced the same byte length and identical bytes as the preceding SKEL output.
+- Artifacts: Unity iOS plugin ID 13082434942 (1,843,690 bytes; SHA-256 `ac51f9c8017a8219cdc504a0cac0a4c2d458b6c16735c4178761d7b500aaf4d4`); iOS ARM64 archive/ABI package ID 13082514570 (1,938,912 bytes; SHA-256 `af1a39911960d53c9a8078c9bd94f72f1b6f1b9d230dafc1d38ed4379a2a3088`).
+- Build emits switch-enum warnings in the pinned converter's multi-version reader/writer sources (including older 3.5-4.1 paths and some 4.2 cases). They did not fail this build. Do not suppress or patch them blindly: inspect the exact converter switch semantics and determine whether each warning is relevant to the Spine 4.2 path before changing upstream code.
+- Scope boundary: this remains a converter/ABI milestone using upstream sample JSON fixtures. It does not prove that AzureArchive's own `.skel` assets parse, that atlas pages/texture formats resolve, or that Spine 4.2 C# runtime and Unity rendering are integrated. The uploaded `Natsu.zip` has not yet been inspected; keep that file-analysis task queued until the analysis allowance is available.
