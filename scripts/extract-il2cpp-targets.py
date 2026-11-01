@@ -44,6 +44,13 @@ if script.exists():
     except Exception as exc:
         metadata_matches=[{"error":str(exc)}]
 (root/"il2cpp-script-metadata.json").write_text(json.dumps(metadata_matches,indent=2))
+addr_matches=[m for m in metadata_matches if "AddrLoadUrl" in json.dumps(m.get("record",{}),ensure_ascii=False)]
+srm_matches=[m for m in metadata_matches if "ScenarioResourceManager" in json.dumps(m.get("record",{}),ensure_ascii=False)]
+def compact(m):
+    rec=m.get("record",{})
+    return {"path":m.get("path"),"keys":list(rec.keys())[:24],
+            "values":{k:v for k,v in rec.items() if isinstance(v,(str,int,float,bool))}}
+
 
 report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods,"script_metadata_matches":len(metadata_matches)}
 out.write_text(json.dumps(report,indent=2))
@@ -51,4 +58,4 @@ md=["# Android IL2CPP target evidence","","Generated from Il2CppDumper dump.cs. 
 for h in hits:
     md += [f"## dump.cs:{h['line']}","\x60\x60\x60csharp",*h["context"],"\x60\x60\x60",""]
 (out.with_suffix(".md")).write_text("\n".join(md))
-print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"script_metadata_preview":[{"path":m.get("path"),"keys":list(m.get("record",{}).keys())[:20],"values":{k:v for k,v in m.get("record",{}).items() if isinstance(v,str)} } for m in metadata_matches[:30]]},ensure_ascii=False))
+print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]]},ensure_ascii=False))
