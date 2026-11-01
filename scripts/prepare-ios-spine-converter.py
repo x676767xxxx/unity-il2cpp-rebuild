@@ -72,7 +72,7 @@ extern "C" int AzureArchiveSpineConvertBuffer(const uint8_t* in_buf, int32_t in_
 }
 extern "C" int AzureArchiveSpineJsonToBinary(const char* json_utf8, int32_t json_len,
                                               uint8_t** out_buf, int32_t* out_len) {
-    return convertBuffer(reinterpret_cast<const uint8_t*>(json_utf8), json_len, -1, true, out_buf, out_len);
+    return convertBuffer(reinterpret_cast<const uint8_t*>(json_utf8), json_len, 6, true, out_buf, out_len);
 }
 extern "C" void AzureArchiveSpineFreeBuffer(void* buffer) { std::free(buffer); }
 '''
