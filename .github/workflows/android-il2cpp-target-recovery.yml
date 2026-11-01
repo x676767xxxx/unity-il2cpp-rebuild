@@ -24,7 +24,10 @@ jobs:
           mkdir -p work/android work/tools work/out
           curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
           unzip -q work/android/base.apk -d work/android/unpacked
-          LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"
+          LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' | head -n 1)"
+          if [ -z "$LIB" ]; then
+            LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"
+          fi
           META="$(find work/android/unpacked -type f -name global-metadata.dat | head -n 1)"
           test -n "$LIB"
           test -n "$META"
@@ -33,6 +36,7 @@ jobs:
           sha256sum "$LIB" "$META" > work/out/input-sha256.txt
           file "$LIB" "$META" > work/out/input-file-types.txt
           readelf -h "$LIB" > work/out/il2cpp-elf-header.txt
+          find work/android/unpacked -type f -name libil2cpp.so -print > work/out/all-il2cpp-libraries.txt
       - name: Download Il2CppDumper
         run: |
           set -euo pipefail
@@ -44,11 +48,28 @@ jobs:
           set -euo pipefail
           LIB="$(cat work/out/libil2cpp-path.txt)"
           META="$(cat work/out/global-metadata-path.txt)"
-          dotnet work/tools/dumper/Il2CppDumper.dll "$LIB" "$META" work/out/dump 2>&1 | tee work/out/il2cpp-dumper.log
-          python3 scripts/extract-il2cpp-targets.py work/out/dump work/out/android-il2cpp-targets.json
-          cp work/out/dump/dump.cs work/out/dump.cs
-          cp work/out/dump/script.json work/out/script.json || true
-          cp work/out/dump/il2cpp.h work/out/il2cpp.h || true
+          set +e
+          printf '\n' | script -q -e -c "dotnet work/tools/dumper/Il2CppDumper.dll \"$LIB\" \"$META\" work/out/dump" /dev/null 2>&1 | tee work/out/il2cpp-dumper.log
+          DUMPER_STATUS=${PIPESTATUS[1]:-${PIPESTATUS[0]}}
+          set -e
+          printf '%s\n' "$DUMPER_STATUS" > work/out/il2cpp-dumper-exit-code.txt
+          find work/out -maxdepth 4 -type f -printf '%p %s bytes\\n' > work/out/generated-files.txt
+          if [ ! -f work/out/dump/dump.cs ]; then
+            FOUND="$(find work/out -type f -name dump.cs | head -n 1)"
+            if [ -n "$FOUND" ]; then cp "$FOUND" work/out/dump.cs; fi
+          else
+            cp work/out/dump/dump.cs work/out/dump.cs
+          fi
+          if [ ! -f work/out/dump.cs ]; then
+            echo "Il2CppDumper did not produce dump.cs" >&2
+            exit 1
+          fi
+          python3 scripts/extract-il2cpp-targets.py work/out work/out/android-il2cpp-targets.json
+          for f in script.json il2cpp.h; do
+            FOUND="$(find work/out -type f -name "$f" | head -n 1)"
+            if [ -n "$FOUND" ] && [ "$FOUND" != "work/out/$f" ]; then cp "$FOUND" "work/out/$f"; fi
+          done
+          echo "Il2CppDumper output recovered; exit code: $DUMPER_STATUS"
       - name: Upload Android IL2CPP analysis
         if: always()
         uses: actions/upload-artifact@v4
