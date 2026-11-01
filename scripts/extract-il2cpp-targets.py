@@ -146,6 +146,18 @@ if elf_path:
                 va=0x7096470
                 contains=p_vaddr <= va < p_vaddr+p_filesz
                 elf_mapping["segments"].append({"type":"PT_LOAD","flags":p_flags,"offset":hex(p_offset),"vaddr":hex(p_vaddr),"filesz":hex(p_filesz),"memsz":hex(p_memsz),"literal_file_backed":contains,"literal_file_offset":hex(p_offset+va-p_vaddr) if contains else None})
+        # Capture bytes at the mapped literal address so the next pass can
+        # verify the actual string and inspect adjacent pointer/table data.
+        mapped=next((x for x in elf_mapping["segments"] if x["literal_file_backed"]),None)
+        if mapped:
+            file_off=int(mapped["literal_file_offset"],16)
+            sample=blob[file_off:file_off+256]
+            nul=sample.find(b"\\x00")
+            cstr=sample[:nul if nul >= 0 else len(sample)]
+            elf_mapping["literal_bytes_hex"]=sample.hex()
+            elf_mapping["literal_ascii_preview"]=cstr.decode("utf-8",errors="replace")
+            elf_mapping["literal_cstring_terminated"]=nul >= 0
+            elf_mapping["literal_va_file_offset_delta"]=hex(0x7096470-file_off)
 report["script_array_schemas"]=array_schemas
 report["named_metadata_records"]=named_records[:200]
 report["il2cpp_header_hits"]=header_hits[:100]
