@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".github/workflows/compare-resource-catalogs.yml"
+      - ".github/workflows/compare-resource-catalogs.yml"\n      - "scripts/compare-ios-0792-android-1.0-catalogs.py"
 permissions:
   contents: read
 jobs:
