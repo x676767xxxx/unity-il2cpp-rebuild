@@ -1,4 +1,4 @@
-name: REA IL2CPP metadata and method-address analysis
+name: REA IL2CPP metadata inventory
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p work/android work/rea
+          mkdir -p work/android work/input work/rea
           curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
           unzip -q work/android/base.apk -d work/android/unpacked
           LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' -print -quit)"
@@ -34,19 +34,17 @@ jobs:
           METADATA="$(find work/android/unpacked -type f -name global-metadata.dat -print -quit)"
           test -n "$LIB" || { echo "libil2cpp.so not found" >&2; exit 1; }
           test -n "$METADATA" || { echo "global-metadata.dat not found" >&2; exit 1; }
-          cp "$LIB" work/rea/libil2cpp.so
-          cp "$METADATA" work/rea/global-metadata.dat
-          sha256sum work/rea/libil2cpp.so work/rea/global-metadata.dat | tee work/rea/input-sha256.txt
-          file work/rea/libil2cpp.so work/rea/global-metadata.dat | tee work/rea/input-file-types.txt
-          readelf -h work/rea/libil2cpp.so > work/rea/elf-header.txt
+          cp "$LIB" work/input/libil2cpp.so
+          cp "$METADATA" work/input/global-metadata.dat
+          sha256sum work/input/libil2cpp.so work/input/global-metadata.dat | tee work/rea/input-sha256.txt
+          file work/input/libil2cpp.so work/input/global-metadata.dat | tee work/rea/input-file-types.txt
+          readelf -h work/input/libil2cpp.so > work/rea/elf-header.txt
 
-      - name: Run REA static IL2CPP metadata and native address analysis
+      - name: Run REA static IL2CPP metadata inventory
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes rea-agents@latest inspect-il2cpp-metadata work/rea/global-metadata.dat \
-            --binary work/rea/libil2cpp.so \
-            --generic-instances \
+          npx --yes rea-agents@latest inspect-il2cpp-metadata work/input/global-metadata.dat \
             --detail summary \
             --evidence_output work/rea/rea-il2cpp-evidence.json \
             --json 2>&1 | tee work/rea/rea-cli.log
