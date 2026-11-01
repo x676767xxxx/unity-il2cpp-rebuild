@@ -5,7 +5,7 @@ from elftools.elf.elffile import ELFFile
 from capstone import Cs,CS_ARCH_ARM64,CS_MODE_ARM
 if len(sys.argv)!=3: raise SystemExit("usage: script libil2cpp.so output-dir")
 elf_path=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); out.mkdir(parents=True,exist_ok=True)
-targets={"ScenarioResourceManager.Initialize":0x3264A00,"ScenarioResourceManager.CheckForUpdate":0x32646B0,"ScenarioResourceManager.InitializeAfterSplash":0x326498C,"ScenarioResourceManager.OnUpdateComplete":0x32654A0,"ScenarioResourceManager..cctor":0x3438D28,"UserSettings.SettingData.get_catalogUrlOverride":0x3287DA4,"UserSettings.SettingData.set_catalogUrlOverride":0x3287DAC}
+targets={"ScenarioResourceManager.CheckForUpdate":0x32646B0,"ScenarioResourceManager.Awake":0x3264724,"ScenarioResourceManager.InitializeAfterSplash":0x326498C,"ScenarioResourceManager.Initialize":0x3264A00,"ScenarioResourceManager.InitializeAuthoringResources":0x3264CA8,"ScenarioResourceManager.OnAddressablesExceptionRaised":0x32652EC,"ScenarioResourceManager.OnUpdateComplete":0x32654A0,"ScenarioResourceManager.UpdateAddressable":0x3265514,"ScenarioResourceManager..cctor":0x3438D28,"UserSettings.SettingData.get_catalogUrlOverride":0x3287DA4,"UserSettings.SettingData.set_catalogUrlOverride":0x3287DAC}
 callees={"helper_2f2d9f8":0x2F2D9F8,"helper_2f2dc84":0x2F2DC84,"CheckForUpdate_callback":0x326FDC4,"InitializeAfterSplash_callback":0x32771B0,"OnUpdateComplete_callback":0x32773F4,"write_barrier_2f2d9a4":0x2F2D9A4}
 pages={0x6E66000,0x6E64000,0x6E65000,0x72C2000}; md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
 def sx(v,n): return (v^(1<<(n-1)))-(1<<(n-1))
@@ -20,7 +20,7 @@ with elf_path.open("rb") as f:
    if b<=a<z:return int(s["p_offset"])+a-b
  def window(a,n):
   o=off_for(a); return {"rva":hex(a),"file_offset":hex(o) if o is not None else None,"instructions":[{"address":hex(i.address),"bytes":i.bytes.hex(),"mnemonic":i.mnemonic,"op_str":i.op_str} for i in md.disasm(blob[o:o+n],a)] if o is not None else []}
- for k,a in targets.items(): report["targets"][k]=window(a,0x180)
+ for k,a in targets.items(): report["targets"][k]=window(a,0x240)
  for k,a in callees.items(): report["callees"][k]=window(a,0x100)
  xrefs={k:[] for k in list(targets)+list(callees)}; refs=[]
  for s in execs:
