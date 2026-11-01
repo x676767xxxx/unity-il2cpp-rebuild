@@ -41,6 +41,20 @@ The 453 different-hash rows were grouped by their decoded logical paths:
 
 The character bundles account for 448/453 changed hashes. The five remaining entries are shared/global bundles: one avatar bundle, one effects bundle, one popups bundle, and two built-in/shader bundles. Resource recovery should prioritize the Android 1.0 character payload set first, while retaining all five global bundles. These are catalog-declared sizes, not verified local payload sizes.
 
+## Cross-check against the supplied 5.73 GB legacy iOS archive
+
+The decoded comparison was joined by logical bundle name against the legacy archive's 13,085-file inventory (archive SHA-256: d330920a20262b49bb32f33f517aff43cc9f04544793ad6c6681c377870dadd2).
+
+| Check across the 453 different-hash entries | Count |
+|---|---:|
+| Entries with a matching file in the legacy archive | 453 |
+| Archive file size equals legacy iOS catalog size | 453 |
+| Archive file size equals Android 1.0 catalog size | 0 |
+
+This is a file-size cross-check, not an individual payload SHA-256 comparison. However, it confirms that all 453 changed entries in the supplied archive correspond to the **legacy iOS catalog's declared sizes**, and none correspond to Android 1.0's declared sizes. Therefore the 5.73 GB archive is not the missing Android 1.0 resource pack. It cannot be used as a drop-in replacement for those 453 Android 1.0 bundles.
+
+The changed entries total 467,434,883 declared bytes on iOS and 468,175,718 declared bytes on Android. The actual Android 1.0 bundle payloads (or a valid Android 1.0 resource archive/CDN source) are still required.
+
 ## Correct interpretation
 
 - Same logical names mean the catalogs refer to the same logical bundle paths.
