@@ -6,6 +6,7 @@ on:
       - ".github/workflows/android-il2cpp-target-recovery.yml"
       - "scripts/extract-il2cpp-targets.py"
       - "scripts/find-srm-static-ctor.py"
+      - "scripts/extract-il2cpp-targets.py"
 permissions:
   contents: read
 jobs:
