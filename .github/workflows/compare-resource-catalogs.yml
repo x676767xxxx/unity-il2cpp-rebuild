@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/compare-resource-catalogs.yml"
       - "scripts/compare-ios-0792-android-1.0-catalogs.py"
-      - "scripts/decode-addressables-bundle-map.py"
+      - "scripts/decode-addressables-bundle-map.py"\n      - "scripts/export-addressables-bundle-manifests.py"
       - "scripts/match-legacy-ios-resource-archive.py"
 permissions:
   contents: read
@@ -90,6 +90,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/decode-addressables-bundle-map.py work/ios/old.ipa work/android/base.apk work/out/addressables-bundle-map.json
+      - name: Export decoded bundle manifests and refresh report
+        run: |
+          set -euo pipefail
+          python3 scripts/export-addressables-bundle-manifests.py work/out/addressables-bundle-map.json work/out
       - name: Exact iOS 0.7.9.2 vs Android 1.0 catalog comparison
         run: |
           set -euo pipefail
