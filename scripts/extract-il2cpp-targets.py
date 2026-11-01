@@ -158,6 +158,30 @@ if elf_path:
             elf_mapping["literal_ascii_preview"]=cstr.decode("utf-8",errors="replace")
             elf_mapping["literal_cstring_terminated"]=nul >= 0
             elf_mapping["literal_va_file_offset_delta"]=hex(0x7096470-file_off)
+# Search the actual UTF-8 literal in the ELF and Il2CppDumper string table.
+# ScriptString.Address can point to a registration/metadata slot rather than
+# the bytes of the string, so do not assume it is a direct ELF VA.
+literal_text=b"{ScenarioResourceManager.AddrLoadUrl}/"
+literal_search={"needle":literal_text.decode(),"elf_file_offsets":[],"stringliteral_json_matches":[]}
+if elf_path:
+    blob=elf_path.read_bytes()
+    pos=0
+    while True:
+        pos=blob.find(literal_text,pos)
+        if pos < 0: break
+        literal_search["elf_file_offsets"].append(hex(pos))
+        pos+=1
+stringliteral=root/"stringliteral.json"
+if stringliteral.exists():
+    try:
+        sl=json.loads(stringliteral.read_text(errors="replace"))
+        if isinstance(sl,list):
+            for idx,item in enumerate(sl):
+                if isinstance(item,dict) and literal_text.decode() in str(item.get("Value","")):
+                    literal_search["stringliteral_json_matches"].append({"index":idx,"record":item})
+    except Exception as exc:
+        literal_search["error"]=str(exc)
+elf_mapping["literal_search"]=literal_search
 report["script_array_schemas"]=array_schemas
 report["named_metadata_records"]=named_records[:200]
 report["il2cpp_header_hits"]=header_hits[:100]
