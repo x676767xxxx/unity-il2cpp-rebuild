@@ -7,7 +7,7 @@ if len(sys.argv)!=3: raise SystemExit("usage: script libil2cpp.so output-dir")
 elf_path=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); out.mkdir(parents=True,exist_ok=True)
 targets={"ScenarioResourceManager.CheckForUpdate":0x32646B0,"ScenarioResourceManager.Awake":0x3264724,"ScenarioResourceManager.InitializeAfterSplash":0x326498C,"ScenarioResourceManager.Initialize":0x3264A00,"ScenarioResourceManager.InitializeAuthoringResources":0x3264CA8,"ScenarioResourceManager.OnAddressablesExceptionRaised":0x32652EC,"ScenarioResourceManager.OnUpdateComplete":0x32654A0,"ScenarioResourceManager.UpdateAddressable":0x3265514,"ScenarioResourceManager..cctor":0x3438D28,"UserSettings.SettingData.get_catalogUrlOverride":0x3287DA4,"UserSettings.SettingData.set_catalogUrlOverride":0x3287DAC}
 callees={"helper_2f2d9f8":0x2F2D9F8,"helper_2f2dc84":0x2F2DC84,"CheckForUpdate_callback":0x326FDC4,"InitializeAfterSplash_callback":0x32771B0,"OnUpdateComplete_callback":0x32773F4,"write_barrier_2f2d9a4":0x2F2D9A4}
-pages={0x6E66000,0x6E64000,0x6E65000,0x72C2000}; md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
+pages={0x6E66000,0x6E64000,0x6E65000,0x72C2000,0x07021000,0x0700F000}; md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
 def sx(v,n): return (v^(1<<(n-1)))-(1<<(n-1))
 report={"targets":{},"callees":{},"direct_bl_xrefs":{},"global_page_refs":[]}
 with elf_path.open("rb") as f:
@@ -35,6 +35,29 @@ with elf_path.open("rb") as f:
     imm=((w>>5)&0x7FFFF)<<2|((w>>29)&3); pg=(pc&~0xFFF)+(sx(imm,21)<<12)
     if pg in pages: refs.append({"address":hex(pc),"page":hex(pg),"register":f"x{w&31}","next_words":[hex(struct.unpack_from("<I",blob,q)[0]) for q in (p+4,p+8,p+12) if q<end-3]})
  report["direct_bl_xrefs"]=xrefs; report["global_page_refs"]=refs
+ # Trace recovered IL2CPP TypeInfo/global symbol slots; these are not assumed runtime class addresses.
+ metadata_slots={"ScenarioResourceManager_TypeInfo":0x07021200,"ScenarioResourceManager_var":0x0700F7F0}
+ metadata_page_refs=[]
+ for seg in execs:
+  base=int(seg["p_vaddr"]); pos0=int(seg["p_offset"]); end=pos0+int(seg["p_filesz"])
+  ins=list(md.disasm(blob[pos0:end],base))
+  for idx,item in enumerate(ins):
+   if item.mnemonic!="adrp": continue
+   parts=item.op_str.split(",",1)
+   if len(parts)!=2: continue
+   reg=parts[0].strip()
+   try: pg=int(parts[1].strip().lstrip("#"),16)
+   except ValueError: continue
+   matching={name:addr for name,addr in metadata_slots.items() if (addr & ~0xFFF)==pg}
+   if not matching: continue
+   context=[]
+   for nxt in ins[idx+1:idx+13]:
+    ops=nxt.op_str
+    if reg in ops and "["+reg in ops: context.append({"address":hex(nxt.address),"mnemonic":nxt.mnemonic,"op_str":ops})
+    dest=ops.split(",",1)[0].strip() if ops else ""
+    if dest==reg and nxt.mnemonic not in ("str","strb","strh","stp","stur","sturb","sturh","stxr","stlxr","cmp","cmn","tst","tbz","tbnz","cbz","cbnz","b","bl","br","blr","ret","nop","dmb"): break
+   if context: metadata_page_refs.append({"adrp":hex(item.address),"page":hex(pg),"register":reg,"slots":[{"name":name,"va":hex(addr),"page_offset":hex(addr & 0xFFF)} for name,addr in matching.items()],"access_context":context})
+ report["metadata_typeinfo_reference_scan"]={"slots":{k:hex(v) for k,v in metadata_slots.items()},"references":metadata_page_refs}
  targeted=[]
  for sec in ("targets","callees"):
   for name,win in report[sec].items():
