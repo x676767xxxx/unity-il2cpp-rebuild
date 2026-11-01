@@ -64,4 +64,10 @@ for name,item in report["targets"].items():
     lines.append("")
 lines += ["## Interpretation limits","",report["scan_note"],"","A missing direct BL result does not prove the method is unused; callers outside these method windows, indirect calls, function pointers, virtual dispatch and data-flow references require further analysis."]
 (out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
-print(json.dumps({"machine":report["elf_header"],"mapped":sum(bool(x["file_offset"]) for x in report["targets"].values()),"direct_bl_xrefs":{k:len(v) for k,v in xrefs.items()}}))
+summary={"machine":report["elf_header"],"mapped":sum(bool(x["file_offset"]) for x in report["targets"].values()),"direct_bl_xrefs":{k:len(v) for k,v in xrefs.items()}}
+print(json.dumps(summary))
+for name,item in report["targets"].items():
+    print("\\n=== "+name+" RVA "+item["rva"]+" file_offset "+str(item["file_offset"])+" ===")
+    for ins in item["instructions"][:28]:
+        print(ins["address"]+"  "+ins["mnemonic"]+" "+ins["op_str"])
+
