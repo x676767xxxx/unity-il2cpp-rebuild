@@ -147,12 +147,10 @@ for name,sites in indirect_calls.items():
   lines.append("- "+site["instruction"]["address"]+" "+site["instruction"]["mnemonic"]+" "+site["instruction"]["op_str"])
   lines.extend("  - "+x["address"]+" "+x["mnemonic"]+" "+x["op_str"] for x in site["context"])
 lines += ["",report["limits"]]
-(out/"arm64-il2cpp-disassembly.md").write_text("
-".join(lines))
+(out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
 summary={"elf":report["elf_header"],"mapped_targets":sum(bool(v["file_offset"]) for v in report["targets"].values()),"mapped_callees":sum(bool(v["file_offset"]) for v in report["callees"].values()),"bl_callers":{k:len(v) for k,v in xrefs.items()},"global_page_refs":len(refs),"targeted_access_groups":len(targeted),"targeted_reads":sum(a["access"]=="read" for z in targeted for a in z["memory_accesses"]),"targeted_writes":sum(a["access"]=="write" for z in targeted for a in z["memory_accesses"])}
 print(json.dumps(summary)); print("TARGETED_GLOBAL_ACCESSES",json.dumps(targeted)); print("ADDRLOADURL_LITERAL_REFERENCE_SCAN",json.dumps(report["addrloadurl_literal_reference_scan"]))
 for sec in ("targets","callees"):
  for k,v in report[sec].items():
-  print("\
-===",k,v["rva"],"===")
+  print("\\n===",k,v["rva"],"===")
   for i in v["instructions"][:96]:print(i["address"],i["mnemonic"],i["op_str"])
