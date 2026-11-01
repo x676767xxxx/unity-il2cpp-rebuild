@@ -21,7 +21,31 @@ for i,line in enumerate(lines):
         block="\n".join(lines[start:end])
         for m in re.finditer(r"// RVA:\s*(0x[0-9A-Fa-f]+).*?// Offset:\s*(0x[0-9A-Fa-f]+).*?// Token:\s*(0x[0-9A-Fa-f]+)",block,re.S):
             methods.append({"rva":m.group(1),"offset":m.group(2),"token":m.group(3),"near_line":i+1})
-report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods}
+
+# Inspect Il2CppDumper script.json for exact type/field metadata. Keep only
+# compact parent records around the named type/field to avoid copying the dump.
+script=root/"script.json"
+metadata_matches=[]
+if script.exists():
+    try:
+        data=json.loads(script.read_text(errors="replace"))
+        def walk(node,path="$"):
+            if isinstance(node,dict):
+                vals=[v for v in node.values() if isinstance(v,str)]
+                joined=" | ".join(vals)
+                if "ScenarioResourceManager" in joined or "AddrLoadUrl" in joined:
+                    metadata_matches.append({"path":path,"record":node})
+                for k,v in node.items():
+                    if isinstance(v,(dict,list)): walk(v,path+"."+str(k))
+            elif isinstance(node,list):
+                for n,v in enumerate(node):
+                    if isinstance(v,(dict,list)): walk(v,path+"["+str(n)+"]")
+        walk(data)
+    except Exception as exc:
+        metadata_matches=[{"error":str(exc)}]
+(root/"il2cpp-script-metadata.json").write_text(json.dumps(metadata_matches,indent=2))
+
+report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods,"script_metadata_matches":len(metadata_matches)}
 out.write_text(json.dumps(report,indent=2))
 md=["# Android IL2CPP target evidence","","Generated from Il2CppDumper dump.cs. RVAs are static metadata addresses, not proof of runtime values.","",f"- Source: {dump}","- Hits: {len(hits)}",""]
 for h in hits:
