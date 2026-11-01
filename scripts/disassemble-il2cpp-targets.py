@@ -5,7 +5,7 @@ from elftools.elf.elffile import ELFFile
 from capstone import Cs,CS_ARCH_ARM64,CS_MODE_ARM
 if len(sys.argv)!=3: raise SystemExit("usage: script libil2cpp.so output-dir")
 elf_path=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2]); out.mkdir(parents=True,exist_ok=True)
-targets={"ScenarioResourceManager.Initialize":0x3264A00,"ScenarioResourceManager.CheckForUpdate":0x32646B0,"ScenarioResourceManager.InitializeAfterSplash":0x326498C,"ScenarioResourceManager.OnUpdateComplete":0x32654A0,"UserSettings.SettingData.get_catalogUrlOverride":0x3287DA4,"UserSettings.SettingData.set_catalogUrlOverride":0x3287DAC}
+targets={"ScenarioResourceManager.Initialize":0x3264A00,"ScenarioResourceManager.CheckForUpdate":0x32646B0,"ScenarioResourceManager.InitializeAfterSplash":0x326498C,"ScenarioResourceManager.OnUpdateComplete":0x32654A0,"ScenarioResourceManager..cctor":0x3438D28,"UserSettings.SettingData.get_catalogUrlOverride":0x3287DA4,"UserSettings.SettingData.set_catalogUrlOverride":0x3287DAC}
 callees={"helper_2f2d9f8":0x2F2D9F8,"helper_2f2dc84":0x2F2DC84,"CheckForUpdate_callback":0x326FDC4,"InitializeAfterSplash_callback":0x32771B0,"OnUpdateComplete_callback":0x32773F4,"write_barrier_2f2d9a4":0x2F2D9A4}
 pages={0x6E66000,0x6E64000,0x6E65000,0x72C2000}; md=Cs(CS_ARCH_ARM64,CS_MODE_ARM)
 def sx(v,n): return (v^(1<<(n-1)))-(1<<(n-1))
