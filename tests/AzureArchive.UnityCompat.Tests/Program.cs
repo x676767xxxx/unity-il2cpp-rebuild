@@ -164,6 +164,43 @@ internal static class Program
             "failed native background handle released");
         failedNativeCache.Dispose();
 
+        // A consumer callback fault must not evict a shared successful lease or
+        // prevent later coalesced consumers from receiving the same texture.
+        Addressables.Reset();
+        var resilientNativeCache = new BackgroundImageRuntimeCache(path => path);
+        int successfulWaiterCount = 0;
+        resilientNativeCache.Load(nativeImageDescriptor,
+            texture => throw new InvalidOperationException("first consumer callback"),
+            exception => { });
+        resilientNativeCache.Load(nativeImageDescriptor,
+            texture => successfulWaiterCount++);
+        var resilientOperation = Addressables.Last<Texture>();
+        var resilientTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        resilientOperation.Complete(resilientTexture);
+        Assert(successfulWaiterCount == 1,
+            "native cache notifies later waiters after an earlier success callback throws");
+        Assert(resilientNativeCache.CachedNativeCount == 1 && Addressables.ReleaseCount == 0,
+            "native cache retains shared lease when a consumer success callback throws");
+        resilientNativeCache.Dispose();
+        Assert(Addressables.ReleaseCount == 1,
+            "native cache releases retained shared lease on disposal after callback fault");
+
+        // Failure callbacks are also isolated so every coalesced waiter is notified.
+        Addressables.Reset();
+        var resilientFailureCache = new BackgroundImageRuntimeCache(path => path);
+        int failureWaiterCount = 0;
+        resilientFailureCache.Load(nativeImageDescriptor, texture => { },
+            exception => throw new InvalidOperationException("first failure callback"));
+        resilientFailureCache.Load(nativeImageDescriptor, texture => { },
+            exception => failureWaiterCount++);
+        var resilientFailureOperation = Addressables.Last<Texture>();
+        resilientFailureOperation.Fail(new InvalidOperationException("shared load failure"));
+        Assert(failureWaiterCount == 1,
+            "native cache notifies later waiters after an earlier failure callback throws");
+        Assert(Addressables.ReleaseCount == 1 && resilientFailureOperation.Released,
+            "failed shared native load releases its Addressables handle");
+        resilientFailureCache.Dispose();
+
         Addressables.Reset();
         var gamePathFixture = new ScenarioResourceManagerPathFixture();
         var gameBoundCache = BackgroundImageRuntimeCache.CreateFromGameRuntime(gamePathFixture);
