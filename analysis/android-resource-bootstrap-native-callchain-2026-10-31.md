@@ -117,3 +117,19 @@ This materially narrows the earlier result:
 - The managed IL still contains no `ldsfld` or `stsfld` instruction for `ScenarioResourceManager.AddrLoadUrl`; only its declaration and the two authoring offline path-prefix string uses are visible.
 
 **Updated conclusion:** `customSource` is now positively classified as an authoring CLI input in the recovered managed path. It must not be used as the iOS gameplay URL provider by assumption. The production mobile resource URL source and assignment remain unresolved; the next useful evidence is the Android native field/static-storage cross-reference or an observed runtime configuration response. No production URL adapter was changed.
+
+
+## Cross-platform decisive comparison — Windows authoring CLI assignment — 2026-11-01
+
+The Windows 1.0.1 full IL export was checked against Android 1.0. The Windows build contains an explicit assignment that is absent from the Android managed IL export:
+
+- Enclosing method: `AzureArchive.Automation.AuthoringCliHost.Bootstrap()`, method RVA `0x5D32C8` in the Windows build.
+- It reads `UserSettings.data.customSource`. If blank, it uses the literal `https://filev2.foxxlight.top/aares/`; otherwise it trims trailing slash characters and normalizes one trailing slash.
+- It appends the platform suffix `win`, then executes `stsfld string ScenarioResourceManager::AddrLoadUrl` at IL offset `0x068F`.
+- This authoring CLI bootstrap is gated by the `AZUREARCHIVE_CLI_DIRECTORY` environment variable and sets `AuthoringCliHost.IsActive`; its surrounding method then prepares local `cli-resources` files and invokes authoring services.
+
+This is now direct evidence for the Windows authoring-tool URL rule, not a guess. It is **not** evidence that Android/iOS ordinary gameplay uses the same default, the `customSource` setting, or the `/win` suffix. In the Android full IL export, the corresponding field assignment is absent and `customSource` reads map to the authoring CLI bootstrap only; the Android offline helper is separately gated by `--aap-offline-resources`.
+
+### Porting consequence
+
+Do not port the Windows `/win` suffix or its default URL into the iOS player. The remaining target is to identify the Android/iOS gameplay-side resource root and catalog selection path independently. The Windows CLI method is useful as a reference for the authoring tool only. No runtime URL code was changed.
