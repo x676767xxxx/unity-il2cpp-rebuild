@@ -43,7 +43,7 @@ def diagnostic_hash_tokens(obj):
     except Exception:
         return set()
     return {x.decode("ascii", "ignore").lower()
-            for x in re.findall(rb"[0-9a-fA-F]{32}_[A-Za-z0-9_.-]+\\.bundle", data)}
+            for x in re.findall(rb"[0-9a-fA-F]{32}_[A-Za-z0-9_.-]+\.bundle", data)}
 
 ios_name, ios_raw, ios = read_catalog(ios_ipa, "ios")
 and_name, and_raw, android = read_catalog(android_apk, "android")
