@@ -77,10 +77,14 @@ def top_array_preview(key, needle="ScenarioResourceManager"):
                              "preview":item if isinstance(item,dict) else str(item)[:500]})
     return {"total":len(arr),"matches":len(selected),"preview":selected[:30]}
 method_arr=data.get("ScriptMethod",[]) if isinstance(data,dict) else []
+srm_methods=[]
+for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
+    if isinstance(item,dict) and str(item.get("Name","")).startswith("ScenarioResourceManager"):
+        srm_methods.append({"index":idx,"name":item.get("Name"),"address":item.get("Address"),"signature":item.get("Signature")})
 related_methods=[]
 for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
     if isinstance(item,dict):
         name=str(item.get("Name",""))
         if any(k.lower() in name.lower() for k in ("AddrLoadUrl","ScenarioResourceManager","SetUrl","Url","Addressable","LoadRemote","Resource")):
             related_methods.append({"index":idx,"name":name,"address":item.get("Address"),"signature":item.get("Signature")})
-print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys,"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]],"script_metadata_type_preview":top_array_preview("ScriptMetadata"),"script_metadata_method_preview":top_array_preview("ScriptMetadataMethod"),"related_script_methods":related_methods[:200]},ensure_ascii=False))
+print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys,"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]],"script_metadata_type_preview":top_array_preview("ScriptMetadata"),"script_metadata_method_preview":top_array_preview("ScriptMetadataMethod"),"scenario_resource_manager_methods":srm_methods,"related_script_methods":related_methods[:200]},ensure_ascii=False))
