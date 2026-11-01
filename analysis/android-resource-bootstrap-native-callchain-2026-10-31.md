@@ -154,3 +154,17 @@ The exact iOS IL2CPP dump confirms `ScenarioResourceManager.AddrLoadUrl` is pres
 The iOS dump contains no `AuthoringCliHost` class, while the Android dump does. Therefore the Windows/Android authoring CLI implementation is not available as an iOS player class. This confirms that the iOS player needs its own assignment mechanism or server/config-driven initialization. Static field presence alone does not prove the field is assigned before Addressables requests.
 
 No gameplay URL was guessed or inserted. No code was changed in this checkpoint; it records verified metadata facts for the next native cross-reference pass.
+
+
+## Addressables catalog entry-point audit — 2026-11-01
+
+A full-file scan of the recovered Android `Assembly-CSharp.full.il` was used to distinguish game-code catalog initialization from ordinary Addressables asset usage:
+
+- No managed calls were found to `Addressables.LoadContentCatalogAsync`, `Addressables.UpdateCatalogs`, `Addressables.InitializeAsync`, `Addressables.LoadResourceLocationsAsync`, or `Addressables.InternalIdTransformFunc` in this game assembly.
+- Five calls to `Addressables.DownloadDependenciesAsync` were found. Their enclosing generated methods are background preload coroutines for Spine, BGM, popup images, sounds, and voice. The arguments are the respective resource keys/paths; these calls do not establish the catalog URL.
+- The game assembly declares `ScenarioResourceManager.AddrLoadUrl`, but its recovered managed IL contains no field read/write instruction for that field. The only two string references to its name are offline resource path-prefix templates in `AuthoringOfflineResources.ValidateDirectory`.
+- This does not rule out Addressables package auto-initialization, serialized Addressables settings/catalog data, native/reflection writes, or configuration supplied by the player build. The game-assembly IL alone cannot reveal those.
+
+**Updated technical conclusion:** the resource URL is not being selected by an explicit game-assembly `LoadContentCatalogAsync` call. The next evidence target is the player-side Addressables settings/catalog data and native startup initialization, not the background `DownloadDependenciesAsync` callsites. In particular, inspect the iOS IPA's `Data/StreamingAssets/aa` content (if present), `AddressablesLink/link.xml`, `settings.json`, catalog JSON/binary, and the iOS executable's IL2CPP native field references. The currently available iOS artifact in this repository is an older IPA release and must be treated as a comparison baseline, not as proof of the Android 1.0 runtime configuration.
+
+No production code or guessed URL was added in this audit.
