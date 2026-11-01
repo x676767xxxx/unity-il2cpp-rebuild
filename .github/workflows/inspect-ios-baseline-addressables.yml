@@ -70,15 +70,15 @@ jobs:
           apk=pathlib.Path("work/ipa/base.apk")
           with zipfile.ZipFile(apk) as z:
               names=z.namelist()
-              selected=[n for n in names if re.search(r"(^|/)(settings\\.json|catalog\\.json)$",n,re.I)]
+              selected=[n for n in names if re.search(r"(^|/)(settings\.json|catalog\.json)$",n,re.I)]
               report=["Android 1.0 APK Addressables files:"]
               for n in selected:
                   info=z.getinfo(n)
-                  report.append(f"{n}\\t{info.file_size}")
+                  report.append(f"{n}\t{info.file_size}")
                   dest=out/"android-1.0"/pathlib.Path(n).name
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   dest.write_bytes(z.read(n))
-              out.joinpath("android-addressables-inventory.txt").write_text("\\n".join(report)+"\\n")
+              out.joinpath("android-addressables-inventory.txt").write_text("\n".join(report)+"\n")
           # Extract printable URLs and Addressables/catalog-related strings from Mach-O images.
           with out.joinpath("ios-player-string-hits.txt").open("w") as w:
               for p,desc in executables:
