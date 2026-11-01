@@ -41,6 +41,22 @@ The 453 different-hash rows were grouped by their decoded logical paths:
 
 The character bundles account for 448/453 changed hashes. The five remaining entries are shared/global bundles: one avatar bundle, one effects bundle, one popups bundle, and two built-in/shader bundles. Resource recovery should prioritize the Android 1.0 character payload set first, while retaining all five global bundles. These are catalog-declared sizes, not verified local payload sizes.
 
+## Same-hash reuse candidates in the legacy iOS archive
+
+A second join of the 12,632 same-hash rows against the archive inventory gives:
+
+| Check | Count |
+|---|---:|
+| Same-hash rows with a file in the archive | 12,632 |
+| Archive size matches both iOS and Android catalog sizes | 12,627 |
+| Archive size matches the iOS catalog size | 12,631 |
+| Archive size matches the Android catalog size | 12,627 |
+| Archive size matches neither catalog size | 1 |
+
+The 12,627 same-hash/same-size files total 5,903,683,485 uncompressed bytes (about 5.50 GiB). These are the strongest candidates to reuse from the legacy iOS archive in an iOS 1.0 resource set, because both the catalog hash and declared size match. This remains a candidate classification, not byte-level proof: Addressables catalog hashes are not the same as independently computed file SHA-256 values, and the actual iOS runtime still needs to load representative bundles.
+
+The four one-byte exceptions are listed above; the remaining same-hash archive mismatch is `defaultlocalgroup_assets_audio/voc_jp/mute.ogg.bundle` (archive 2,195 bytes, both catalogs 2,192 bytes).
+
 ## Cross-check against the supplied 5.73 GB legacy iOS archive
 
 The decoded comparison was joined by logical bundle name against the legacy archive's 13,085-file inventory (archive SHA-256: d330920a20262b49bb32f33f517aff43cc9f04544793ad6c6681c377870dadd2).
