@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Trace selected IL2CPP ARM64 methods, callees, direct BL callers and ADRP-based memory accesses."""
-import json,pathlib,struct,sys
+import json,pathlib,struct,sys,re
 from elftools.elf.elffile import ELFFile
 from capstone import Cs,CS_ARCH_ARM64,CS_MODE_ARM
 if len(sys.argv)!=3: raise SystemExit("usage: script libil2cpp.so output-dir")
@@ -59,6 +59,38 @@ with elf_path.open("rb") as f:
      if dest==reg and writes_dest: break
     if accesses: targeted.append({"section":sec,"method":name,"adrp_address":insn["address"],"register":reg,"page":hex(page),"memory_accesses":accesses})
  report["targeted_global_accesses"]=targeted
+ # Trace references to the exact IL2CPP string-literal address for
+ # "{ScenarioResourceManager.AddrLoadUrl}/" (0x07096470). This is a
+ # metadata literal address, not the AddrLoadUrl static-field storage.
+ literal_addr=0x07096470
+ literal_page=literal_addr & ~0xFFF
+ literal_off=literal_addr & 0xFFF
+ literal_refs=[]
+ for s in execs:
+  base=int(s["p_vaddr"]); pos0=int(s["p_offset"]); end=pos0+int(s["p_filesz"])
+  ins=list(md.disasm(blob[pos0:end],base))
+  for idx,insn in enumerate(ins):
+   if insn.mnemonic!="adrp": continue
+   parts=insn.op_str.split(",",1)
+   if len(parts)!=2: continue
+   reg=parts[0].strip()
+   try: pg=int(parts[1].strip().lstrip("#"),16)
+   except ValueError: continue
+   if pg!=literal_page: continue
+   nearby=[]
+   for nxt in ins[idx+1:idx+13]:
+    ops=nxt.op_str
+    if reg not in ops: continue
+    nearby.append({"address":hex(nxt.address),"mnemonic":nxt.mnemonic,"op_str":ops})
+    # Record any ADD using the exact page offset, or a load/store through
+    # the ADRP register; retain context for manual validation.
+    if nxt.mnemonic=="add" and re.search(r"#(?:0x)?"+format(literal_off,"x")+r"(?:\\b|$)",ops,re.I):
+     literal_refs.append({"adrp":hex(insn.address),"register":reg,"reference_kind":"adrp_add_literal","instruction":nearby[-1],"context":nearby[:]})
+    elif nxt.mnemonic.startswith(("ldr","ldur")) and "["+reg in ops:
+     literal_refs.append({"adrp":hex(insn.address),"register":reg,"reference_kind":"adrp_load_from_literal_page","instruction":nearby[-1],"context":nearby[:]})
+   if nearby and not any(x["adrp"]==hex(insn.address) for x in literal_refs):
+    literal_refs.append({"adrp":hex(insn.address),"register":reg,"reference_kind":"page_only_candidate","context":nearby[:]})
+ report["addrloadurl_literal_reference_scan"]={"literal_address":hex(literal_addr),"page":hex(literal_page),"page_offset":hex(literal_off),"candidates":literal_refs}
  report["limits"]="ADRP-based accesses stop when the base register is overwritten. Read/write labels describe instruction direction only; class-static field identity is not proven. Direct BL scans cover file-backed executable PT_LOAD segments; indirect calls and runtime-resolved pointers remain unresolved."
 (out/"arm64-il2cpp-disassembly.json").write_text(json.dumps(report,indent=2))
 lines=["# ARM64 IL2CPP trace","","Direct BL callers are scanned across executable file-backed PT_LOAD segments.",""]
