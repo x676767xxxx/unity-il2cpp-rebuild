@@ -103,3 +103,22 @@ No upstream Spine runtime source has been copied into this project. Before integ
 - Tests: 13 path-safety, 5 background override, 5 atlas metadata, 4 page-resource mapping, 8 texture-cache lifecycle, and 7 isolated Unity decoder contract checks all passed.
 - Artifact: `azurearchive-background-path-compat-library`, ID `13036513008`, size 13,127 bytes.
 - This verifies the standalone .NET helper library and its fake-backend tests only. It does not verify Unity Texture2D creation, Spine runtime loading, actual game assets, or iOS playback.
+
+## Atlas page cache stress-test milestone — 2026-11-01
+
+- Added concurrent acquisition/release coverage to tests/AzureArchive.BackgroundCompat.Tests/Program.cs: 64 parallel leases for one page must share one texture and release it exactly once; transient loader failure must not poison the key and a later acquire must succeed; page keys remain ordinal/case-sensitive.
+- Latest verification: [run 41306795293](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41306795293), completed successfully on the latest test commit a61738a1bc4e93747b8cd18e1a1d761e6a12e2b3.
+- Build: 0 warnings, 0 errors. Background compatibility test suite passed, including 20 texture-cache lifecycle checks, 4 page-resource mapping checks, 5 atlas metadata checks, 11 Spine reference lifecycle checks and 15 construction ownership checks. Unity compatibility stub suite also passed.
+- Artifact: azurearchive-background-path-compat-library, ID 13083389245, 26,699 bytes; SHA-256 ba560cbe69f44044da523caa7d4837cca60f231b822204960a0f394b3daff06c.
+- This validates engine-independent cache semantics and isolated Unity API stubs only. The cache loader/releaser still need a real Unity main-thread implementation; no Texture2D, Spine Atlas, Material or SkeletonDataAsset is constructed by these tests.
+
+## Remaining implementation order (tasks that do not require Natsu.zip inspection first)
+
+1. Confirm the required Spine Editor/runtime license or obtain written permission before importing upstream Spine runtime source. This is a hard gate, not a code task to bypass.
+2. Recover a complete Unity project or obtain a rebuildable source project matching Android 1.0 / Windows 1.0.1. Current player archives do not provide Assets/, Packages/manifest.json, or ProjectSettings/.
+3. Once the project and license gate are satisfied, pin the matching Spine 4.2 C# and Spine-Unity package and compile a minimal Unity iOS test scene against the actual project editor. Do not copy runtime files into the current repository root as a pretend Unity project.
+4. Implement the Unity-main-thread atlas page texture/material adapter using the game's verified DXT5 cache and image fallback semantics; then connect the existing page resolver, cache leases, construction ledger and cleanup adapter.
+5. Only after a real AzureArchive skeleton/atlas sample is available, validate .skel parsing, page mapping, blend modes, constraints and animation playback. Natsu.zip analysis remains deferred until file-analysis allowance is available.
+6. Recover gameplay scenes/resources, build the full iOS player, test on device, then handle signing/IPA.
+
+Current state: converter CI is successful; page-cache helper CI is successful; runtime import, real atlas texture loading, actual game-asset validation, full Unity build and IPA remain uncompleted.
