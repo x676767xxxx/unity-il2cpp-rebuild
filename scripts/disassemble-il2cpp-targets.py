@@ -37,22 +37,21 @@ with elf_path.open("rb") as f:
             for ins in md.disasm(blob[off:off+0x180],addr):
                 item["instructions"].append({"address":hex(ins.address),"bytes":ins.bytes.hex(),"mnemonic":ins.mnemonic,"op_str":ins.op_str})
         report["targets"][name]=item
-    # Scan executable sections and record direct branch-with-link references.
+    # Bounded first pass: inspect calls inside selected method windows only.
+    # A whole-.text scan is deferred to an optimized follow-up pass.
     xrefs={name:[] for name in targets}
-    for sec in e.iter_sections():
-        flags=int(sec["sh_flags"])
-        if not (flags & 0x4) or sec["sh_type"]=="SHT_NOBITS": continue
-        data=sec.data(); base=int(sec["sh_addr"])
-        for ins in md.disasm(data,base):
-            if ins.mnemonic=="bl" and ins.operands and ins.operands[0].type==2:
-                dest=int(ins.operands[0].imm)
-                for name,addr in targets.items():
-                    if dest==addr:
-                        xrefs[name].append({"caller":hex(ins.address),"section":sec.name,"instruction":ins.mnemonic+" "+ins.op_str})
+    for name,item in report["targets"].items():
+        for ins in item["instructions"]:
+            if ins["mnemonic"]=="bl":
+                try: dest=int(ins["op_str"].split()[0].replace("#",""),0)
+                except (ValueError,IndexError): continue
+                for target_name,target_addr in targets.items():
+                    if dest==target_addr:
+                        xrefs[target_name].append({"caller":ins["address"],"within":name,"instruction":"bl "+ins["op_str"]})
     report["direct_bl_xrefs"]=xrefs
-    report["scan_note"]="Only direct ARM64 BL immediate calls are reported; ADRP/ADD/LDR/STR data references and indirect calls are not resolved."
+    report["scan_note"]="Bounded first pass: direct BL calls originating inside selected method windows only. No whole-.text caller scan, indirect calls or static-field data-flow resolution."
 (out/"arm64-il2cpp-disassembly.json").write_text(json.dumps(report,indent=2))
-lines=["# ARM64 IL2CPP native disassembly","",f"- ELF: {elf_path}",f"- ELF header: {report['elf_header']}","- Method windows: 0x180 bytes from each RVA","- Cross-reference scan: direct BL immediate only",""]
+lines=["# ARM64 IL2CPP native disassembly","",f"- ELF: {elf_path}",f"- ELF header: {report['elf_header']}","- Method windows: 0x180 bytes from each RVA","- Cross-reference scan: direct BL inside selected method windows only",""]
 for name,item in report["targets"].items():
     lines += [f"## {name} — {item['rva']}",f"- File offset: {item['file_offset'] or 'not mapped'}"]
     if item.get("error"): lines.append("- "+item["error"])
@@ -63,6 +62,6 @@ for name,item in report["targets"].items():
     callers=report["direct_bl_xrefs"][name]
     lines += [f"- {x['caller']} ({x['section']})" for x in callers] if callers else ["- None found"]
     lines.append("")
-lines += ["## Interpretation limits","",report["scan_note"],"","A missing direct BL result does not prove the method is unused; indirect calls, function pointers, virtual dispatch and data-flow references require further analysis."]
+lines += ["## Interpretation limits","",report["scan_note"],"","A missing direct BL result does not prove the method is unused; callers outside these method windows, indirect calls, function pointers, virtual dispatch and data-flow references require further analysis."]
 (out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
 print(json.dumps({"machine":report["elf_header"],"mapped":sum(bool(x["file_offset"]) for x in report["targets"].values()),"direct_bl_xrefs":{k:len(v) for k,v in xrefs.items()}}))
