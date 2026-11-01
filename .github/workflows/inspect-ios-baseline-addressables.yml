@@ -51,7 +51,7 @@ jobs:
               lines.append(f"{p.relative_to(app)}\t{p.stat().st_size}")
           lines += ["", "App executables:"]
           executables=[]
-          for p in app.iterdir():
+          for p in app.rglob("*"):
               if p.is_file():
                   try:
                       desc=subprocess.run(["file",str(p)],capture_output=True,text=True).stdout.strip()
@@ -59,7 +59,7 @@ jobs:
                       desc=""
                   if "Mach-O" in desc:
                       executables.append((p,desc))
-                      lines.append(f"{p.name}\t{desc}")
+                      lines.append(f"{p.relative_to(app)}\t{desc}")
           out.joinpath("ios-addressables-inventory.txt").write_text("\n".join(lines)+"\n")
           # Copy configuration-like files only; keep the executable out of the artifact.
           for i,p in enumerate(matches):
@@ -103,12 +103,24 @@ jobs:
                               url_hits.append(f"{n} [{mode[0]}] {safe[:500]}")
                   dest.unlink(missing_ok=True)
               out.joinpath("android-runtime-url-hits.txt").write_text("\n".join(dict.fromkeys(url_hits[:30000]))+"\n")
-          # Extract printable URLs and Addressables/catalog-related strings from Mach-O images.
+          # Scan the iOS executable, UnityFramework, and global metadata for runtime URL candidates.
+          ios_hits=[]
+          scan_files=[p for p in app.rglob("*") if p.is_file() and (
+              p.name == "global-metadata.dat" or any(p == exe for exe,_ in executables)
+          )]
+          for p in scan_files:
+              for mode in (["-a"],["-el"]):
+                  result=subprocess.run(["strings",*mode,str(p)],capture_output=True,text=True,errors="replace")
+                  for line in result.stdout.splitlines():
+                      if re.search(r"https?://",line,re.I):
+                          safe=re.sub(r"([?&][^=\\s]+)=([^&\\s]+)",r"\\1=<redacted>",line)
+                          ios_hits.append(f"{p.relative_to(app)} [{mode[0]}] {safe[:500]}")
+          out.joinpath("ios-runtime-url-hits.txt").write_text("\n".join(dict.fromkeys(ios_hits[:30000]))+"\n")
           with out.joinpath("ios-player-string-hits.txt").open("w") as w:
               for p,desc in executables:
                   r=subprocess.run(["strings","-a",str(p)],capture_output=True,text=True,errors="replace")
                   hits=[x for x in r.stdout.splitlines() if re.search(r"https?://|catalog|addressable|streamingassets|\.bundle|\.hash|\.json",x,re.I)]
-                  w.write(f"## {p.name}\n")
+                  w.write(f"## {p.relative_to(app)}\n")
                   w.write("\n".join(hits[:20000])+"\n")
           PY
       - name: Upload legacy iOS configuration evidence
