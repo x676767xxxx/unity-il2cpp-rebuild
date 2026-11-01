@@ -21,7 +21,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24.22.1"
-          cache: npm
 
       - name: Download Android 1.0 APK and extract IL2CPP inputs
         shell: bash
