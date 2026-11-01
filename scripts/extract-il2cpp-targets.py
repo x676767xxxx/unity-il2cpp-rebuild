@@ -81,6 +81,38 @@ srm_methods=[]
 for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
     if isinstance(item,dict) and str(item.get("Name","")).startswith("ScenarioResourceManager"):
         srm_methods.append({"index":idx,"name":item.get("Name"),"address":item.get("Address"),"signature":item.get("Signature")})
+# Produce a compact, deterministic index of SRM methods and the exact class block.
+# Keep static-constructor and URL/configuration candidates separate from broad hits.
+srm_focus_methods=[]
+for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
+    if not isinstance(item,dict):
+        continue
+    name=str(item.get("Name", ""))
+    if name.startswith("ScenarioResourceManager"):
+        tail=name.rsplit("$",1)[-1] if "$" in name else name
+        if (tail in (".cctor", ".ctor") or
+            any(k in name.lower() for k in ("addrloadurl", "url", "catalog", "initialize", "checkforupdate", "loadremote", "addressable"))):
+            srm_focus_methods.append({"index":idx,"name":name,"address":item.get("Address"),"signature":item.get("Signature")})
+# Extract the full declaration region for ScenarioResourceManager from dump.cs.
+class_blocks=[]
+for i,line in enumerate(lines):
+    if re.search(r"\\b(class|struct)\\s+ScenarioResourceManager\\b", line):
+        depth=0; started=False; block=[]
+        for j in range(i,min(len(lines),i+2500)):
+            block.append(lines[j])
+            depth += lines[j].count("{")-lines[j].count("}")
+            if "{" in lines[j]: started=True
+            if started and depth<=0: break
+        class_blocks.append({"start_line":i+1,"end_line":i+len(block),"declaration":line.strip(),
+                             "field_lines":[x.strip() for x in block if re.search(r"\\bAddrLoadUrl\\b|static\\s+.*;",x)],
+                             "method_signatures":[x.strip() for x in block if "(" in x and ")" in x and not x.lstrip().startswith("//")],
+                             "block":block})
+# Save the detailed evidence separately; this is additive to the existing report.
+(root/"scenario-resource-manager-focused.json").write_text(json.dumps({
+    "static_constructor_and_url_candidates":srm_focus_methods,
+    "class_blocks":class_blocks,
+    "interpretation":"ScriptMethod.Address is a method address; static field storage still requires class/static-field layout evidence."
+},indent=2))
 related_methods=[]
 for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
     if isinstance(item,dict):
