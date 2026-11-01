@@ -66,3 +66,22 @@ LoadGlobalResourceOverrides() begins by invalidating the global authoring catalo
 The integration point for an iOS resource loader is now more concrete: preserve the mobile startup order, initialize the Addressables URL transform before the update/catalog coroutine begins, and retain the later TextAsset/FlatBuffer and local override stages. However, the exact runtime URL assignment and catalog-update call chain remain unproven because the key CheckForUpdate coroutine contains unresolved native/indirect operations in the managed IL export.
 
 The next native disassembly pass adds the Addressables loader and local override methods to distinguish remote catalog setup from local override processing. No production CDN is hard-coded and no IPA has been produced.
+
+## Follow-up native disassembly checkpoint — 2026-11-01
+
+The previously generated Android ARM64 disassembly artifact from workflow [41200328434](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41200328434), artifact ID `13041957634`, was downloaded and inspected directly. This adds native evidence but does not resolve the mobile URL assignment.
+
+### Confirmed startup coroutine behavior
+
+- `ScenarioResourceManager.InitializeAfterSplash()` at RVA `0x326498C` is a coroutine factory. Its generated `MoveNext` is at `0x32771DC`.
+- The startup iterator reaches `ScenarioResourceManager.Initialize()` at RVA `0x3264A00`; it does not establish an `AddrLoadUrl` assignment.
+- The generated `ScenarioResourceManager.CheckForUpdate()` iterator has its native `MoveNext` at RVA `0x326FDF0`. Within its state-machine body, the code calls `AuthoringOfflineResources.TryGetStartupUrl(out string)` at RVA `0x33C5E00` before continuing through Addressables/catalog-related calls. This confirms the optional startup/offline URL helper is consulted in the mobile update coroutine. It does not prove that the returned value is assigned to `ScenarioResourceManager.AddrLoadUrl`.
+- `AuthoringOfflineResources.TryGetStartupUrl` reads its own helper/configuration state and has separate calls for validation/catalog handling. The helper is not a verified production CDN provider.
+- `ScenarioResourceManager.UpdateAddressable()` at RVA `0x3265514` is a single `ret` instruction in this Android build; it is not the missing URL initialization method.
+- `UserSettings.ReadUserSettings.MoveNext()` at RVA `0x3289908` deserializes settings through `SettingData.Deserialize` and then invokes `InitializeSettings`. The inspected body does not show a direct write to the static `AddrLoadUrl` field.
+
+### Decision
+
+No production URL has been established. Keep the URL provider injectable and do not hard-code the authoring CLI fallback `https://filev2.foxxlight.top/aares/`. The next useful reverse-engineering step is a metadata/native cross-reference of the static field itself (including reflection/native field writes), not another guessed URL adapter.
+
+No C# source was changed in this checkpoint because the required runtime value and precedence are still unknown. Existing compatibility modules remain intact; no duplicate files were added. This checkpoint does not produce a Unity/Xcode build or IPA.
