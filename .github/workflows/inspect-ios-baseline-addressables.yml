@@ -79,6 +79,30 @@ jobs:
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   dest.write_bytes(z.read(n))
               out.joinpath("android-addressables-inventory.txt").write_text("\n".join(report)+"\n")
+              # Scan the Android 1.0 player binaries for embedded runtime URL/domain candidates.
+              candidate_names=[n for n in names if (
+                  n.endswith("/libil2cpp.so") or n.endswith("/global-metadata.dat") or
+                  re.fullmatch(r"classes(?:[0-9]+)?\\.dex", pathlib.Path(n).name) or
+                  n.endswith("/libunity.so")
+              )]
+              url_hits=[]
+              for n in candidate_names:
+                  dest=pathlib.Path("work/ipa")/("scan_"+pathlib.Path(n).name)
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  with z.open(n) as src, dest.open("wb") as dst:
+                      while True:
+                          chunk=src.read(8*1024*1024)
+                          if not chunk: break
+                          dst.write(chunk)
+                  for mode in (["-a"],["-el"]):
+                      result=subprocess.run(["strings",*mode,str(dest)],capture_output=True,text=True,errors="replace")
+                      for line in result.stdout.splitlines():
+                          if re.search(r"https?://|(?:[a-z0-9-]+\\.)+[a-z]{2,}",line,re.I):
+                              # Avoid leaking query parameters or embedded credentials.
+                              safe=re.sub(r"([?&][^=\\s]+)=([^&\\s]+)",r"\\1=<redacted>",line)
+                              url_hits.append(f"{n} [{mode[0]}] {safe[:500]}")
+                  dest.unlink(missing_ok=True)
+              out.joinpath("android-runtime-url-hits.txt").write_text("\n".join(dict.fromkeys(url_hits[:30000]))+"\n")
           # Extract printable URLs and Addressables/catalog-related strings from Mach-O images.
           with out.joinpath("ios-player-string-hits.txt").open("w") as w:
               for p,desc in executables:
