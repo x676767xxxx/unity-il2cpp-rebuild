@@ -7,6 +7,7 @@ on:
       - "scripts/compare-ios-0792-android-1.0-catalogs.py"
       - "scripts/decode-addressables-bundle-map.py"
       - "scripts/export-addressables-bundle-manifests.py"
+      - "scripts/scan-release-endpoint-strings.py"
       - "scripts/match-legacy-ios-resource-archive.py"
 permissions:
   contents: read
@@ -85,6 +86,10 @@ jobs:
               lines += [""]
           (out/"resource-catalog-report.md").write_text("\n".join(lines))
           PY
+      - name: Scan APK and Windows binaries for resource endpoint clues
+        run: |
+          set -euo pipefail
+          python3 scripts/scan-release-endpoint-strings.py work/android/base.apk work/windows/windows.zip work/out/endpoint-string-scan.json
       - name: Install Addressables catalog parser
         run: python3 -m pip install --disable-pip-version-check addressablestools
       - name: Decode complete Addressables bundle metadata
