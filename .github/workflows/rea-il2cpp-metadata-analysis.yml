@@ -1,0 +1,62 @@
+name: REA IL2CPP metadata and method-address analysis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/rea-il2cpp-metadata-analysis.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.22.1"
+          cache: npm
+
+      - name: Download Android 1.0 APK and extract IL2CPP inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/android work/rea
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -q work/android/base.apk -d work/android/unpacked
+          LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' -print -quit)"
+          if [ -z "$LIB" ]; then LIB="$(find work/android/unpacked -type f -name libil2cpp.so -print -quit)"; fi
+          METADATA="$(find work/android/unpacked -type f -name global-metadata.dat -print -quit)"
+          test -n "$LIB" || { echo "libil2cpp.so not found" >&2; exit 1; }
+          test -n "$METADATA" || { echo "global-metadata.dat not found" >&2; exit 1; }
+          cp "$LIB" work/rea/libil2cpp.so
+          cp "$METADATA" work/rea/global-metadata.dat
+          sha256sum work/rea/libil2cpp.so work/rea/global-metadata.dat | tee work/rea/input-sha256.txt
+          file work/rea/libil2cpp.so work/rea/global-metadata.dat | tee work/rea/input-file-types.txt
+          readelf -h work/rea/libil2cpp.so > work/rea/elf-header.txt
+
+      - name: Run REA static IL2CPP metadata and native address analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes rea-agents@latest inspect-il2cpp-metadata work/rea/global-metadata.dat \
+            --binary work/rea/libil2cpp.so \
+            --generic-instances \
+            --detail summary \
+            --evidence_output work/rea/rea-il2cpp-evidence.json \
+            --json 2>&1 | tee work/rea/rea-cli.log
+          test -s work/rea/rea-il2cpp-evidence.json
+
+      - name: Upload REA evidence and input fingerprints
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-rea-il2cpp-evidence
+          path: work/rea/
+          if-no-files-found: warn
