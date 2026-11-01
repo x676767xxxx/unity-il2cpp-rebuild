@@ -54,4 +54,4 @@ print(json.dumps(summary)); print("GLOBAL_PAGE_REFS",json.dumps(refs[:100]))
 for sec in ("targets","callees"):
  for k,v in report[sec].items():
   print("\\n===",k,v["rva"],"===")
-  for i in v["instructions"][:32]:print(i["address"],i["mnemonic"],i["op_str"])
+  for i in v["instructions"][:96]:print(i["address"],i["mnemonic"],i["op_str"])
