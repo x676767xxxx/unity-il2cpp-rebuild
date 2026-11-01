@@ -58,7 +58,9 @@ with elf_path.open("rb") as f:
     if dest==reg and nxt.mnemonic not in ("str","strb","strh","stp","stur","sturb","sturh","stxr","stlxr","cmp","cmn","tst","tbz","tbnz","cbz","cbnz","b","bl","br","blr","ret","nop","dmb"): break
    if context: metadata_page_refs.append({"adrp":hex(item.address),"page":hex(pg),"register":reg,"slots":[{"name":name,"va":hex(addr),"page_offset":hex(addr & 0xFFF)} for name,addr in matching.items()],"access_context":context})
  report["metadata_typeinfo_reference_scan"]={"slots":{k:hex(v) for k,v in metadata_slots.items()},"references":metadata_page_refs}
- # Record the static-constructor dataflow separately; the cctor window is clipped before the next function.\n cctor=report["targets"]["ScenarioResourceManager..cctor"]["instructions"]\n report["cctor_store_trace"]={"instructions":cctor,"observations":["x20 is loaded from the global pointer slot at 0x6e72b70","x0 is returned by the helper at 0x2f2dc84 and copied to x19","x19 is stored at [x8] after loading x8 from [x20,#0xb8]","the helper at 0x5cbc718 is called with x0 still holding the returned object and x1=0; its exact role must be resolved from its own disassembly"]}
+ # Record the static-constructor dataflow separately; the cctor window is clipped before the next function.
+ cctor=report["targets"]["ScenarioResourceManager..cctor"]["instructions"]
+ report["cctor_store_trace"]={"instructions":cctor,"observations":["x20 is loaded from the global pointer slot at 0x6e72b70","x0 is returned by the helper at 0x2f2dc84 and copied to x19","x19 is stored at [x8] after loading x8 from [x20,#0xb8]","the helper at 0x5cbc718 is called with x0 still holding the returned object and x1=0; its exact role must be resolved from its own disassembly"]}
  targeted=[]
  for sec in ("targets","callees"):
   for name,win in report[sec].items():
@@ -145,10 +147,12 @@ for name,sites in indirect_calls.items():
   lines.append("- "+site["instruction"]["address"]+" "+site["instruction"]["mnemonic"]+" "+site["instruction"]["op_str"])
   lines.extend("  - "+x["address"]+" "+x["mnemonic"]+" "+x["op_str"] for x in site["context"])
 lines += ["",report["limits"]]
-(out/"arm64-il2cpp-disassembly.md").write_text("\n".join(lines))
+(out/"arm64-il2cpp-disassembly.md").write_text("
+".join(lines))
 summary={"elf":report["elf_header"],"mapped_targets":sum(bool(v["file_offset"]) for v in report["targets"].values()),"mapped_callees":sum(bool(v["file_offset"]) for v in report["callees"].values()),"bl_callers":{k:len(v) for k,v in xrefs.items()},"global_page_refs":len(refs),"targeted_access_groups":len(targeted),"targeted_reads":sum(a["access"]=="read" for z in targeted for a in z["memory_accesses"]),"targeted_writes":sum(a["access"]=="write" for z in targeted for a in z["memory_accesses"])}
 print(json.dumps(summary)); print("TARGETED_GLOBAL_ACCESSES",json.dumps(targeted)); print("ADDRLOADURL_LITERAL_REFERENCE_SCAN",json.dumps(report["addrloadurl_literal_reference_scan"]))
 for sec in ("targets","callees"):
  for k,v in report[sec].items():
-  print("\\n===",k,v["rva"],"===")
+  print("\
+===",k,v["rva"],"===")
   for i in v["instructions"][:96]:print(i["address"],i["mnemonic"],i["op_str"])
