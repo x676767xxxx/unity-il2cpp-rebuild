@@ -102,3 +102,47 @@ AuthoringResourceCatalog is a distinct type in the same Android metadata image. 
 ## Limits
 
 This artifact is a complete metadata inventory, not a recovered source project. Metadata-only REA has no native addresses, no field/parameter/return type resolution against the binary, and no runtime behavior. No complete Unity project, IPA or device test is produced by this step.
+## REA native method-address linking — verified 2026-11-01
+
+- Linked workflow: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41307223323
+- Linked artifact: azurearchive-rea-il2cpp-native-link, ID 13083512223 (5,555,419 bytes compressed). It includes complete linked Evidence and a Ghidra seed file.
+- Android ELF SHA-256: 7f15b8e7557eb7948f8bea746c629fb15d442d05c649ab2db3667ae08aa2c9b6 (120,315,032 bytes), ARM64, image base 0x0.
+- REA structurally matched all 77 code-generation modules and linked all 152,789 metadata methods: 136,430 code slots, 16,359 observed no-body slots, 0 unknown slots. The native Il2CppType table has 69,098 entries. Return types were resolved for 152,789 methods, field types for 77,092 fields and parameter types for 182,036 parameters.
+- No generic method instances, adjustor thunks or invokers were linked in this pass. The binary/metadata pair is structurally consistent by module name/count/token; this is not a cryptographic same-build proof.
+- Ghidra seed file contains 136,430 function seeds and is 10,064,435 bytes. The default ELF seed base is 0x100000, so the seed address is RVA + 0x100000. Example: RuntimeSpineLoader.Load RVA 0x325f2dc is seeded at 0x335f2dc.
+
+### Spine and background methods now linked to native code
+
+| Type | Method | Parameters → return | ELF RVA | Ghidra seed address |
+|---|---|---|---:|---:|
+| RuntimeSpineLoader | Read | basePath:string, supportsDxt5:bool → RuntimeSpineLoader.Files | 0x325ee08 | 0x326ee08 |
+| RuntimeSpineLoader | ReadAsync | basePath:string → Task<RuntimeSpineLoader.Files> | 0x325f1c0 | 0x326f1c0 |
+| RuntimeSpineLoader | Load | basePath:string, material:UnityEngine.Material, blends:Spine.Unity.BlendModeMaterials.TemplateMaterials, quiet:bool → RuntimeSpineAsset | 0x325f2dc | 0x335f2dc |
+| RuntimeSpineLoader | Create | files:RuntimeSpineLoader.Files, material:UnityEngine.Material, blends:Spine.Unity.BlendModeMaterials.TemplateMaterials, quiet:bool → RuntimeSpineAsset | 0x325f32c | 0x335f32c |
+| RuntimeSpineLoader | CanLoadPngAsDxt5 | → bool | 0x325ffc8 | 0x326ffc8 |
+| PageTextureLoader | Load | page:Spine.AtlasPage, path:string → void | 0x326004c | 0x336004c |
+| PageTextureLoader | Unload | texture:object → void | 0x32601c4 | 0x33601c4 |
+| RuntimeSpineAsset | Own | → void | 0x325fc74 | 0x326fc74 |
+| RuntimeSpineAsset | Retain | → RuntimeSpineAsset | 0x3260490 | 0x3270490 |
+| RuntimeSpineAsset | Dispose | → void | 0x325fd1c | 0x326fd1c |
+| ScenarioResourceManager | AcquireBackgroundSpine | resource:BackgroundResource → RuntimeSpineAsset | 0x3261460 | 0x3361460 |
+| ScenarioResourceManager | TrimBackgroundSkeletonCache | → void | 0x3263a2c | 0x3273a2c |
+| SpineBackgroundVisual | ValidatePlayback | → void | 0x3275418 | 0x3375418 |
+| SpineBackgroundVisual | Attach | → void | 0x327d380 | 0x337d380 |
+| SpineBackgroundVisual | SetColor | → void | 0x327d7f0 | 0x337d7f0 |
+| SpineBackgroundVisual | Dispose | → void | 0x327d1c4 | 0x337d1c4 |
+
+### Runtime ownership fields recovered from the paired binary
+
+- ScenarioResourceManager: backgroundSkeletons is Dictionary<string, RuntimeSpineAsset>; backgroundSkeletonAccess is Dictionary<string, int>; backgroundPreviews is Dictionary<string, BackgroundPreview>; pendingBackgroundPreviews is Dictionary<string, List<Action<Texture>>>; separate loaded-object sets track Addressables and web resources.
+- RuntimeSpineAsset: owned is HashSet<UnityEngine.Object>; references is int; Asset is Spine.Unity.SkeletonDataAsset. This directly supports an owned-object set plus reference-counted lifetime model.
+- PageTextureLoader: materials is Dictionary<string, UnityEngine.Material>.
+- SpineBackgroundVisual: Root is GameObject; Animation is Spine.Unity.SkeletonAnimation; Frame is Rect; asset is RuntimeSpineAsset; settings is BgSpineOverrideData; materials is List<Material>; disposed is bool.
+- BackgroundResource: Id:uint, Name:string, Type:ScenarioBGType, Source:ScenarioResourceManager.ResourceType, Root:string, Path:string, Spine:BgSpineOverrideData.
+- ResourceOverrideData: BgSpineOverrides is List<BgSpineOverrideData>; BgOverrides is HashSet<string>; basePath is string.
+
+### Interpretation and next step
+
+REA has now mapped the Android 1.0 Spine loader entry points to native ARM64 code and recovered their signatures and ownership fields. This independently cross-checks the earlier hand-selected ARM64 disassembly RVAs. The next step is to import the seed file into Ghidra through REA and decompile a small set of high-value functions: RuntimeSpineLoader.Load/Create, PageTextureLoader.Load/Unload, ScenarioResourceManager.AcquireBackgroundSpine/TrimBackgroundSkeletonCache and SpineBackgroundVisual.ValidatePlayback. Ghidra pseudocode/assembly will be treated as evidence, not original source.
+
+Important: Ghidra seed addresses are analysis-image addresses, not Android RVAs and never iOS addresses. Do not use them as iOS function addresses or copy ARM64 instructions into the iOS build.
