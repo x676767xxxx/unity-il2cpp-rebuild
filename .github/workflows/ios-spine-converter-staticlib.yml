@@ -1,4 +1,5 @@
 name: Build Spine converter for iOS ARM64
+# Host ABI smoke test traverses the full pinned Spine 4.2 fixture directory.
 on:
   push:
     paths:
