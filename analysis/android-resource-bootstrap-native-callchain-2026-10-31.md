@@ -168,3 +168,29 @@ A full-file scan of the recovered Android `Assembly-CSharp.full.il` was used to 
 **Updated technical conclusion:** the resource URL is not being selected by an explicit game-assembly `LoadContentCatalogAsync` call. The next evidence target is the player-side Addressables settings/catalog data and native startup initialization, not the background `DownloadDependenciesAsync` callsites. In particular, inspect the iOS IPA's `Data/StreamingAssets/aa` content (if present), `AddressablesLink/link.xml`, `settings.json`, catalog JSON/binary, and the iOS executable's IL2CPP native field references. The currently available iOS artifact in this repository is an older IPA release and must be treated as a comparison baseline, not as proof of the Android 1.0 runtime configuration.
 
 No production code or guessed URL was added in this audit.
+
+
+## Legacy iOS IPA Addressables settings extracted — 2026-11-01
+
+A new GitHub Actions inspection workflow downloaded and unpacked the repository's legacy release asset `AzureArchive_IOS_0.7.9.2.ipa`. The workflow completed successfully in run [41259629374](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41259629374), artifact `azurearchive-ios-0.7.9.2-addressables-baseline` (ID `13064726095`). This is an older iOS baseline, not the Android 1.0 target build.
+
+The IPA contains:
+- `Data/Raw/aa/settings.json`
+- `Data/Raw/aa/catalog.json` (23,911,858 bytes)
+- `Data/Raw/aa/AddressablesLink/link.xml`
+
+The extracted settings establish:
+- `m_buildTarget = iOS`
+- Addressables package version `1.21.20`
+- remote catalog hash key `AddressablesMainContentCatalogRemoteHash` points to `{ScenarioResourceManager.AddrLoadUrl}/catalog_2024.08.25.10.06.35.hash`
+- cached hash is under `{UnityEngine.Application.persistentDataPath}/com.unity.addressables/catalog_2024.08.25.10.06.35.hash`
+- main catalog key `AddressablesMainContentCatalog` points to `{UnityEngine.AddressableAssets.Addressables.RuntimePath}/catalog.json`
+- `m_DisableCatalogUpdateOnStart = true`, `m_IsLocalCatalogInBundle = false`, max concurrent web requests 3, catalog request timeout 60 seconds.
+
+The extracted catalog has 32,353 internal IDs. Remote bundle IDs use the prefix `{ScenarioResourceManager.AddrLoadUrl}/`; the first entries include `avatars_assets_all.bundle`, `characters_assets_airiall.bundle`, and related character/preload bundles. Local audio entries also exist as `Assets/Addressables/Audio/BGM/*.ogg`. This proves that the legacy iOS player used the static field as an Addressables URL substitution token in its serialized settings/catalog, even though the recovered game-assembly IL did not contain a managed field read/write.
+
+### What this proves and what it does not
+
+This is direct serialized player-build evidence for the old iOS package's Addressables configuration and confirms the field is operationally significant to its catalog IDs. It does **not** reveal who assigns the static field at runtime, nor does it prove that Android 1.0 or the intended iOS 1.0 port uses the same catalog version, URL, or startup sequence. The old IPA's catalog hash timestamp is `2024.08.25.10.06.35`; do not reuse it as the 1.0 catalog.
+
+The workflow's binary-string pass returned no useful URL hits from the stripped Mach-O executable, so the next pass should inspect the extracted `settings.json` / `catalog.json` against Android 1.0 build outputs and locate the actual field assignment in native code or runtime startup. No production URL was hardcoded and no game runtime source was changed.
