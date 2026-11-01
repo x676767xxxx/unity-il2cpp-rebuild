@@ -627,7 +627,7 @@ internal static class Program
             BackgroundPreviewCallbackDispatcher.Dispatch(Array.Empty<Action<int>>(), 0, null!),
             "callback dispatcher requires error reporter");
 
-        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 18 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks; 15 Spine construction ownership checks");
+        Console.WriteLine("PASS: 13 SafeResourcePath checks; 11 BackgroundResourceDescriptor checks; 5 BackgroundOverrideResolver checks; 24 ScenarioBackgroundResolver checks; 5 BackgroundResourceIdHash checks; 5 BackgroundImageOverrideFactory checks; 5 BackgroundOverrideSetFactory checks; 13 Addressables internal-ID checks; 5 Spine atlas metadata checks; 4 page resource mapping checks; 20 texture cache lifecycle checks; 8 Addressables handle ownership checks; 11 preview request coalescer checks; 30 preview cache ledger checks; 8 skeleton cache trim planner checks; 11 Spine reference lifecycle checks; 15 Spine construction ownership checks");
         return 0;
     }
 
