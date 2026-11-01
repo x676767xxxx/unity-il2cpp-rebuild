@@ -1,0 +1,78 @@
+name: Reassemble and verify uploaded iOS resource archive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reassemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Download all four Release parts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          cd work
+          base="https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/IOS_202408202213.6.zip"
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 30 "${base}.001" -o part.001
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 30 "${base}.002" -o part.002
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 30 "${base}.003" -o part.003
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 30 "${base}.004" -o part.004
+          printf '%s  %s\n' \
+            'adaf740e114536f299ffcf0cfd0e7b2e4f28d189973db1a4674a97973d8e0b11' 'part.001' \
+            '2a1def1b76590b4dc626f0d234669f31f44f1f8080a24b3f9250d3140a6bee6b' 'part.002' \
+            '03940b5e472f7e4a8af3f4650c960de7710e686af73070dd4a3c55be9bffc34f' 'part.003' \
+            'e193d0e3273afe22e5b127701f95be1d6aa4883aa64480febc47da5adc93b18e' 'part.004' | sha256sum -c -
+          test "$(stat -c %s part.001)" = 1500000000
+          test "$(stat -c %s part.002)" = 1500000000
+          test "$(stat -c %s part.003)" = 1500000000
+          test "$(stat -c %s part.004)" = 1238046419
+          cat part.001 part.002 part.003 part.004 > IOS_202408202213.6.zip
+          test "$(stat -c %s IOS_202408202213.6.zip)" = 5738046419
+          rm part.001 part.002 part.003 part.004
+          echo "Reassembled bytes: $(stat -c %s IOS_202408202213.6.zip)" | tee ../reassembly-report.txt
+          sha256sum IOS_202408202213.6.zip | tee -a ../reassembly-report.txt
+
+      - name: Test ZIP integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -tq work/IOS_202408202213.6.zip
+          echo "ZIP integrity: PASS" | tee -a reassembly-report.txt
+
+      - name: Inventory archive contents
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, collections, os
+          p = "work/IOS_202408202213.6.zip"
+          with zipfile.ZipFile(p) as z:
+              infos = z.infolist()
+              counts = collections.Counter(os.path.splitext(i.filename)[1].lower() or "[no extension]" for i in infos)
+              bundles = [i for i in infos if i.filename.lower().endswith(".bundle")]
+              with open("archive-inventory.txt", "w", encoding="utf-8") as f:
+                  f.write(f"Entries: {len(infos)}\\n")
+                  f.write(f"Total uncompressed bytes: {sum(i.file_size for i in infos)}\\n")
+                  f.write(f"Bundle entries: {len(bundles)}\\n\\n")
+                  f.write("Extension counts:\\n")
+                  for ext, n in counts.most_common():
+                      f.write(f"{ext}: {n}\\n")
+                  f.write("\\nLargest 100 entries:\\n")
+                  for i in sorted(infos, key=lambda x: x.file_size, reverse=True)[:100]:
+                      f.write(f"{i.file_size}\\t{i.filename}\\n")
+          print(f"Archive entries: {len(infos)}; bundle entries: {len(bundles)}")
+          PY
+
+      - name: Upload verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-resource-archive-verification
+          path: |
+            reassembly-report.txt
+            archive-inventory.txt
+          if-no-files-found: error
+          retention-days: 30
