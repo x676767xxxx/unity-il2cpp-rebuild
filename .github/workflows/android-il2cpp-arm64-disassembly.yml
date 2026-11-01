@@ -1,0 +1,39 @@
+name: Android IL2CPP ARM64 native disassembly
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/android-il2cpp-arm64-disassembly.yml"
+      - "scripts/disassemble-il2cpp-targets.py"
+permissions:
+  contents: read
+jobs:
+  disassemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download Android APK and extract libil2cpp
+        run: |
+          set -euo pipefail
+          mkdir -p work/android work/out
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -q work/android/base.apk -d work/android/unpacked
+          LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' | head -n 1)"
+          if [ -z "$LIB" ]; then LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"; fi
+          test -n "$LIB"
+          cp "$LIB" work/out/libil2cpp.so
+          sha256sum work/out/libil2cpp.so > work/out/libil2cpp-sha256.txt
+          readelf -h work/out/libil2cpp.so > work/out/elf-header.txt
+          readelf -l work/out/libil2cpp.so > work/out/elf-program-headers.txt
+      - name: Install ARM64 analysis libraries
+        run: python3 -m pip install --disable-pip-version-check capstone pyelftools
+      - name: Disassemble target methods and scan direct calls
+        run: python3 scripts/disassemble-il2cpp-targets.py work/out/libil2cpp.so work/out/report
+      - name: Upload ARM64 disassembly report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-arm64-il2cpp-disassembly
+          path: work/out/
