@@ -7,6 +7,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument("input", type=Path, help="addressables-bundle-map.json")
 parser.add_argument("output", type=Path, help="Markdown report path")
+parser.add_argument("--legacy-archive-match", type=Path, help="optional legacy-ios-archive-match.json")
 args = parser.parse_args()
 
 data = json.loads(args.input.read_text(encoding="utf-8"))
@@ -17,6 +18,17 @@ same_hash_size_diff = [
     row for row in rows
     if row["hash_equal"] and row["ios"]["size"] != row["android"]["size"]
 ]
+
+archive_match_stats = None
+if args.legacy_archive_match:
+    archive_data = json.loads(args.legacy_archive_match.read_text(encoding="utf-8"))
+    archive_by_name = {row["bundle_name"]: row for row in archive_data["matches"]}
+    matched = [(row, archive_by_name.get(row["bundle_name"])) for row in changed]
+    archive_match_stats = {
+        "matched": sum(item is not None for _, item in matched),
+        "ios_size": sum(item is not None and item["archive_bytes"] == row["ios"]["size"] for row, item in matched),
+        "android_size": sum(item is not None and item["archive_bytes"] == row["android"]["size"] for row, item in matched),
+    }
 
 def category(path):
     logical = path.split("}/", 1)[-1].lower()
@@ -82,6 +94,20 @@ for name, totals in sorted(category_totals.items()):
     )
 lines += [
     "",
+if archive_match_stats is not None:
+    lines += [
+        "",
+        "## Legacy iOS archive cross-check",
+        "",
+        "| Check across different-hash rows | Count |",
+        "|---|---:|",
+        "| Changed rows with a matching legacy archive file | " + str(archive_match_stats["matched"]) + " |",
+        "| Archive size equals legacy iOS catalog size | " + str(archive_match_stats["ios_size"]) + " |",
+        "| Archive size equals Android 1.0 catalog size | " + str(archive_match_stats["android_size"]) + " |",
+        "",
+        "This is a size comparison, not a byte-level content hash. It establishes which catalog's declared sizes the supplied archive matches; it does not prove payload byte identity.",
+    ]
+
     "## Same-hash rows with declared-size differences",
     "",
     "| Logical path | Hash | iOS bytes | Android bytes |",
