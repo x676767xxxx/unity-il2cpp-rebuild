@@ -52,10 +52,16 @@ def compact(m):
             "values":{k:v for k,v in rec.items() if isinstance(v,(str,int,float,bool))}}
 
 
-report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods,"script_metadata_matches":len(metadata_matches)}
+report={"dump_file":str(dump),"line_count":len(lines),"hit_count":len(hits),"hits":hits,"nearby_method_headers":methods,"script_metadata_matches":len(metadata_matches),"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys}
+# Emit focused source evidence for the exact AddrLoadUrl placeholder.
+addr_dump_lines=[{"line":i+1,"text":line.strip(),
+                  "context":lines[max(0,i-12):min(len(lines),i+18)]}
+                 for i,line in enumerate(lines)
+                 if "AddrLoadUrl" in line]
+script_top_keys=list(data.keys()) if script.exists() and isinstance(data,dict) else []
 out.write_text(json.dumps(report,indent=2))
 md=["# Android IL2CPP target evidence","","Generated from Il2CppDumper dump.cs. RVAs are static metadata addresses, not proof of runtime values.","",f"- Source: {dump}","- Hits: {len(hits)}",""]
 for h in hits:
     md += [f"## dump.cs:{h['line']}","\x60\x60\x60csharp",*h["context"],"\x60\x60\x60",""]
 (out.with_suffix(".md")).write_text("\n".join(md))
-print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]]},ensure_ascii=False))
+print(json.dumps({"hits":len(hits),"nearby_method_headers":len(methods),"dump_file":str(dump),"script_metadata_matches":len(metadata_matches),"addrloadurl_metadata_matches":len(addr_matches),"scenariorm_metadata_matches":len(srm_matches),"addrloadurl_metadata_preview":[compact(m) for m in addr_matches[:60]],"addrloadurl_dump_lines":addr_dump_lines,"script_top_level_keys":script_top_keys,"scenariorm_metadata_preview":[compact(m) for m in srm_matches[:12]]},ensure_ascii=False))
