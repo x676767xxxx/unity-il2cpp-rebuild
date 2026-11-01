@@ -139,5 +139,6 @@ jobs:
             reassembly-report.txt
             archive-inventory.txt
             metadata-analysis.txt
+            metadata-file-hashes.txt
           if-no-files-found: error
           retention-days: 30
