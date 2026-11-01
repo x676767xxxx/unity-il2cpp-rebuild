@@ -96,7 +96,7 @@ for idx,item in enumerate(method_arr if isinstance(method_arr,list) else []):
 # Extract the full declaration region for ScenarioResourceManager from dump.cs.
 class_blocks=[]
 for i,line in enumerate(lines):
-    if re.search(r"\\b(class|struct)\\s+ScenarioResourceManager\\b", line):
+    if re.search(r"\b(class|struct)\s+ScenarioResourceManager\b", line):
         depth=0; started=False; block=[]
         for j in range(i,min(len(lines),i+2500)):
             block.append(lines[j])
@@ -104,7 +104,7 @@ for i,line in enumerate(lines):
             if "{" in lines[j]: started=True
             if started and depth<=0: break
         class_blocks.append({"start_line":i+1,"end_line":i+len(block),"declaration":line.strip(),
-                             "field_lines":[x.strip() for x in block if re.search(r"\\bAddrLoadUrl\\b|static\\s+.*;",x)],
+                             "field_lines":[x.strip() for x in block if re.search(r"\bAddrLoadUrl\b|static\s+.*;",x)],
                              "method_signatures":[x.strip() for x in block if "(" in x and ")" in x and not x.lstrip().startswith("//")],
                              "block":block})
 # Save the detailed evidence separately; this is additive to the existing report.
