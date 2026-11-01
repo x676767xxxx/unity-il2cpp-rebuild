@@ -115,18 +115,18 @@ This artifact is a complete metadata inventory, not a recovered source project. 
 
 | Type | Method | Parameters → return | ELF RVA | Ghidra seed address |
 |---|---|---|---:|---:|
-| RuntimeSpineLoader | Read | basePath:string, supportsDxt5:bool → RuntimeSpineLoader.Files | 0x325ee08 | 0x326ee08 |
-| RuntimeSpineLoader | ReadAsync | basePath:string → Task<RuntimeSpineLoader.Files> | 0x325f1c0 | 0x326f1c0 |
+| RuntimeSpineLoader | Read | basePath:string, supportsDxt5:bool → RuntimeSpineLoader.Files | 0x325ee08 | 0x335ee08 |
+| RuntimeSpineLoader | ReadAsync | basePath:string → Task<RuntimeSpineLoader.Files> | 0x325f1c0 | 0x335f1c0 |
 | RuntimeSpineLoader | Load | basePath:string, material:UnityEngine.Material, blends:Spine.Unity.BlendModeMaterials.TemplateMaterials, quiet:bool → RuntimeSpineAsset | 0x325f2dc | 0x335f2dc |
 | RuntimeSpineLoader | Create | files:RuntimeSpineLoader.Files, material:UnityEngine.Material, blends:Spine.Unity.BlendModeMaterials.TemplateMaterials, quiet:bool → RuntimeSpineAsset | 0x325f32c | 0x335f32c |
-| RuntimeSpineLoader | CanLoadPngAsDxt5 | → bool | 0x325ffc8 | 0x326ffc8 |
+| RuntimeSpineLoader | CanLoadPngAsDxt5 | → bool | 0x325ffc8 | 0x335ffc8 |
 | PageTextureLoader | Load | page:Spine.AtlasPage, path:string → void | 0x326004c | 0x336004c |
 | PageTextureLoader | Unload | texture:object → void | 0x32601c4 | 0x33601c4 |
-| RuntimeSpineAsset | Own | → void | 0x325fc74 | 0x326fc74 |
-| RuntimeSpineAsset | Retain | → RuntimeSpineAsset | 0x3260490 | 0x3270490 |
-| RuntimeSpineAsset | Dispose | → void | 0x325fd1c | 0x326fd1c |
+| RuntimeSpineAsset | Own | → void | 0x325fc74 | 0x335fc74 |
+| RuntimeSpineAsset | Retain | → RuntimeSpineAsset | 0x3260490 | 0x3360490 |
+| RuntimeSpineAsset | Dispose | → void | 0x325fd1c | 0x335fd1c |
 | ScenarioResourceManager | AcquireBackgroundSpine | resource:BackgroundResource → RuntimeSpineAsset | 0x3261460 | 0x3361460 |
-| ScenarioResourceManager | TrimBackgroundSkeletonCache | → void | 0x3263a2c | 0x3273a2c |
+| ScenarioResourceManager | TrimBackgroundSkeletonCache | → void | 0x3263a2c | 0x3363a2c |
 | SpineBackgroundVisual | ValidatePlayback | → void | 0x3275418 | 0x3375418 |
 | SpineBackgroundVisual | Attach | → void | 0x327d380 | 0x337d380 |
 | SpineBackgroundVisual | SetColor | → void | 0x327d7f0 | 0x337d7f0 |
