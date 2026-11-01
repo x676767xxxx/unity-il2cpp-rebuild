@@ -1,0 +1,57 @@
+name: Android IL2CPP native target recovery
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/android-il2cpp-target-recovery.yml"
+      - "scripts/extract-il2cpp-targets.py"
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.x
+      - name: Download and extract Android APK
+        run: |
+          set -euo pipefail
+          mkdir -p work/android work/tools work/out
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -q work/android/base.apk -d work/android/unpacked
+          LIB="$(find work/android/unpacked -type f -name libil2cpp.so | head -n 1)"
+          META="$(find work/android/unpacked -type f -name global-metadata.dat | head -n 1)"
+          test -n "$LIB"
+          test -n "$META"
+          printf '%s\n' "$LIB" > work/out/libil2cpp-path.txt
+          printf '%s\n' "$META" > work/out/global-metadata-path.txt
+          sha256sum "$LIB" "$META" > work/out/input-sha256.txt
+          file "$LIB" "$META" > work/out/input-file-types.txt
+          readelf -h "$LIB" > work/out/il2cpp-elf-header.txt
+      - name: Download Il2CppDumper
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o work/tools/Il2CppDumper.zip "https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net6-v6.7.46.zip"
+          unzip -q work/tools/Il2CppDumper.zip -d work/tools/dumper
+          test -f work/tools/dumper/Il2CppDumper.dll
+      - name: Recover IL2CPP metadata and method RVAs
+        run: |
+          set -euo pipefail
+          LIB="$(cat work/out/libil2cpp-path.txt)"
+          META="$(cat work/out/global-metadata-path.txt)"
+          dotnet work/tools/dumper/Il2CppDumper.dll "$LIB" "$META" work/out/dump 2>&1 | tee work/out/il2cpp-dumper.log
+          python3 scripts/extract-il2cpp-targets.py work/out/dump work/out/android-il2cpp-targets.json
+          cp work/out/dump/dump.cs work/out/dump.cs
+          cp work/out/dump/script.json work/out/script.json || true
+          cp work/out/dump/il2cpp.h work/out/il2cpp.h || true
+      - name: Upload Android IL2CPP analysis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-android-il2cpp-target-recovery
+          path: work/out/
