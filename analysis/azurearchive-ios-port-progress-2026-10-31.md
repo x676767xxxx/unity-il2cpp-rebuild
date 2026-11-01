@@ -445,3 +445,25 @@ The corrected workflow [41200720295](https://github.com/x676767xxxx/unity-il2cpp
 6. Build the complete iOS app, install and test on a physical iPhone, then produce and inspect a signed IPA.
 
 No duplicate source file was added by this audit. The next code change must wait for a real project/dependency surface or be limited to a narrowly testable engine-independent behavior; adding fake Unity/Spine APIs would not move the app toward a valid build.
+
+
+## Runtime cache callback-isolation checkpoint — 2026-11-01
+
+A review of the existing static-background Addressables cache found that a consumer callback exception could invalidate a successfully loaded shared texture lease, even when other coalesced callers were waiting for the same asset. The failure path also stopped notifying later waiters if an earlier failure callback threw.
+
+Changes committed on the working branch:
+- `BackgroundImageRuntimeCache.Unity.cs`: successful native Addressables leases remain cache-owned when an individual consumer callback throws; later success callbacks still run. Callback exceptions are logged through Unity `Debug.LogError`.
+- The native load failure path now continues notifying all coalesced failure callbacks if one callback throws, logging callback faults separately from the original load failure.
+- `tests/AzureArchive.UnityCompat.Tests/Program.cs`: added regression coverage for success callback isolation, shared lease retention and disposal, and failure callback fan-out.
+- No existing source file was duplicated; the existing test program and runtime cache implementation were updated in place.
+
+Validation:
+- Latest tested commit: `28d647959f70adb7d640e08033513e232a6526cd`
+- GitHub Actions run: [41258336235](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/41258336235) — completed successfully.
+- Source include/path preflight: passed.
+- .NET Standard 2.1 compatibility library build: passed.
+- Background path safety tests: passed.
+- Unity compatibility source compile and isolated API-stub regression tests: passed.
+- Artifact: `azurearchive-background-path-compat-library`, ID `13063598527`, 26,704 bytes.
+
+Validation boundary: these are isolated .NET / Unity API-stub tests. This does not compile the full game in Unity, link the adapter into the actual UnityFramework, build an Xcode app, or produce an IPA. The missing Unity project/Xcode integration base remains the hard blocker for full application compilation.
