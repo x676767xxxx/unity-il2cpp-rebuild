@@ -3,6 +3,7 @@
 // metadata-bounded method range, creates one function, and obtains pseudocode.
 // It intentionally does not run whole-program auto-analysis.
 
+import ghidra.app.script.GhidraScript;
 import ghidra.app.cmd.disassemble.DisassembleCommand;
 import ghidra.app.cmd.function.CreateFunctionCmd;
 import ghidra.app.decompiler.DecompInterface;
