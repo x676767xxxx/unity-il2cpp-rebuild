@@ -1,7 +1,8 @@
-// Focused, bounded Ghidra preparation for one IL2CPP method.
-// The caller imports the ELF with -noanalysis; this script decodes only the
-// metadata-bounded method range, creates one function, and obtains pseudocode.
-// It intentionally does not run whole-program auto-analysis.
+// Focused Ghidra preparation for one IL2CPP method.
+// Import is performed with -noanalysis. Only flow reachable from the selected
+// entry is disassembled inside a bounded executable window; calls are not
+// turned into whole-program auto-analysis. Ghidra then computes the function
+// body from the decoded control flow, including out-of-line basic blocks.
 
 import ghidra.app.script.GhidraScript;
 import ghidra.app.cmd.disassemble.DisassembleCommand;
@@ -25,56 +26,59 @@ public class PrepareFocusedFunction extends GhidraScript {
     @Override
     protected void run() throws Exception {
         String[] args = getScriptArgs();
-        if (args.length != 5) {
+        if (args.length != 6) {
             throw new IllegalArgumentException(
-                "Expected: <entry> <end-exclusive> <function-name> <pseudocode-path> <metadata-json-path>");
+                "Expected: <entry> <next-method-entry> <max-range-bytes> <function-name> <pseudocode-path> <metadata-json-path>");
         }
 
         Address entry = toAddr(Long.decode(args[0]));
-        Address endExclusive = toAddr(Long.decode(args[1]));
-        String functionName = args[2];
-        Path pseudocodePath = Paths.get(args[3]).toAbsolutePath();
-        Path metadataPath = Paths.get(args[4]).toAbsolutePath();
+        Address nextMethodEntry = toAddr(Long.decode(args[1]));
+        long maxRangeBytes = Long.decode(args[2]);
+        String functionName = args[3];
+        Path pseudocodePath = Paths.get(args[4]).toAbsolutePath();
+        Path metadataPath = Paths.get(args[5]).toAbsolutePath();
 
-        if (entry.compareTo(endExclusive) >= 0) {
-            throw new IllegalArgumentException("Invalid empty/reversed target range");
+        if (maxRangeBytes < 4 || maxRangeBytes > 0x1000000L) {
+            throw new IllegalArgumentException("max-range-bytes must be between 4 and 16 MiB");
         }
-        Address last = endExclusive.subtract(1);
+        if (entry.equals(nextMethodEntry)) {
+            throw new IllegalArgumentException("The next method entry must differ from the target entry");
+        }
+
         MemoryBlock block = currentProgram.getMemory().getBlock(entry);
         if (block == null || !block.isInitialized() || !block.isExecute()) {
             throw new IllegalStateException("Target entry is not in initialized executable memory: " + entry);
         }
-        if (!block.contains(last)) {
-            throw new IllegalStateException("Metadata-bounded target range crosses a memory block: " + entry + ".." + last);
+        if (currentProgram.getMemory().getBlock(nextMethodEntry) != block) {
+            throw new IllegalStateException("Next method entry is not in the same executable memory block");
         }
 
-        AddressSet restricted = new AddressSet(entry, last);
+        Address rangeEnd = entry.add(maxRangeBytes - 1);
+        if (rangeEnd.compareTo(block.getEnd()) > 0) {
+            rangeEnd = block.getEnd();
+        }
+        if (rangeEnd.compareTo(nextMethodEntry) < 0) {
+            throw new IllegalStateException("Disassembly range does not reach the next-method guard");
+        }
+
+        AddressSet restricted = new AddressSet(entry, rangeEnd);
         DisassembleCommand disassemble = new DisassembleCommand(entry, restricted, true);
         if (!disassemble.applyTo(currentProgram, monitor)) {
-            throw new IllegalStateException("Bounded disassembly failed: " + disassemble.getStatusMsg());
+            throw new IllegalStateException("Bounded flow disassembly failed: " + disassemble.getStatusMsg());
         }
         AddressSet decoded = disassemble.getDisassembledAddressSet();
         if (decoded == null || decoded.isEmpty() || !decoded.contains(entry)) {
             throw new IllegalStateException("No instruction was decoded at target entry: " + entry);
         }
 
-        int instructionCount = 0;
-        InstructionIterator iterator = currentProgram.getListing().getInstructions(decoded, true);
-        while (iterator.hasNext()) {
-            Instruction instruction = iterator.next();
-            if (instruction.getAddress().compareTo(last) > 0) {
-                throw new IllegalStateException("Disassembler escaped the metadata-bounded range");
-            }
-            instructionCount++;
-        }
-        if (instructionCount == 0) {
-            throw new IllegalStateException("Target range produced no instructions");
+        int decodedInstructionCount = countInstructions(decoded);
+        if (decodedInstructionCount == 0) {
+            throw new IllegalStateException("Bounded flow disassembly produced no instructions");
         }
 
         Function function = currentProgram.getFunctionManager().getFunctionAt(entry);
         if (function == null) {
-            CreateFunctionCmd create = new CreateFunctionCmd(
-                functionName, entry, decoded, SourceType.ANALYSIS);
+            CreateFunctionCmd create = new CreateFunctionCmd(entry);
             if (!create.applyTo(currentProgram, monitor)) {
                 throw new IllegalStateException("Function creation failed: " + create.getStatusMsg());
             }
@@ -83,11 +87,22 @@ public class PrepareFocusedFunction extends GhidraScript {
         if (function == null || !function.getEntryPoint().equals(entry)) {
             throw new IllegalStateException("Ghidra did not create the requested function entry");
         }
+        function.setName(functionName, SourceType.ANALYSIS);
+
         if (function.getBody().getMinAddress().compareTo(entry) < 0 ||
-            function.getBody().getMaxAddress().compareTo(last) > 0) {
+            function.getBody().getMaxAddress().compareTo(rangeEnd) > 0) {
             throw new IllegalStateException(
-                "Created function body escaped metadata range: " +
+                "Computed function body escaped the bounded disassembly window: " +
                 function.getBody().getMinAddress() + ".." + function.getBody().getMaxAddress());
+        }
+        if (function.getBody().contains(nextMethodEntry)) {
+            throw new IllegalStateException(
+                "Computed function body overlaps the next metadata method entry: " + nextMethodEntry);
+        }
+
+        int bodyInstructionCount = countInstructions(function.getBody());
+        if (bodyInstructionCount == 0) {
+            throw new IllegalStateException("Computed function body contains no instructions");
         }
 
         DecompInterface decompiler = new DecompInterface();
@@ -120,18 +135,30 @@ public class PrepareFocusedFunction extends GhidraScript {
             "  \"program_name\": " + quote(currentProgram.getName()) + ",\n" +
             "  \"function_name\": " + quote(functionName) + ",\n" +
             "  \"entry\": " + quote(entry.toString()) + ",\n" +
-            "  \"end_exclusive\": " + quote(endExclusive.toString()) + ",\n" +
+            "  \"next_method_entry_guard\": " + quote(nextMethodEntry.toString()) + ",\n" +
+            "  \"disassembly_range_end\": " + quote(rangeEnd.toString()) + ",\n" +
             "  \"function_body_min\": " + quote(function.getBody().getMinAddress().toString()) + ",\n" +
             "  \"function_body_max\": " + quote(function.getBody().getMaxAddress().toString()) + ",\n" +
-            "  \"instruction_count\": " + instructionCount + ",\n" +
+            "  \"decoded_instruction_count\": " + decodedInstructionCount + ",\n" +
+            "  \"body_instruction_count\": " + bodyInstructionCount + ",\n" +
             "  \"pseudocode_chars\": " + pseudocode.length() + ",\n" +
             "  \"pseudocode_sha256\": " + quote(digest) + ",\n" +
             "  \"pseudocode_file\": " + quote(pseudocodePath.toString()) + ",\n" +
-            "  \"analysis_mode\": \"noanalysis plus metadata-bounded disassembly\"\n" +
+            "  \"analysis_mode\": \"noanalysis plus bounded flow disassembly and Ghidra-computed function body\"\n" +
             "}\n";
         Files.writeString(metadataPath, json, StandardCharsets.UTF_8);
 
         println("REA_FOCUSED_FUNCTION_OK " + json.replace("\n", " "));
+    }
+
+    private int countInstructions(ghidra.program.model.address.AddressSetView addresses) {
+        int count = 0;
+        InstructionIterator iterator = currentProgram.getListing().getInstructions(addresses, true);
+        while (iterator.hasNext()) {
+            Instruction instruction = iterator.next();
+            count++;
+        }
+        return count;
     }
 
     private String quote(String value) {

@@ -69,7 +69,7 @@ jobs:
             --json 2>&1 | tee work/rea/metadata-link.log
           test -s work/input/ghidra-method-seeds.txt
 
-      - name: Prepare bounded Ghidra project for RuntimeSpineLoader.Load
+      - name: Prepare focused Ghidra project for RuntimeSpineLoader.Load
         shell: bash
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
@@ -84,12 +84,13 @@ jobs:
             -noanalysis \
             -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
             -postScript PrepareFocusedFunction.java \
-              0x335f2dc 0x335f32c RuntimeSpineLoader_Load \
+              0x335f2dc 0x335f32c 0x10000 RuntimeSpineLoader_Load \
               "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.c" \
               "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.json" \
             -max-cpu 2 \
             2>&1 | tee work/rea/ghidra-focused-prepare.log
-          test -s work/ghidra-project/azurearchive-spine.gpr
+          ls -la work/ghidra-project | tee work/rea/ghidra-project-files.txt
+          test -f work/ghidra-project/azurearchive-spine.gpr
           test -d work/ghidra-project/azurearchive-spine.rep
           test -s work/rea/runtime-spine-loader-load-ghidra.c
           test -s work/rea/runtime-spine-loader-load-ghidra.json
