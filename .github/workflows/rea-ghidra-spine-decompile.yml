@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - ".github/workflows/rea-ghidra-spine-decompile.yml"
+      - "scripts/ghidra/PrepareFocusedFunction.java"
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   decompile:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
           mkdir -p tools
           curl -fL --retry 3 -o tools/ghidra.zip "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip"
           unzip -q tools/ghidra.zip -d tools
-          test -x tools/ghidra_12.1.4_PUBLIC/support/launch.sh
+          test -x tools/ghidra_12.1.4_PUBLIC/support/analyzeHeadless
 
       - name: Download Android 1.0 APK and extract native analysis inputs
         shell: bash
@@ -56,11 +57,11 @@ jobs:
           cp "$METADATA" work/input/global-metadata.dat
           sha256sum work/input/libil2cpp.so work/input/global-metadata.dat | tee work/rea/input-sha256.txt
 
-      - name: Generate REA Ghidra method seeds
+      - name: Generate REA IL2CPP method-address evidence
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes rea-agents@latest inspect-il2cpp-metadata work/input/global-metadata.dat \
+          npx --yes rea-agents@6.8.0 inspect-il2cpp-metadata work/input/global-metadata.dat \
             --binary work/input/libil2cpp.so \
             --detail summary \
             --evidence_output work/rea/linked-evidence.json \
@@ -68,28 +69,90 @@ jobs:
             --json 2>&1 | tee work/rea/metadata-link.log
           test -s work/input/ghidra-method-seeds.txt
 
+      - name: Prepare bounded Ghidra project for RuntimeSpineLoader.Load
+        shell: bash
+        env:
+          GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
+          JAVA_TOOL_OPTIONS: "-Xmx2G -XX:ActiveProcessorCount=2"
+        run: |
+          set -euo pipefail
+          rm -rf work/ghidra-project
+          mkdir -p work/ghidra-project
+          "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
+            "$GITHUB_WORKSPACE/work/ghidra-project" azurearchive-spine \
+            -import "$GITHUB_WORKSPACE/work/input/libil2cpp.so" \
+            -noanalysis \
+            -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
+            -postScript PrepareFocusedFunction.java \
+              0x335f2dc 0x335f32c RuntimeSpineLoader_Load \
+              "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.c" \
+              "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.json" \
+            -max-cpu 2 \
+            2>&1 | tee work/rea/ghidra-focused-prepare.log
+          test -s work/ghidra-project/azurearchive-spine.gpr
+          test -d work/ghidra-project/azurearchive-spine.rep
+          test -s work/rea/runtime-spine-loader-load-ghidra.c
+          test -s work/rea/runtime-spine-loader-load-ghidra.json
+
       - name: Check REA Ghidra provider
         shell: bash
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
-          REA_GHIDRA_SEED_FILE: ${{ github.workspace }}/work/input/ghidra-method-seeds.txt
-          REA_GHIDRA_STARTUP_TIMEOUT_MS: "3600000"
+          REA_GHIDRA_PROJECT_PATH: ${{ github.workspace }}/work/ghidra-project/azurearchive-spine.gpr
+          REA_GHIDRA_PROGRAM_NAME: libil2cpp.so
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
         run: |
           set -euo pipefail
-          npx --yes rea-agents@latest doctor --provider ghidra --json | tee work/rea/ghidra-doctor.json
+          npx --yes rea-agents@6.8.0 doctor --provider ghidra --json | tee work/rea/ghidra-doctor.json
 
-      - name: Decompile RuntimeSpineLoader.Load
+      - name: Decompile RuntimeSpineLoader.Load with REA
         shell: bash
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
-          REA_GHIDRA_SEED_FILE: ${{ github.workspace }}/work/input/ghidra-method-seeds.txt
-          REA_GHIDRA_STARTUP_TIMEOUT_MS: "3600000"
-          REA_GHIDRA_DISABLED_ANALYZERS: "GCC Exception Handlers"
+          REA_GHIDRA_PROJECT_PATH: ${{ github.workspace }}/work/ghidra-project/azurearchive-spine.gpr
+          REA_GHIDRA_PROGRAM_NAME: libil2cpp.so
+          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
           REA_GHIDRA_DECOMPILE_TIMEOUT_SECONDS: "180"
         run: |
           set -euo pipefail
-          npx --yes rea-agents@latest decompile work/input/libil2cpp.so 0x335f2dc --provider ghidra --json \
+          npx --yes rea-agents@6.8.0 decompile work/input/libil2cpp.so 0x335f2dc --provider ghidra --json \
             2>&1 | tee work/rea/runtime-spine-loader-load-decompile.json
+
+      - name: Verify actual REA pseudocode was returned
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          source = pathlib.Path("work/rea/runtime-spine-loader-load-decompile.json")
+          payload = json.loads(source.read_text(encoding="utf-8"))
+          if isinstance(payload, dict) and payload.get("error"):
+              raise SystemExit(f"REA returned an error: {payload.get('code')}: {payload.get('message')}")
+          pseudocode = payload.get("normalized_result") if isinstance(payload, dict) else None
+          if not isinstance(pseudocode, str) or not pseudocode.strip():
+              raise SystemExit("REA result has no non-empty normalized_result pseudocode string")
+          if "{" not in pseudocode or "}" not in pseudocode:
+              raise SystemExit("REA normalized_result does not look like a function body")
+          ghidra_code = pathlib.Path("work/rea/runtime-spine-loader-load-ghidra.c").read_text(encoding="utf-8")
+          if not ghidra_code.strip():
+              raise SystemExit("Focused Ghidra pseudocode file is empty")
+          pathlib.Path("work/rea/runtime-spine-loader-load-rea.c").write_text(pseudocode, encoding="utf-8")
+          verification = {
+              "status": "verified",
+              "operation": "procedure_pseudo_code",
+              "target": "RuntimeSpineLoader.Load",
+              "address": "0x335f2dc",
+              "rea_pseudocode_chars": len(pseudocode),
+              "rea_pseudocode_sha256": hashlib.sha256(pseudocode.encode()).hexdigest(),
+              "focused_ghidra_pseudocode_chars": len(ghidra_code),
+              "focused_ghidra_pseudocode_sha256": hashlib.sha256(ghidra_code.encode()).hexdigest(),
+              "same_text": pseudocode == ghidra_code,
+              "note": "Both outputs are Ghidra-derived pseudocode; equality is recorded, not required."
+          }
+          pathlib.Path("work/rea/decompile-verification.json").write_text(
+              json.dumps(verification, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(verification, indent=2))
+          PY
 
       - name: Upload REA Ghidra decompilation
         if: always()
