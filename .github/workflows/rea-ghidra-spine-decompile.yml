@@ -69,7 +69,7 @@ jobs:
             --json 2>&1 | tee work/rea/metadata-link.log
           test -s work/input/ghidra-method-seeds.txt
 
-      - name: Prepare focused Ghidra project for RuntimeSpineLoader.Load
+      - name: Extract focused Ghidra pseudocode for Spine loader methods
         shell: bash
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
@@ -87,72 +87,93 @@ jobs:
               0x335f2dc 0x335f32c RuntimeSpineLoader_Load \
               "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.c" \
               "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.json" \
+            -postScript PrepareFocusedFunction.java \
+              0x335f32c 0x335fbdc RuntimeSpineLoader_Create \
+              "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-create-ghidra.c" \
+              "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-create-ghidra.json" \
+            -postScript PrepareFocusedFunction.java \
+              0x336004c 0x33601c4 PageTextureLoader_Load \
+              "$GITHUB_WORKSPACE/work/rea/page-texture-loader-load-ghidra.c" \
+              "$GITHUB_WORKSPACE/work/rea/page-texture-loader-load-ghidra.json" \
+            -postScript PrepareFocusedFunction.java \
+              0x33601c4 0x33601c8 PageTextureLoader_Unload \
+              "$GITHUB_WORKSPACE/work/rea/page-texture-loader-unload-ghidra.c" \
+              "$GITHUB_WORKSPACE/work/rea/page-texture-loader-unload-ghidra.json" \
+            -postScript PrepareFocusedFunction.java \
+              0x335fd1c 0x335ffc8 RuntimeSpineAsset_Dispose \
+              "$GITHUB_WORKSPACE/work/rea/runtime-spine-asset-dispose-ghidra.c" \
+              "$GITHUB_WORKSPACE/work/rea/runtime-spine-asset-dispose-ghidra.json" \
             -max-cpu 2 \
             2>&1 | tee work/rea/ghidra-focused-prepare.log
           ls -la work/ghidra-project | tee work/rea/ghidra-project-files.txt
           test -f work/ghidra-project/azurearchive-spine.gpr
           test -d work/ghidra-project/azurearchive-spine.rep
-          test -s work/rea/runtime-spine-loader-load-ghidra.c
-          test -s work/rea/runtime-spine-loader-load-ghidra.json
+          for stem in \
+            runtime-spine-loader-load \
+            runtime-spine-loader-create \
+            page-texture-loader-load \
+            page-texture-loader-unload \
+            runtime-spine-asset-dispose; do
+            test -s "work/rea/${stem}-ghidra.c"
+            test -s "work/rea/${stem}-ghidra.json"
+          done
 
-      - name: Check REA Ghidra provider
-        shell: bash
-        env:
-          GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
-          REA_GHIDRA_PROJECT_PATH: ${{ github.workspace }}/work/ghidra-project/azurearchive-spine.gpr
-          REA_GHIDRA_PROGRAM_NAME: libil2cpp.so
-          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
-        run: |
-          set -euo pipefail
-          npx --yes rea-agents@6.8.0 doctor --provider ghidra --json | tee work/rea/ghidra-doctor.json
-
-      - name: Decompile RuntimeSpineLoader.Load with REA
-        shell: bash
-        env:
-          GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
-          REA_GHIDRA_PROJECT_PATH: ${{ github.workspace }}/work/ghidra-project/azurearchive-spine.gpr
-          REA_GHIDRA_PROGRAM_NAME: libil2cpp.so
-          REA_GHIDRA_STARTUP_TIMEOUT_MS: "600000"
-          REA_GHIDRA_DECOMPILE_TIMEOUT_SECONDS: "180"
-        run: |
-          set -euo pipefail
-          npx --yes rea-agents@6.8.0 decompile work/input/libil2cpp.so 0x335f2dc --provider ghidra --json \
-            2>&1 | tee work/rea/runtime-spine-loader-load-decompile.json
-
-      - name: Verify actual REA pseudocode was returned
+      - name: Verify focused Ghidra pseudocode artifacts
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import hashlib, json, pathlib
-          source = pathlib.Path("work/rea/runtime-spine-loader-load-decompile.json")
-          payload = json.loads(source.read_text(encoding="utf-8"))
-          if isinstance(payload, dict) and payload.get("error"):
-              raise SystemExit(f"REA returned an error: {payload.get('code')}: {payload.get('message')}")
-          pseudocode = payload.get("normalized_result") if isinstance(payload, dict) else None
-          if not isinstance(pseudocode, str) or not pseudocode.strip():
-              raise SystemExit("REA result has no non-empty normalized_result pseudocode string")
-          if "{" not in pseudocode or "}" not in pseudocode:
-              raise SystemExit("REA normalized_result does not look like a function body")
-          ghidra_code = pathlib.Path("work/rea/runtime-spine-loader-load-ghidra.c").read_text(encoding="utf-8")
-          if not ghidra_code.strip():
-              raise SystemExit("Focused Ghidra pseudocode file is empty")
-          pathlib.Path("work/rea/runtime-spine-loader-load-rea.c").write_text(pseudocode, encoding="utf-8")
-          verification = {
-              "status": "verified",
-              "operation": "procedure_pseudo_code",
-              "target": "RuntimeSpineLoader.Load",
-              "address": "0x335f2dc",
-              "rea_pseudocode_chars": len(pseudocode),
-              "rea_pseudocode_sha256": hashlib.sha256(pseudocode.encode()).hexdigest(),
-              "focused_ghidra_pseudocode_chars": len(ghidra_code),
-              "focused_ghidra_pseudocode_sha256": hashlib.sha256(ghidra_code.encode()).hexdigest(),
-              "same_text": pseudocode == ghidra_code,
-              "note": "Both outputs are Ghidra-derived pseudocode; equality is recorded, not required."
+          root = pathlib.Path("work/rea")
+          targets = [
+              ("RuntimeSpineLoader.Load", "0335f2dc", "0335f32c", "runtime-spine-loader-load"),
+              ("RuntimeSpineLoader.Create", "0335f32c", "0335fbdc", "runtime-spine-loader-create"),
+              ("PageTextureLoader.Load", "0336004c", "033601c4", "page-texture-loader-load"),
+              ("PageTextureLoader.Unload", "033601c4", "033601c8", "page-texture-loader-unload"),
+              ("RuntimeSpineAsset.Dispose", "0335fd1c", "0335ffc8", "runtime-spine-asset-dispose"),
+          ]
+          verified = []
+          for name, entry, end, stem in targets:
+              code_path = root / f"{stem}-ghidra.c"
+              meta_path = root / f"{stem}-ghidra.json"
+              code = code_path.read_text(encoding="utf-8")
+              meta = json.loads(meta_path.read_text(encoding="utf-8"))
+              digest = hashlib.sha256(code.encode()).hexdigest()
+              if not code.strip() or not meta.get("pseudocode_chars"):
+                  raise SystemExit(f"{name}: missing non-empty Ghidra pseudocode")
+              if meta.get("function_name") != name.replace(".", "_"):
+                  raise SystemExit(f"{name}: unexpected function identity {meta.get('function_name')}")
+              if meta.get("entry", "").lower() != entry.lower():
+                  raise SystemExit(f"{name}: entry mismatch {meta.get('entry')}")
+              if int(meta.get("metadata_end_exclusive", "0"), 16) != int(end, 16):
+                  raise SystemExit(f"{name}: end-exclusive mismatch {meta.get('metadata_end_exclusive')}")
+              if int(meta.get("function_body_min", "0"), 16) < int(entry, 16):
+                  raise SystemExit(f"{name}: function body begins before its metadata interval")
+              if int(meta.get("function_body_max", "0"), 16) >= int(end, 16):
+                  raise SystemExit(f"{name}: function body escapes its metadata interval")
+              if meta.get("pseudocode_sha256") != digest or meta.get("pseudocode_chars") != len(code):
+                  raise SystemExit(f"{name}: pseudocode hash/length does not match its sidecar")
+              if name.replace(".", "_") not in code:
+                  raise SystemExit(f"{name}: output does not contain the requested function name")
+              verified.append({
+                  "target": name,
+                  "entry": "0x" + entry,
+                  "metadata_end_exclusive": "0x" + end,
+                  "instruction_count": meta.get("instruction_count"),
+                  "pseudocode_chars": len(code),
+                  "pseudocode_sha256": digest,
+                  "status": "extracted_and_hash_verified",
+                  "limitation": "Metadata-bounded extraction; not proof of complete CFG, out-of-line blocks, or LSDA coverage."
+              })
+          report = {
+              "format": "azurearchive-focused-ghidra-batch-v1",
+              "binary_sha256": pathlib.Path("work/rea/input-sha256.txt").read_text().splitlines()[0].split()[0],
+              "targets": verified,
+              "analysis_mode": "Ghidra 12.1.4 headless import with -noanalysis and focused DecompInterface scripts",
+              "not_claimed": ["complete function CFG", "exception/LSDA recovery", "recovered C# source", "Unity project restoration", "iOS Player or IPA"]
           }
-          pathlib.Path("work/rea/decompile-verification.json").write_text(
-              json.dumps(verification, indent=2) + "\n", encoding="utf-8")
-          print(json.dumps(verification, indent=2))
+          (root / "focused-ghidra-verification.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(report, indent=2))
           PY
 
       - name: Upload REA Ghidra decompilation
