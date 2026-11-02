@@ -84,7 +84,7 @@ jobs:
             -noanalysis \
             -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
             -postScript PrepareFocusedFunction.java \
-              0x335f2dc 0x335f32c 0x10000 RuntimeSpineLoader_Load \
+              0x335f2dc 0x335f32c RuntimeSpineLoader_Load \
               "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.c" \
               "$GITHUB_WORKSPACE/work/rea/runtime-spine-loader-load-ghidra.json" \
             -max-cpu 2 \
