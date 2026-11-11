@@ -208,7 +208,7 @@ public class PrepareFlowFunction extends GhidraScript {
         // This distinguishes missing function ownership from missing/non-executable code bytes.
         if (name.equals("RuntimeSpineLoader_Load") || name.equals("RuntimeSpineAsset_Retain") ||
             name.equals("RuntimeSpineAsset_get_EstimatedTextureBytes")) {
-            StringBuilder forensic = new StringBuilder("pcode_address\\tmemory_block\\tinitialized\\texecutable\\tinstruction_present\\tmnemonic\\tinstruction_text\\tbytes_hex\\tflow_type\\tflow_targets\\towner_entry\\towner_name\\ttarget_body\\n");
+            StringBuilder forensic = new StringBuilder("pcode_address\tmemory_block\tinitialized\texecutable\tinstruction_present\tmnemonic\tinstruction_text\tbytes_hex\tflow_type\tflow_targets\towner_entry\towner_name\ttarget_body\n");
             TreeSet<Long> sortedPcodeAddresses = new TreeSet<>(decompilerInstructionAddresses);
             for (Long rawAddress : sortedPcodeAddresses) {
                 Address address = toAddr(rawAddress);
@@ -222,7 +222,7 @@ public class PrepareFlowFunction extends GhidraScript {
                 }
                 Function owner = currentProgram.getFunctionManager().getFunctionContaining(address);
                 String mnemonic = instruction == null ? "" : instruction.getMnemonicString();
-                String instructionText = instruction == null ? "" : instruction.toString().replace("\\t", " ").replace("\\n", " ");
+                String instructionText = instruction == null ? "" : instruction.toString().replace("\t", " ").replace("\n", " ");
                 String bytesHex = "";
                 if (instruction != null) {
                     byte[] rawBytes = instruction.getBytes();
@@ -232,16 +232,21 @@ public class PrepareFlowFunction extends GhidraScript {
                 }
                 String flowType = instruction == null ? "" : instruction.getFlowType().toString();
                 StringBuilder flowTargets = new StringBuilder();
+                StringBuilder flowTargetOwners = new StringBuilder();
                 if (instruction != null) {
                     for (Address target : instruction.getFlows()) {
                         if (flowTargets.length() > 0) flowTargets.append(",");
                         flowTargets.append(target.toString());
+                        Function targetOwner = currentProgram.getFunctionManager().getFunctionContaining(target);
+                        if (flowTargetOwners.length() > 0) flowTargetOwners.append(",");
+                        flowTargetOwners.append(target.toString()).append("=");
+                        if (targetOwner != null) flowTargetOwners.append(targetOwner.getEntryPoint()).append(":").append(targetOwner.getName());
                     }
                 }
-                forensic.append(String.format("0x%x\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n",
+                forensic.append(String.format("0x%x\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
                     rawAddress, block == null ? "" : block.getName(), block != null && block.isInitialized(),
                     block != null && block.isExecute(), instruction != null, mnemonic, instructionText, bytesHex,
-                    flowType, flowTargets.toString(), owner == null ? "" : owner.getEntryPoint().toString(),
+                    flowType, flowTargets.toString(), flowTargetOwners.toString(), owner == null ? "" : owner.getEntryPoint().toString(),
                     owner == null ? "" : owner.getName(), function.getBody().contains(address)));
             }
             Path forensicPath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".pcode-address-forensics.tsv");
