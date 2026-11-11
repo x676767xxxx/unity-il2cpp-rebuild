@@ -207,3 +207,38 @@ The script correction commit [b4d545a](https://github.com/x676767xxxx/unity-il2c
 - No Artifact was available yet.
 
 This is the first run that includes both the fall-through method-entry guard and explicit Ghidra function-body replacement/size verification. Its eventual success or failure remains to be observed.
+
+
+## Corrected rerun artifact review — run 42997601270
+
+The corrected run [42997601270](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42997601270) completed with conclusion `success` (all 11 workflow steps passed). Artifact [13845391583 — azurearchive-rea-spine-flow-recovery](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42997601270/artifacts/13845391583) is 4,348,125 bytes; GitHub reports SHA-256 `3dcee536a0c575e697c41f196c4bd465187292afbec1e3c36a93ffcf15602af7`.
+
+### Corrected bounded traversal counts
+
+| Method | ELF RVA | Reachable/decoded instructions | Decode failures | Skipped method entries | Pseudocode chars |
+|---|---:|---:|---:|---:|---:|
+| RuntimeAtlasTexture.TryPngSize | `0x325c770` | 136 / 136 | 0 | 1 | 3,406 |
+| RuntimeSpineLoader.DestroyOwned | `0x325e994` | 51 / 51 | 0 | 2 | 2,809 |
+| RuntimeSpineLoader.AtlasPages | `0x325ea60` | 225 / 225 | 0 | 1 | 7,137 |
+| RuntimeSpineLoader.Read | `0x325ee08` | 179 / 179 | 0 | 1 | 2,833 |
+| RuntimeSpineLoader.ReadAsync | `0x325f1c0` | 329 / 329 | 0 | 1 | 3,630 |
+
+The corrected traversal now reports fewer instructions for TryPngSize, AtlasPages, and Read than the prior flawed run, consistent with the new method-entry fall-through fence. AtlasPages' skipped-entry file explicitly records `0x335ee08` (the Read method entry); ReadAsync records `0x335f2d4` (the following Load method entry). All five per-file JSON records report zero decode failures.
+
+### Important: do not yet accept all five decompilations
+
+The corrected run has fixed the traversal-side method-entry fence and passed the new function-body address-count check. However, a direct review of the generated C files still shows unresolved Ghidra decompiler issues:
+
+- `AtlasPages` still has numerous “Removing unreachable block” warnings at addresses beginning around `0x0335eebc`, and the exported function body ends with runtime initialization/helper logic that resembles the adjacent Read implementation. The JSON confirms the Read entry itself was skipped, but that alone does not prove every later address belongs to AtlasPages. This remains a decompiler-scope/ownership-of-cold-blocks issue requiring instruction-address-to-body-set comparison.
+- `ReadAsync` still decompiles as `void RuntimeSpineLoader_ReadAsync(void)` with a very small body (initialization and one helper call), despite the bounded traversal counting 329 instructions. The metadata signature is `Task<Files> ReadAsync(string basePath)`. This could reflect an IL2CPP wrapper/state-machine split or a decompiler function-body/signature limitation; it is not enough evidence to label the whole method body recovered. The pseudocode SHA-256 is unchanged from the earlier export, so this rerun has not yet demonstrated richer ReadAsync semantics.
+- `DestroyOwned` still contains explicit Ghidra warnings for unresolved jump tables at `0x06814cf8` and `0x06814e4c`, with indirect jumps treated as calls.
+- `Read` and `AtlasPages` still contain PIC-construction and unreachable-block warnings. Hash/length verification validates artifact integrity, not semantic completeness.
+
+### Current evidence grade
+
+- **Traversal evidence:** improved and useful as bounded reachability evidence for five method entries.
+- **Decompiler evidence:** TryPngSize and DestroyOwned are inspectable but have unresolved helper/jump-table questions; AtlasPages and ReadAsync remain unaccepted as clean method-body exports; Read remains provisional due decompiler warnings.
+- **Full CFG:** not established. The script still does not recover indirect jump tables or all exception/LSDA edges.
+- **Original C# / Unity project / iOS IPA:** not recovered or built.
+
+Next engineering step is to compare the exact decoded address set against Ghidra's decompiler output/control-flow graph, and resolve cold blocks and async state-machine helper targets before expanding this workflow to the remaining texture/cache and page-texture methods.
