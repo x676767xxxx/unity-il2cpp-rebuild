@@ -28,6 +28,24 @@ def read_cstr(blob, base, index):
         return ""
     return blob[start:end].decode("utf-8", errors="replace")
 
+def decode_compressed_int32(data, offset, end):
+    encoded = 0
+    shift = 0
+    raw = bytearray()
+    for _ in range(5):
+        if offset + len(raw) >= end:
+            fail("compressed int32 runs past field-default data section")
+        byte = data[offset + len(raw)]
+        raw.append(byte)
+        encoded |= (byte & 0x7f) << shift
+        if (byte & 0x80) == 0:
+            # IL2CPP v29 compressed signed integers use zig-zag decoding.
+            value = (encoded >> 1) ^ -(encoded & 1)
+            return value, bytes(raw).hex()
+        shift += 7
+    fail("invalid compressed int32 in field-default data")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--metadata", required=True)
@@ -112,11 +130,11 @@ def main():
     field_defaults = {}
     for idx in range(field_default_size // 12):
         field_index, type_index, data_index = struct.unpack_from("<3i", data, field_default_off + idx * 12)
-        if 0 <= data_index <= field_data_size - 4:
-            raw_bytes = data[field_data_off + data_index:field_data_off + data_index + 8]
-            value = struct.unpack_from("<i", data, field_data_off + data_index)[0]
+        if 0 <= data_index < field_data_size:
+            value, raw_hex = decode_compressed_int32(data, field_data_off + data_index,
+                                                     field_data_off + field_data_size)
             field_defaults[field_index] = {"type_index": type_index, "data_index": data_index,
-                                           "value": value, "raw_hex": raw_bytes.hex()}
+                                           "value": value, "raw_hex": raw_hex}
 
     vtable_values = struct.unpack_from("<" + "I" * (vtable_size // 4), data, vtable_off)
     type_records = []
