@@ -155,7 +155,7 @@ jobs:
             -noanalysis
             -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra"
           )
-          while IFS=$'\\t' read -r index type method symbol stem entry; do
+          while IFS=$'\t' read -r index type method symbol stem entry; do
             echo "Queueing $type.$method at $entry"
             ARGS+=(
               -postScript PrepareFlowFunction.java
@@ -170,7 +170,7 @@ jobs:
           EXPECTED="$(wc -l < work/rea/flow-targets.tsv)"
           ACTUAL="$(grep -c 'REA_FLOW_FUNCTION_OK' "$LOG" || true)"
           test "$ACTUAL" -eq "$EXPECTED"
-          while IFS=$'\\t' read -r index type method symbol stem entry; do
+          while IFS=$'\t' read -r index type method symbol stem entry; do
             test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c"
             test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json"
           done < work/rea/flow-targets.tsv
