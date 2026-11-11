@@ -379,3 +379,12 @@ The linked IL2CPP metadata identifies the helper called at loaded address `0x033
 `RuntimeAtlasTexture.<TryPngSize>g__Read|19_0`
 
 This resolves the helper's ownership: it is a compiler-generated local function belonging to `RuntimeAtlasTexture.TryPngSize`. Its exact byte-reading semantics and bounds behavior are still to be confirmed by decompiling this helper itself. This is the next focused target, rather than guessing its endianness from the caller.
+
+
+## Generated local reader helper target — workflow repair log
+
+Metadata index 25286 identifies the caller's local helper `RuntimeAtlasTexture.<TryPngSize>g__Read|19_0` at RVA `0x325e4f4`. The workflow target list was extended to include it, using a safe Ghidra symbol label while preserving the exact metadata method name for identity checks.
+
+The first three push-triggered attempts (runs 43000546124, 43000609947, and 43000676656) failed immediately during workflow-file editing. The shell loop and TSV column schema were being changed, and duplicate trailing workflow fragments were found in the file. The workflow has now been reduced to one copy of each step, with a six-column TSV reader and matching six-column verifier. Current workflow cleanup commit: `f284da5992c863056cb36e6248f5c45636b822e6`.
+
+The cleaned file currently contains one recovery loop, one verification step, and one artifact-upload step. A successful run for this cleaned commit has not yet been observed; do not treat the helper analysis as completed until a new Artifact includes its pseudocode and metadata JSON.
