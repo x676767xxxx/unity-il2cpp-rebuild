@@ -97,6 +97,22 @@ The linked metadata record provides concrete declared field types for the Spine 
 
 This metadata strongly supports interpreting the two file-read results in `RuntimeSpineLoader.Read` as the Atlas text and skeleton byte array, with the page dictionary populated from Atlas page paths. The `EstimatedTextureBytes` method begins from the `owned` field at `this+0x10` and contains collection/enumerator plus virtual-dispatch loops. It is therefore traversing the owned Unity-object set; the exact texture subtype filter and per-texture size formula are still not resolved. Do not assume the total is simply width × height × 4 or DXT5 block size without recovering the virtual targets and arithmetic.
 
+### Run 25: exact ReadAsync closure adapter and texture-byte estimator boundaries
+
+Run 25 succeeded (workflow run `43009553595`, artifact `13850270986`, SHA-256 `fa83a88f3a67fb0338dec17eefe964c02f5e3db7f19b04a08f5610c8742c3bdc`). The artifact now includes an independent instruction listing for the nested callback.
+
+**Exact callback machine code.** At loaded address `0x3360250`, the four instructions are:
+- `ldr x8,[x0,#0x10]`
+- `ldrb w1,[x0,#0x18]`
+- `mov x0,x8`
+- `b 0x0335ee08`
+
+This proves that the closure's `basePath` field at +0x10 and `supportsDxt5` flag at +0x18 are passed as the two arguments to `RuntimeSpineLoader.Read(string,bool)`. It is a tail branch, not a separately implemented file loader. It does not alone identify the exact scheduling API used by the outer ReadAsync method.
+
+**EstimatedTextureBytes: what the machine code does establish.** The function reads the `owned` field from `RuntimeSpineAsset` at +0x10, obtains/initializes cached collection/enumerator support objects, and performs multiple collection iterations with virtual getter calls. The loops include signed 64-bit overflow guards and an accumulator; other branches handle empty/null collections and enumeration cleanup. The linked metadata confirms `owned` is `HashSet<UnityEngine.Object>`, `references` is `int`, and the Asset backing field is `Spine.Unity.SkeletonDataAsset`. However, the virtual getter slot targets are not yet mapped to named methods. Consequently, the exact texture filtering predicate, size property (for example dimensions or format), and per-texture formula remain unresolved. The current evidence does not justify asserting a particular bytes-per-pixel or mipmap formula.
+
+**ReadAsync scheduler caveat.** The four-instruction closure is now correctly isolated. The larger `ReadAsync` reachable flow includes Task runtime and completion paths, but the current decompiler output still does not provide a trustworthy high-level Task expression. The exact task creation/scheduling and callback registration relationship requires mapping the indirect calls and generic method instances; do not reduce this to an unqualified claim that it uses `Task.Run`.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
