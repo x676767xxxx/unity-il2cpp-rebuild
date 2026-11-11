@@ -301,3 +301,8 @@ Commit [9f830a7](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/9f83
 - record P-code addresses outside the function body and bounded diagnostic samples for both missing and extra addresses.
 
 This new check is deliberately stricter. It may fail if Ghidra's function manager cannot represent the discontiguous set exactly; that failure would be useful evidence and must not be bypassed by weakening the check. A push-triggered validation run for this commit has not yet been observed at the time of this report update.
+
+
+### Exact-set validation run status
+
+The push to script commit [9f830a7](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/9f830a77429d4844079ea4e3bed400e071446942) has now created [run 42999979795](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999979795). At the latest check it was `in_progress`; setup, checkout, Java, and runtime dependency steps had passed, while Ghidra download/install was running. No Artifact was available yet. This run will determine whether Ghidra's actual function instruction-start set exactly matches the bounded reachable set under the stricter check.
