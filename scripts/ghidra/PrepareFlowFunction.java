@@ -206,6 +206,37 @@ public class PrepareFlowFunction extends GhidraScript {
         InstructionIterator it = currentProgram.getListing().getInstructions(decoded, true);
         while (it.hasNext()) { it.next(); blockCount++; }
 
+        // Preserve the exact ARM64 listing for Spine-family targets. This is especially
+        // important for tiny callback thunks whose decompiler output may follow a tail branch
+        // into another metadata method and otherwise obscure the adapter instructions.
+        if (name.startsWith("RuntimeAtlasTexture_") || name.startsWith("RuntimeSpineLoader_") ||
+            name.startsWith("RuntimeSpineAsset_") || name.startsWith("PageTextureLoader_")) {
+            StringBuilder listing = new StringBuilder(
+                "address\\tmnemonic\\tinstruction\\tbytes_hex\\tflow_type\\tflow_targets\\tfallthrough\\tinside_target_body\\n");
+            InstructionIterator listingIt = currentProgram.getListing().getInstructions(decoded, true);
+            while (listingIt.hasNext()) {
+                Instruction instruction = listingIt.next();
+                StringBuilder bytes = new StringBuilder();
+                for (byte value : instruction.getBytes()) bytes.append(String.format("%02x", value & 0xff));
+                StringBuilder flows = new StringBuilder();
+                for (Address target : instruction.getFlows()) {
+                    if (flows.length() > 0) flows.append(",");
+                    flows.append(target.toString());
+                }
+                Address fallthrough = instruction.getFallThrough();
+                listing.append(instruction.getAddress()).append("\\t")
+                    .append(instruction.getMnemonicString()).append("\\t")
+                    .append(instruction.toString().replace("\\t", " ").replace("\\n", " ")).append("\\t")
+                    .append(bytes).append("\\t")
+                    .append(instruction.getFlowType()).append("\\t")
+                    .append(flows).append("\\t")
+                    .append(fallthrough == null ? "" : fallthrough.toString()).append("\\t")
+                    .append(function.getBody().contains(instruction.getAddress())).append("\\n");
+            }
+            Path listingPath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".instructions.tsv");
+            Files.writeString(listingPath, listing.toString(), StandardCharsets.UTF_8);
+        }
+
         // For selected provenance-heavy methods, inspect every distinct P-code source address.
         // This distinguishes missing function ownership from missing/non-executable code bytes.
         if (name.startsWith("RuntimeSpineLoader_") || name.startsWith("RuntimeSpineAsset_") ||
