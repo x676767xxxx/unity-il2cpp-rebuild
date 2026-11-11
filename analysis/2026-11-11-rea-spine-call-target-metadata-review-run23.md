@@ -194,6 +194,17 @@ The unresolved helper at `0x067e9aa0` loads the native pointer at managed object
 
 This closes the identity and return-type question: the helper's result is a `UnityEngine.TextureFormat` value obtained via `Texture2D.get_format_Injected(IntPtr)`. The method's exact native implementation and the field-layout provenance for the +0x10 pointer are still being checked. The first enum-value export used a raw-width interpretation that produced invalid-looking values; it is superseded by the corrected compressed-int32 parser in the current workflow, and the enum values will only be marked verified after that run's output is inspected.
 
+### Run 31: TextureFormat numeric constants verified directly
+
+Run 31 succeeded (workflow run `43013272599`, artifact `13852020675`, SHA-256 `3d7527c2cf9c8b4e778eff52900c1e2c061832dbcdc2a683fa1086d01fd06a8f`). The v29 metadata parser now decodes the compressed signed-integer field-default blobs for the three relevant enum constants. The exact stored defaults are:
+- `UnityEngine.TextureFormat.RGB24 = 3` (raw compressed byte `0x06`)
+- `UnityEngine.TextureFormat.DXT1 = 10` (raw compressed byte `0x14`)
+- `UnityEngine.TextureFormat.DXT5 = 12` (raw compressed byte `0x18`)
+
+All three match the comparisons in `RuntimeAtlasTexture.EstimateTextureBytes`. This removes the prior caveat about relying on standard Unity enum-order knowledge.
+
+Run 31 also exported the metadata-confirmed method body at `0x067e9b18`, named `Texture2D_get_format_Injected`. It has 15 reachable/decoded instructions, zero decode failures, and zero P-code addresses outside its recovered body. Its pseudocode lazily resolves the same internal-call string `UnityEngine.Texture2D::get_format_Injected(System.IntPtr)` through `0x0302d9bc`, caches the pointer at global `0x073d3998`, and calls it with the IntPtr argument. This corroborates that `0x067e9aa0` is a wrapper/trampoline around this internal call rather than an unrelated format calculator.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
