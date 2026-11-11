@@ -14,6 +14,7 @@ import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.PcodeOpAST;
 import java.util.Iterator;
+import java.util.TreeSet;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.SourceType;
 import java.nio.charset.StandardCharsets;
@@ -144,7 +145,20 @@ public class PrepareFlowFunction extends GhidraScript {
             throw new IllegalStateException("Function entry mismatch for " + name);
         }
         if (function.getBody().getNumAddresses() != decoded.getNumAddresses()) {
-            throw new IllegalStateException("Function body does not match reachable address set for " + name);
+            throw new IllegalStateException("Function body byte count does not match reachable address set for " + name);
+        }
+        Set<Long> functionBodyInstructionStarts = new HashSet<>();
+        InstructionIterator bodyInstructions = currentProgram.getListing().getInstructions(function.getBody(), true);
+        while (bodyInstructions.hasNext()) {
+            functionBodyInstructionStarts.add(bodyInstructions.next().getAddress().getOffset());
+        }
+        Set<Long> bodyStartsMissingFromDecoded = new HashSet<>(decodedInstructionStarts);
+        bodyStartsMissingFromDecoded.removeAll(functionBodyInstructionStarts);
+        Set<Long> bodyStartsOutsideDecoded = new HashSet<>(functionBodyInstructionStarts);
+        bodyStartsOutsideDecoded.removeAll(decodedInstructionStarts);
+        if (!bodyStartsMissingFromDecoded.isEmpty() || !bodyStartsOutsideDecoded.isEmpty()) {
+            throw new IllegalStateException("Function body instruction-start set differs from reachable set for " + name +
+                "; missing=" + bodyStartsMissingFromDecoded.size() + "; outside=" + bodyStartsOutsideDecoded.size());
         }
 
         DecompInterface decompiler = new DecompInterface();
@@ -191,7 +205,13 @@ public class PrepareFlowFunction extends GhidraScript {
         missingFromDecompiler.removeAll(decompilerInstructionAddresses);
         Set<Long> outsideDecodedSet = new HashSet<>(decompilerInstructionAddresses);
         outsideDecodedSet.removeAll(decodedInstructionStarts);
+        Set<Long> pcodeOutsideFunctionBody = new HashSet<>(decompilerInstructionAddresses);
+        pcodeOutsideFunctionBody.removeAll(functionBodyInstructionStarts);
         String digest = sha256(pseudocode.getBytes(StandardCharsets.UTF_8));
+        String missingSample = addressSample(missingFromDecompiler);
+        String outsideSample = addressSample(outsideDecodedSet);
+        String bodyMissingSample = addressSample(bodyStartsMissingFromDecoded);
+        String bodyOutsideSample = addressSample(bodyStartsOutsideDecoded);
         String json = "{\n" +
             "  \"format\": \"azurearchive-flow-ghidra-v1\",\n" +
             "  \"program_name\": " + quote(currentProgram.getName()) + ",\n" +
@@ -206,6 +226,14 @@ public class PrepareFlowFunction extends GhidraScript {
             "  \"decompiler_pcode_instruction_address_count\": " + decompilerInstructionAddresses.size() + ",\n" +
             "  \"decoded_starts_missing_from_decompiler\": " + missingFromDecompiler.size() + ",\n" +
             "  \"decompiler_addresses_outside_decoded_set\": " + outsideDecodedSet.size() + ",\n" +
+            "  \"pcode_addresses_outside_function_body\": " + pcodeOutsideFunctionBody.size() + ",\n" +
+            "  \"function_body_instruction_start_count\": " + functionBodyInstructionStarts.size() + ",\n" +
+            "  \"function_body_starts_missing_from_decoded\": " + bodyStartsMissingFromDecoded.size() + ",\n" +
+            "  \"function_body_starts_outside_decoded\": " + bodyStartsOutsideDecoded.size() + ",\n" +
+            "  \"pcode_missing_address_sample\": " + quote(missingSample) + ",\n" +
+            "  \"pcode_outside_address_sample\": " + quote(outsideSample) + ",\n" +
+            "  \"body_missing_address_sample\": " + quote(bodyMissingSample) + ",\n" +
+            "  \"body_outside_address_sample\": " + quote(bodyOutsideSample) + ",\n" +
             "  \"pseudocode_sha256\": " + quote(digest) + ",\n" +
             "  \"pseudocode_file\": " + quote(codePath.toString()) + ",\n" +
             "  \"method_entry_list\": " + quote(entriesPath.toString()) + ",\n" +
@@ -214,6 +242,18 @@ public class PrepareFlowFunction extends GhidraScript {
             "}\n";
         Files.writeString(metaPath, json, StandardCharsets.UTF_8);
         println("REA_FLOW_FUNCTION_OK " + json.replace("\n", " "));
+    }
+
+    private String addressSample(Set<Long> values) {
+        TreeSet<Long> sorted = new TreeSet<>(values);
+        StringBuilder out = new StringBuilder();
+        int count = 0;
+        for (Long value : sorted) {
+            if (count++ >= 12) break;
+            if (out.length() > 0) out.append(",");
+            out.append(String.format("0x%x", value));
+        }
+        return out.toString();
     }
 
     private String quote(String value) {
