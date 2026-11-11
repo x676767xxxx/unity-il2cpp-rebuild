@@ -132,6 +132,27 @@ The decompilations of `RuntimeAtlasTexture.CreateTexture` and `DestroyTexture` s
 
 `RuntimeAtlasTexture.DxtBytes(width,height)` independently confirms the DXT5-style block estimate `ceil(width/4) × ceil(height/4) × 16`, with signed-safe rounding. This matches the format-12 branch in `EstimateTextureBytes`.
 
+### Run 26: exact Unity Texture virtual getter mapping
+
+Run 26 succeeded (workflow run `43010677189`, artifact `13850351845`, SHA-256 `06cd55f084f2e0d9d9f175cc9518f8d6350941aa8dd5bd4da0de4bcebf275f16`). A narrow v29 metadata parser read the serialized type-definition and vtable-method tables, and cross-checked all 16,912 type definitions and 152,789 method definitions against REA's linked metadata counts.
+
+For `UnityEngine.Texture`, the metadata vtable is 12 entries:
+- slot 4 = `get_graphicsFormat` (method 92881, token `0x0600091e`)
+- slot 5 = `get_width` (method 92885, token `0x06000922`)
+- slot 7 = `get_height` (method 92887, token `0x06000924`)
+- slot 11 = `get_isReadable` (method 92891, token `0x06000928`)
+
+The ARM64 estimator uses `ldp VirtualInvokeData` loads at class-relative offsets `+0x188`, `+0x1a8`, and `+0x1e8`. Each `VirtualInvokeData` is 16 bytes (method pointer plus MethodInfo pointer). Matching the three offsets to vtable slots 5, 7, and 11 yields the same vtable base offset in all cases:
+- `0x188 - 5*0x10 = 0x138`
+- `0x1a8 - 7*0x10 = 0x138`
+- `0x1e8 - 11*0x10 = 0x138`
+
+This three-way agreement resolves the calls as **get_width**, **get_height**, and **get_isReadable**, respectively. It also corrects the earlier Run 25 limitation: the conditional left shift by one is controlled by `get_isReadable()`; the estimated bytes are doubled when Unity reports the texture is readable. The binary establishes the conditional doubling, not the reason Unity's memory accounting uses it, so a CPU-side copy explanation remains a plausible interpretation rather than proven semantics.
+
+Derived classes confirm polymorphic overrides: `Texture2D` overrides `get_isReadable` at slot 11; `Texture3D` overrides `get_isReadable` at slot 11; `RenderTexture` overrides `get_width` and `get_height` at slots 5 and 7. Thus the estimate uses runtime texture dimensions/readability rather than hard-coded managed fields.
+
+Important distinction: the format-code helper at direct call target `0x067e9aa0` is **not** one of these three virtual getters and is not an exact method-entry match in REA metadata. The metadata `get_graphicsFormat` at slot 4 is present but is not the virtual slot used by this estimator. The helper's precise identity/enum semantics remain a separate recovery target.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
