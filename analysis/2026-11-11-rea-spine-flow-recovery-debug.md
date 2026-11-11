@@ -306,3 +306,20 @@ This new check is deliberately stricter. It may fail if Ghidra's function manage
 ### Exact-set validation run status
 
 The push to script commit [9f830a7](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/9f830a77429d4844079ea4e3bed400e071446942) has now created [run 42999979795](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999979795). At the latest check it was `in_progress`; setup, checkout, Java, and runtime dependency steps had passed, while Ghidra download/install was running. No Artifact was available yet. This run will determine whether Ghidra's actual function instruction-start set exactly matches the bounded reachable set under the stricter check.
+
+
+## Additional async-state-machine metadata scan — 2026-11-11
+
+A full-type-name scan of the linked Android metadata artifact found no compiler-generated `<ReadAsync>d__...` type nested under `RuntimeSpineLoader`. Its five nested types remain `Files`, `PageTextureLoader`, `<>c`, `<>c__DisplayClass4_0`, and `<>c__DisplayClass6_0`.
+
+The scan did find `<ReadAsyncCore>d__40`, but its declaring type is `System.IO.Compression.DeflateManagedStream`, not `RuntimeSpineLoader`. Its methods are:
+
+- `DeflateManagedStream.ReadAsyncCore`: RVA `0x5ffd1a0`.
+- `<ReadAsyncCore>d__40.MoveNext`: RVA `0x5ffdf90`.
+- `<ReadAsyncCore>d__40.SetStateMachine`: RVA `0x5ffe518`.
+
+This is a separate compression-stream state machine. It must not be mistaken for AzureArchive's Spine loader state machine. Current metadata evidence therefore supports treating `RuntimeSpineLoader.ReadAsync` as a short wrapper/delegator until its actual call target and downstream task implementation are mapped. No direct state-machine association has been proven.
+
+## Latest strict body-set run status
+
+Run [42999979795](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999979795), head commit `9f830a77429d4844079ea4e3bed400e071446942`, remains `in_progress` at the latest check. Ghidra install and APK extraction passed; metadata linking was running; no Artifact exists yet. Do not infer a timeout or success from the apparent pause.
