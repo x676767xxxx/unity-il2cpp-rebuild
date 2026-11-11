@@ -139,6 +139,14 @@ jobs:
           rows.append((-1,"unresolved","call-target 0x067e9aa0",
                        "Unresolved_FormatCodeTarget_067E9AA0",
                        "unresolved-format-code-target-067e9aa0",0x067e9aa0))
+          # These are direct callees on the null-pointer/null-receiver paths.
+          # Keep neutral address-based labels until their bodies are recovered.
+          rows.append((-1,"unresolved","call-target 0x0681e418",
+                       "UnresolvedTarget_0681E418",
+                       "unresolved-target-0681e418",0x0681e418))
+          rows.append((-1,"unresolved","call-target 0x0302dc94",
+                       "UnresolvedTarget_0302DC94",
+                       "unresolved-target-0302dc94",0x0302dc94))
           pathlib.Path("work/rea/flow-targets.tsv").write_text(
               "".join("\t".join(map(str,row))+"\n" for row in rows))
           print(json.dumps({"method_entry_count":len(entries),"targets":[
