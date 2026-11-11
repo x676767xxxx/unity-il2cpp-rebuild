@@ -37,7 +37,7 @@ This supports a high-level path of texture-format capability check → read → 
 
 ### RuntimeSpineLoader.DestroyOwned
 
-The decompiled body checks Unity object equality and `Application.isPlaying`, then dispatches through indirect call sites. The indirect dispatch target is not resolved to a stable metadata method in this artifact. Therefore the evidence supports a play-mode-dependent destruction path, but not the exact Unity destruction API or all lifetime semantics.
+The decompiled body checks Unity object equality and `Application.isPlaying`, then dispatches through indirect call sites. The p-code provenance includes two computed tail branches at `0x6814cf8` and `0x6814e4c`. Normalizing their nearby method entries by the same `+0x100000` Ghidra relocation maps the first wrapper region to metadata `UnityEngine.Object.Destroy` (`0x6714c4c` RVA) / `Destroy_Injected` (`0x6714cfc` RVA), and the second to `UnityEngine.Object.DestroyImmediate` (`0x6714da0` RVA) / `DestroyImmediate_Injected` (`0x6714e50` RVA). In the decompiled branch structure, the `Application.isPlaying`-true arm selects the first pointer and the false arm selects the second. This is strong cross-evidence for delayed `Object.Destroy` while playing and `Object.DestroyImmediate` otherwise; the indirect function-pointer initialization is still not fully recovered, so retain that distinction as high-confidence rather than complete source-level proof.
 
 ### RuntimeSpineAsset.Own and Dispose
 
