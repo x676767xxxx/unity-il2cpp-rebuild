@@ -113,6 +113,19 @@ This proves that the closure's `basePath` field at +0x10 and `supportsDxt5` flag
 
 **ReadAsync scheduler caveat.** The four-instruction closure is now correctly isolated. The larger `ReadAsync` reachable flow includes Task runtime and completion paths, but the current decompiler output still does not provide a trustworthy high-level Task expression. The exact task creation/scheduling and callback registration relationship requires mapping the indirect calls and generic method instances; do not reduce this to an unqualified claim that it uses `Task.Run`.
 
+### Run 25: exact per-texture byte estimator recovered
+
+The same artifact contains `RuntimeAtlasTexture.EstimateTextureBytes` with 123 reachable ARM64 instructions. Unlike the higher-level `RuntimeSpineAsset.EstimatedTextureBytes` aggregation, this per-texture routine exposes a concrete size formula in the decompilation and instruction stream.
+
+After a Unity-object null/equality guard, it obtains a format code and dimensions through virtual calls. The arithmetic is:
+
+- Format code `12`: block-compressed path, `ceil(width/4) × ceil(height/4) × 16 bytes`.
+- Format code `10`: block-compressed path, `ceil(width/4) × ceil(height/4) × 8 bytes`; the code includes a signed-overflow-aware half-size operation.
+- Other formats: `width × height × (3 if format code is 3, otherwise 4)`.
+- The resulting estimate is then left-shifted by the low bit of another virtual getter result. This is a conditional ×2 adjustment; the exact property represented by vtable slot `+0x1e8` is not yet mapped, so do not label it mipmaps or readability without further metadata/vtable evidence.
+
+The dimension rounding is implemented as `(dimension + 3) >> 2` for the block paths. The code does not currently show a mip-level summation loop in this method. This is a per-texture estimate, not yet proof that the outer `RuntimeSpineAsset.EstimatedTextureBytes` returns the sum of precisely these values: its virtual dispatch chain still needs to be mapped to establish that relationship.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
