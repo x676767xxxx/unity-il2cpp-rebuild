@@ -212,7 +212,7 @@ public class PrepareFlowFunction extends GhidraScript {
         if (name.startsWith("RuntimeAtlasTexture_") || name.startsWith("RuntimeSpineLoader_") ||
             name.startsWith("RuntimeSpineAsset_") || name.startsWith("PageTextureLoader_")) {
             StringBuilder listing = new StringBuilder(
-                "address\\tmnemonic\\tinstruction\\tbytes_hex\\tflow_type\\tflow_targets\\tfallthrough\\tinside_target_body\\n");
+                "address\tmnemonic\tinstruction\tbytes_hex\tflow_type\tflow_targets\tfallthrough\tinside_target_body\n");
             InstructionIterator listingIt = currentProgram.getListing().getInstructions(decoded, true);
             while (listingIt.hasNext()) {
                 Instruction instruction = listingIt.next();
@@ -224,14 +224,14 @@ public class PrepareFlowFunction extends GhidraScript {
                     flows.append(target.toString());
                 }
                 Address fallthrough = instruction.getFallThrough();
-                listing.append(instruction.getAddress()).append("\\t")
-                    .append(instruction.getMnemonicString()).append("\\t")
-                    .append(instruction.toString().replace("\\t", " ").replace("\\n", " ")).append("\\t")
-                    .append(bytes).append("\\t")
-                    .append(instruction.getFlowType()).append("\\t")
-                    .append(flows).append("\\t")
-                    .append(fallthrough == null ? "" : fallthrough.toString()).append("\\t")
-                    .append(function.getBody().contains(instruction.getAddress())).append("\\n");
+                listing.append(instruction.getAddress()).append("\t")
+                    .append(instruction.getMnemonicString()).append("\t")
+                    .append(instruction.toString().replace("\t", " ").replace("\n", " ")).append("\t")
+                    .append(bytes).append("\t")
+                    .append(instruction.getFlowType()).append("\t")
+                    .append(flows).append("\t")
+                    .append(fallthrough == null ? "" : fallthrough.toString()).append("\t")
+                    .append(function.getBody().contains(instruction.getAddress())).append("\n");
             }
             Path listingPath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".instructions.tsv");
             Files.writeString(listingPath, listing.toString(), StandardCharsets.UTF_8);
