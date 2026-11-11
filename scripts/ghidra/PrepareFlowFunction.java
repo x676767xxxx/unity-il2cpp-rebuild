@@ -211,7 +211,7 @@ public class PrepareFlowFunction extends GhidraScript {
         // into another metadata method and otherwise obscure the adapter instructions.
         if (name.startsWith("RuntimeAtlasTexture_") || name.startsWith("RuntimeSpineLoader_") ||
             name.startsWith("RuntimeSpineAsset_") || name.startsWith("PageTextureLoader_") ||
-            name.equals("DisplayClass4_0_ReadAsync_b0") || name.startsWith("Unresolved_")) {
+            name.equals("DisplayClass4_0_ReadAsync_b0") || name.startsWith("Unresolved")) {
             StringBuilder listing = new StringBuilder(
                 "address\tmnemonic\tinstruction\tbytes_hex\tflow_type\tflow_targets\tfallthrough\tinside_target_body\n");
             InstructionIterator listingIt = currentProgram.getListing().getInstructions(decoded, true);
@@ -364,21 +364,26 @@ public class PrepareFlowFunction extends GhidraScript {
         Files.createDirectories(codePath.getParent());
         Files.createDirectories(metaPath.getParent());
         Files.writeString(codePath, pseudocode, StandardCharsets.UTF_8);
-        if (name.startsWith("Unresolved_")) {
+        if (name.startsWith("Unresolved")) {
             StringBuilder resolverString = new StringBuilder();
-            resolverString.append("address=0x013fed17\n");
-            try {
-                Address stringAddress = toAddr(0x013fed17L);
-                for (int i = 0; i < 256; i++) {
-                    int value = currentProgram.getMemory().getByte(stringAddress.add(i)) & 0xff;
-                    if (value == 0) break;
-                    if (value >= 0x20 && value <= 0x7e) resolverString.append((char)value);
-                    else resolverString.append(String.format("\\x%02x", value));
+            long[] stringAddresses = {
+                0x013fed17L, 0x013f6cabL, 0x01426b38L, 0x013e210bL, 0x0140ac42L
+            };
+            for (long rawAddress : stringAddresses) {
+                resolverString.append(String.format("address=0x%08x\n", rawAddress));
+                try {
+                    Address stringAddress = toAddr(rawAddress);
+                    for (int i = 0; i < 256; i++) {
+                        int value = currentProgram.getMemory().getByte(stringAddress.add(i)) & 0xff;
+                        if (value == 0) break;
+                        if (value >= 0x20 && value <= 0x7e) resolverString.append((char)value);
+                        else resolverString.append(String.format("\\x%02x", value));
+                    }
+                    resolverString.append("\n");
+                } catch (Exception e) {
+                    resolverString.append("unavailable: ").append(e.getClass().getSimpleName())
+                        .append(": ").append(e.getMessage()).append("\n");
                 }
-                resolverString.append("\n");
-            } catch (Exception e) {
-                resolverString.append("unavailable: ").append(e.getClass().getSimpleName())
-                    .append(": ").append(e.getMessage()).append("\n");
             }
             Path resolverStringPath = metaPath.resolveSibling(name + ".resolver-string.txt");
             Files.writeString(resolverStringPath, resolverString.toString(), StandardCharsets.UTF_8);
