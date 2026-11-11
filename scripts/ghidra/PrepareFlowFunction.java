@@ -364,6 +364,25 @@ public class PrepareFlowFunction extends GhidraScript {
         Files.createDirectories(codePath.getParent());
         Files.createDirectories(metaPath.getParent());
         Files.writeString(codePath, pseudocode, StandardCharsets.UTF_8);
+        if (name.startsWith("Unresolved_")) {
+            StringBuilder resolverString = new StringBuilder();
+            resolverString.append("address=0x013fed17\n");
+            try {
+                Address stringAddress = toAddr(0x013fed17L);
+                for (int i = 0; i < 256; i++) {
+                    int value = currentProgram.getMemory().getByte(stringAddress.add(i)) & 0xff;
+                    if (value == 0) break;
+                    if (value >= 0x20 && value <= 0x7e) resolverString.append((char)value);
+                    else resolverString.append(String.format("\\x%02x", value));
+                }
+                resolverString.append("\n");
+            } catch (Exception e) {
+                resolverString.append("unavailable: ").append(e.getClass().getSimpleName())
+                    .append(": ").append(e.getMessage()).append("\n");
+            }
+            Path resolverStringPath = metaPath.resolveSibling(name + ".resolver-string.txt");
+            Files.writeString(resolverStringPath, resolverString.toString(), StandardCharsets.UTF_8);
+        }
         Path pcodePath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".pcode-provenance.tsv");
         Files.writeString(pcodePath, pcodeProvenance.toString(), StandardCharsets.UTF_8);
         StringBuilder skipped = new StringBuilder();
