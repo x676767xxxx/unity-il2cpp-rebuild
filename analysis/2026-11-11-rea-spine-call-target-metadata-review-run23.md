@@ -186,6 +186,14 @@ The serialized `UnityEngine.Texture` vtable contains 12 entries. `Texture2D` and
 
 The helper at `0x067e9aa0` is now exported with its own ARM64 listing. It lazily resolves and caches a function pointer through `0x0302d9bc`; for a non-null managed Texture it loads the field at object offset `+0x10`, calls `0x0681e418(texture,0)` if that field is null, then dispatches through the cached pointer. For a null Texture it obtains an alternate argument from `0x0302dc94()`. Callers use the helper's W0 result immediately in format-code comparisons (12, 10, and 3). This is strong evidence of a native texture-format query/helper role, but the exact resolved function, return type, and enum identity remain unconfirmed because the two indirect jump targets are not recovered. Do not equate it with the managed virtual `Texture.get_graphicsFormat()` merely because that property exists in slot 4.
 
+### Run 30: resolve the texture-format helper to its exact managed method signature
+
+Run 30 succeeded (workflow run `43012393815`, artifact `13850408698`, SHA-256 `b2cc836a9a8d735b095d922c17d720a90f59e23d75a0a0e3debaafc038280008`). The resolver string at `0x013fed17` is exactly `UnityEngine.Texture2D::get_format_Injected(System.IntPtr)`. The linked metadata identifies this method as index 93062, declaring type `UnityEngine.Texture2D`, returning `UnityEngine.TextureFormat`, with parameter `_unity_self`. Its method entry is RVA `0x066e9b18`, loaded Ghidra address `0x067e9b18`.
+
+The unresolved helper at `0x067e9aa0` loads the native pointer at managed object offset `+0x10` and dispatches through the function pointer resolved from that exact method name. Its skipped-method-entry list explicitly contains `0x067e9b18`, which is why the first helper-only export did not include the actual injected method body. The workflow target list has now been extended to export method index 93062 directly in the next run.
+
+This closes the identity and return-type question: the helper's result is a `UnityEngine.TextureFormat` value obtained via `Texture2D.get_format_Injected(IntPtr)`. The method's exact native implementation and the field-layout provenance for the +0x10 pointer are still being checked. The first enum-value export used a raw-width interpretation that produced invalid-looking values; it is superseded by the corrected compressed-int32 parser in the current workflow, and the enum values will only be marked verified after that run's output is inspected.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
