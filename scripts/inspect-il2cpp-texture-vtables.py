@@ -176,8 +176,11 @@ def main():
         field = field_records[field_index]
         default = field_defaults.get(field_index)
         if default is not None:
-            value, raw_hex = decode_compressed_int32(
-                data, field_data_off + default["data_index"], field_data_off + field_data_size)
+            value = None
+            raw_hex = ""
+            if field["name"] in expected_enum_values:
+                value, raw_hex = decode_compressed_int32(
+                    data, field_data_off + default["data_index"], field_data_off + field_data_size)
             enum_values.append({
                 "field_index": field_index,
                 "name": field["name"],
