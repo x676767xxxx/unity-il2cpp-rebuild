@@ -153,6 +153,14 @@ Derived classes confirm polymorphic overrides: `Texture2D` overrides `get_isRead
 
 Important distinction: the format-code helper at direct call target `0x067e9aa0` is **not** one of these three virtual getters and is not an exact method-entry match in REA metadata. The metadata `get_graphicsFormat` at slot 4 is present but is not the virtual slot used by this estimator. The helper's precise identity/enum semantics remain a separate recovery target.
 
+### Run 27: shared engine-dispatch helper reached
+
+Run 27 succeeded (workflow run `43011111213`, artifact `13849923633`, SHA-256 `c7d0378cb6d18f3004a4b88b570d046efea8228cadbd80d82359fe12f984260d`). It added the non-metadata call target at loaded address `0x067e9aa0`, called by `RuntimeAtlasTexture.EstimateTextureBytes`, `RuntimeAtlasTexture.Load`, and the PNG-size helper.
+
+Ghidra recovered 30 reachable instructions with zero decode failures. The body lazily initializes a cached function pointer via shared resolver `0x0302d9bc`, then invokes that pointer indirectly. For a non-null Texture argument it reads the object field at +0x10; if that value is null it calls `0x0681e418(texture,0)` before dispatch. For a null argument it obtains an alternate argument from `0x0302dc94()` and dispatches through the same cached function pointer. The two indirect jump tables at `0x067e9b10` and `0x067e9b50` remain unresolved by Ghidra.
+
+The callsites consume the helper's W0 result immediately as a numeric format code (compared against 12, 10 and 3), although Ghidra's standalone decompilation currently assigns a `void` prototype because no metadata method entry supplies the signature. Treat the result-as-format-code role as callsite-derived evidence; the actual engine function pointer target, exact return signature, and meaning of the +0x10 field are not yet proven. REA metadata does confirm the receiver type is `UnityEngine.Texture` and that `UnityEngine.Object` declares `m_CachedPtr`, but no field-offset table has yet tied that name to +0x10 in this build.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
