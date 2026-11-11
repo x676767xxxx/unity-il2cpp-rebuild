@@ -134,3 +134,63 @@ Additional review point: if Ghidra has already created a function at the target 
 ### Next verification gate
 
 Do not infer that the current run is merely slow or successful. Wait for its terminal status and logs. If it times out or fails, inspect the exact target log and per-target project state, then adjust the script. If it succeeds, verify all five JSON metadata files, pseudocode hashes, entry addresses, decode failures, and skipped method-entry lists before widening the target list to the remaining texture/cache and ownership functions.
+
+
+## Artifact review — run 42997115705 (completed successfully)
+
+Run [42997115705](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42997115705) completed with conclusion `success`. All 11 steps passed. Artifact [13844003725 — azurearchive-rea-spine-flow-recovery](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42997115705/artifacts/13844003725) is 4,348,107 bytes, SHA-256 digest `9288c20bdd87b11221adde89038248d003956d308722b3a8d64080a2163fb955`.
+
+The archive was downloaded and inspected locally. It contains five pseudocode files and five per-function JSON records. The input pair matches the prior run:
+
+- `libil2cpp.so`: 120,315,032 bytes; SHA-256 `7f15b8e7557eb7948fbea746c629fb15d442d05c649ab2db3667ae08aa2c9b6`.
+- `global-metadata.dat`: 17,132,296 bytes; SHA-256 `717236ea9c650b4fcd373e0afc7c03c25d5949726bebe251d3e8301e4da7a144`.
+
+### Actual per-target flow counts
+
+The JSON reports Ghidra import addresses; subtract `0x100000` to obtain the Android ELF RVA.
+
+| Method | Android ELF RVA | Reachable/decoded instructions | Decode failures | Skipped other method entries | Pseudocode chars |
+|---|---:|---:|---:|---:|---:|
+| RuntimeAtlasTexture.TryPngSize | `0x325c770` | 162 / 162 | 0 | 0 | 3,400 |
+| RuntimeSpineLoader.DestroyOwned | `0x325e994` | 51 / 51 | 0 | 2 | 2,809 |
+| RuntimeSpineLoader.AtlasPages | `0x325ea60` | 463 / 463 | 0 | 1 | 7,137 |
+| RuntimeSpineLoader.Read | `0x325ee08` | 238 / 238 | 0 | 1 | 2,833 |
+| RuntimeSpineLoader.ReadAsync | `0x325f1c0` | 331 / 331 | 0 | 1 | 3,630 |
+
+The verification JSON reports all five as `flow_decompiled_and_hash_verified`. That status only means the generated pseudocode files match their own recorded hash/length and the expected entry/name checks passed. It does not establish that Ghidra decompiled the exact newly traversed address set.
+
+### Confirmed decompiler/body mismatch
+
+Inspection of the actual pseudocode exposes two material correctness problems:
+
+1. `RuntimeSpineLoader.ReadAsync` has 331 reachable/decoded instructions and metadata signature `Task<Files> ReadAsync(string basePath)`, but the exported C-like pseudocode is only a short parameterless `void RuntimeSpineLoader_ReadAsync(void)` stub (roughly 20 lines). The body contains runtime initialization and one helper call, not the full 331-instruction region. The script looked up an existing Ghidra function and reused it without setting its body to the `decoded` address set. This is a confirmed mismatch between traversal output and decompiler input.
+2. `RuntimeSpineLoader.AtlasPages`'s 7,137-character pseudocode continues into initialization logic beginning at/around the adjacent `RuntimeSpineLoader.Read` entry (`0x335ee08`, ELF RVA `0x325ee08`). The traversal excludes other method entries when following explicit flow targets, but the fall-through path was not subject to the same method-entry exclusion. The pseudocode therefore appears to include adjacent method content. This is a confirmed cross-method contamination risk in the generated export.
+
+These findings mean the successful workflow status must not be treated as proof that all five decompilations are valid. The instruction traversal counters are still useful bounded reachability evidence, but the decompiler outputs for ReadAsync and AtlasPages are not accepted as clean method bodies.
+
+### Additional confirmed limitations from the pseudocode
+
+- `DestroyOwned` contains Ghidra warnings that it could not recover jump tables at import addresses `0x06814cf8` and `0x06814e4c`, then treated indirect jumps as calls. Ownership/dispatch semantics are unresolved.
+- `Read` and `ReadAsync` contain multiple Ghidra “Removing unreachable block” warnings and PIC construction warnings.
+- `TryPngSize` checks the PNG signature, IHDR marker, dimensions aligned to multiples of four, positive dimensions, and an upper-bound arithmetic expression. The helper at ELF RVA `0x325e4f4` is called to read the relevant PNG fields. This still requires ARM64 instruction-level validation before asserting exact endianness or safety semantics.
+- `AtlasPages` shows collection/enumerator and disposal-like helper operations, but the pseudocode is contaminated by the adjacent function and cannot yet support a reliable ownership conclusion.
+
+### Corrective code change committed
+
+Commit [b4d545a](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/b4d545a071f3e9b8799b17c7dda0d7d47bbd5c7b) updates `scripts/ghidra/PrepareFlowFunction.java`:
+
+- Apply the same “do not cross another metadata method entry” check to fall-through edges, including call fall-throughs.
+- If Ghidra already has a function at the entry, set its body to the newly traversed `decoded` address set before decompiling.
+- Verify that the resulting function body's address count matches the decoded set; fail instead of silently accepting a stale body.
+
+This is a source-level corrective change only. A subsequent GitHub Actions run using this exact commit has not yet been observed, so the correction is not yet runtime-validated. The available GitHub integration in this session exposes run/log/artifact retrieval but no workflow-dispatch action; do not claim a rerun has been triggered.
+
+## Updated conclusion
+
+- The successful run supplies bounded reachable-instruction evidence for five target entries, with zero decoder failures in the reported traversal.
+- It does not yet supply five valid decompilations of the intended method bodies.
+- `AtlasPages` and `ReadAsync` exports are explicitly rejected pending rerun with the corrective script.
+- `DestroyOwned` remains incomplete due indirect jump-table recovery warnings.
+- Full CFG recovery, exception/LSDA edges, async state-machine recovery, and exact branch-target audit remain outstanding.
+- No texture/cache target beyond `TryPngSize` has yet received this reachable-flow treatment.
+- No original C# recovery, restored Unity project, iOS build, or IPA is established by this work.
