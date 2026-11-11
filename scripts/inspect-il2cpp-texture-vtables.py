@@ -131,9 +131,10 @@ def main():
     for idx in range(field_default_size // 12):
         field_index, type_index, data_index = struct.unpack_from("<3i", data, field_default_off + idx * 12)
         if 0 <= data_index < field_data_size:
-            raw_bytes = data[field_data_off + data_index:field_data_off + data_index + 8]
-            field_defaults[field_index] = {"type_index": type_index, "data_index": data_index,
-                                           "raw_hex": raw_bytes.hex()}
+            # Keep opaque payload offsets here. Other fields may store floats,
+            # structs or other encodings; decode only TextureFormat enum
+            # constants below after their declaring type has been identified.
+            field_defaults[field_index] = {"type_index": type_index, "data_index": data_index}
 
     vtable_values = struct.unpack_from("<" + "I" * (vtable_size // 4), data, vtable_off)
     type_records = []
@@ -175,11 +176,8 @@ def main():
         field = field_records[field_index]
         default = field_defaults.get(field_index)
         if default is not None:
-            value = None
-            raw_hex = default["raw_hex"]
-            if field["name"] in expected_enum_values:
-                value, raw_hex = decode_compressed_int32(data, field_data_off + default["data_index"],
-                                                         field_data_off + field_data_size)
+            value, raw_hex = decode_compressed_int32(
+                data, field_data_off + default["data_index"], field_data_off + field_data_size)
             enum_values.append({
                 "field_index": field_index,
                 "name": field["name"],
