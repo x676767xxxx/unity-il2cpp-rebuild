@@ -15,6 +15,8 @@ import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.PcodeOpAST;
 import java.util.Iterator;
 import java.util.TreeSet;
+import java.util.Map;
+import java.util.TreeMap;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.SourceType;
 import java.nio.charset.StandardCharsets;
@@ -251,6 +253,75 @@ public class PrepareFlowFunction extends GhidraScript {
             }
             Path forensicPath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".pcode-address-forensics.tsv");
             Files.writeString(forensicPath, forensic.toString(), StandardCharsets.UTF_8);
+
+            // Export unique statically resolved call destinations separately from P-code
+            // source addresses. These are candidates for review, not automatic function entries.
+            Map<Long, TreeSet<Long>> callSitesByTarget = new TreeMap<>();
+            for (Long rawAddress : sortedPcodeAddresses) {
+                Address source = toAddr(rawAddress);
+                Instruction sourceInstruction = currentProgram.getListing().getInstructionAt(source);
+                if (sourceInstruction == null || !sourceInstruction.getFlowType().isCall()) continue;
+                for (Address target : sourceInstruction.getFlows()) {
+                    if (target == null) continue;
+                    callSitesByTarget.computeIfAbsent(target.getOffset(), k -> new TreeSet<>()).add(rawAddress);
+                }
+            }
+            StringBuilder candidates = new StringBuilder(
+                "target\tmetadata_method_entry\tmemory_block\tinitialized\texecutable\tinstruction_present\ttarget_instruction\ttarget_bytes_hex\tcontaining_function_entry\tcontaining_function_name\txref_count\txref_sources\tcall_sites\tpreceding_instructions\n");
+            for (Map.Entry<Long, TreeSet<Long>> candidate : callSitesByTarget.entrySet()) {
+                Address target = toAddr(candidate.getKey());
+                MemoryBlock targetBlock = currentProgram.getMemory().getBlock(target);
+                Instruction targetInstruction = currentProgram.getListing().getInstructionAt(target);
+                if (targetInstruction == null && targetBlock != null && targetBlock.isInitialized() && targetBlock.isExecute()) {
+                    DisassembleCommand targetCommand = new DisassembleCommand(target, new AddressSet(target, target.add(3)), false);
+                    targetCommand.applyTo(currentProgram, monitor);
+                    targetInstruction = currentProgram.getListing().getInstructionAt(target);
+                }
+                Function targetOwner = currentProgram.getFunctionManager().getFunctionContaining(target);
+                String targetText = targetInstruction == null ? "" :
+                    targetInstruction.toString().replace("\t", " ").replace("\n", " ");
+                String targetBytes = "";
+                if (targetInstruction != null) {
+                    StringBuilder hex = new StringBuilder();
+                    for (byte value : targetInstruction.getBytes()) hex.append(String.format("%02x", value & 0xff));
+                    targetBytes = hex.toString();
+                }
+                ghidra.program.model.symbol.Reference[] refs =
+                    currentProgram.getReferenceManager().getReferencesTo(target);
+                TreeSet<String> refSources = new TreeSet<>();
+                for (ghidra.program.model.symbol.Reference ref : refs) refSources.add(ref.getFromAddress().toString());
+                StringBuilder callSites = new StringBuilder();
+                for (Long site : candidate.getValue()) {
+                    if (callSites.length() > 0) callSites.append(",");
+                    callSites.append(String.format("0x%x", site));
+                }
+                StringBuilder preceding = new StringBuilder();
+                Instruction prev = currentProgram.getListing().getInstructionBefore(target);
+                int prevCount = 0;
+                while (prev != null && prevCount < 4) {
+                    if (preceding.length() > 0) preceding.insert(0, " || ");
+                    preceding.insert(0, prev.getAddress() + ": " +
+                        prev.toString().replace("\t", " ").replace("\n", " "));
+                    prev = currentProgram.getListing().getInstructionBefore(prev.getAddress());
+                    prevCount++;
+                }
+                StringBuilder refList = new StringBuilder();
+                for (String refSource : refSources) {
+                    if (refList.length() > 0) refList.append(",");
+                    refList.append(refSource);
+                }
+                candidates.append(String.format("0x%x\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n",
+                    candidate.getKey(), methodEntries.contains(candidate.getKey()),
+                    targetBlock == null ? "" : targetBlock.getName(),
+                    targetBlock != null && targetBlock.isInitialized(),
+                    targetBlock != null && targetBlock.isExecute(),
+                    targetInstruction != null, targetText, targetBytes,
+                    targetOwner == null ? "" : targetOwner.getEntryPoint().toString(),
+                    targetOwner == null ? "" : targetOwner.getName(), refs.length,
+                    refList.toString(), callSites.toString(), preceding.toString()));
+            }
+            Path candidatePath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".call-target-candidates.tsv");
+            Files.writeString(candidatePath, candidates.toString(), StandardCharsets.UTF_8);
         }
 
         Files.createDirectories(codePath.getParent());
