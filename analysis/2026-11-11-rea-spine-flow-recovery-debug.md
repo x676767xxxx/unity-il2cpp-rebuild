@@ -266,3 +266,38 @@ The linked IL2CPP metadata artifact was queried independently for the `RuntimeSp
 - None of those five nested types is a compiler-generated `<ReadAsync>d__...` state-machine type. The metadata search did not identify a state machine directly nested under `RuntimeSpineLoader`.
 
 This narrows but does not settle the short `ReadAsync` pseudocode question: it may be a non-async Task-returning wrapper or delegate work to a helper/state machine declared elsewhere. Do not associate unrelated `<ReadAsync>d__...` types elsewhere in the large metadata image without a proven call/reference path. Next step is to identify the actual callees and cross-reference the wrapper's ARM64 call targets with metadata method entries.
+
+
+## P-code coverage results — run 42999506194
+
+Run [42999506194](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999506194) completed successfully. Artifact [13844643875](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999506194/artifacts/13844643875) is 4,348,713 bytes; GitHub digest `sha256:dc9181a8851b4ddc3b587473d03d04b51f84d949ececc7622e943970aac553bc`.
+
+The new metrics compare the traversed instruction-start addresses with unique instruction addresses represented in Ghidra's decompiler P-code:
+
+| Method | Traversed instruction starts | P-code addresses | Traversed starts missing from P-code | P-code addresses outside traversed set |
+|---|---:|---:|---:|---:|
+| TryPngSize | 136 | 106 | 40 | 10 |
+| DestroyOwned | 51 | 83 | 25 | 57 |
+| AtlasPages | 225 | 176 | 89 | 40 |
+| Read | 179 | 40 | 166 | 27 |
+| ReadAsync | 329 | 11 | 319 | 1 |
+
+These counts show that the decompiler representation and the bounded traversal sets differ materially. In particular, ReadAsync's P-code covers only 10 of its 329 traversed starts (about 3.0%); Read covers 13 of 179 (about 7.3%). AtlasPages overlaps 136 of 225 (about 60.4%), TryPngSize 96 of 136 (about 70.6%), and DestroyOwned 26 of 51 (about 51.0%). “Outside traversed set” values mean the decompiler emitted P-code at addresses not found in this bounded walk; they are not automatically proof of another method because the walk can miss indirect and exception edges.
+
+### Interpretation
+
+- The run is technically green but the P-code evidence rejects the assumption that all five reachable-flow sets were faithfully represented by the decompiler.
+- ReadAsync and Read are especially poor matches. Their output must remain classified as wrappers/provisional exports, not recovered complete method bodies.
+- The P-code metric is diagnostic. It does not prove complete CFG, because the traversal omits indirect jump-table and exception/LSDA edges and the decompiler may legitimately omit unreachable instructions.
+- The metric also revealed that checking only `function.getBody().getNumAddresses()` is insufficient: equal byte counts do not prove equal instruction-start sets.
+
+## Exact function-body verification added
+
+Commit [9f830a7](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/9f830a77429d4844079ea4e3bed400e071446942) strengthens the script:
+
+- enumerate the actual instruction starts in Ghidra's assigned function body;
+- compare the exact start-address set against the reachable traversal set, not merely byte counts;
+- fail if either set contains addresses absent from the other;
+- record P-code addresses outside the function body and bounded diagnostic samples for both missing and extra addresses.
+
+This new check is deliberately stricter. It may fail if Ghidra's function manager cannot represent the discontiguous set exactly; that failure would be useful evidence and must not be bypassed by weakening the check. A push-triggered validation run for this commit has not yet been observed at the time of this report update.
