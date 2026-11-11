@@ -86,7 +86,15 @@ public class PrepareFlowFunction extends GhidraScript {
             instructionCount++;
 
             if (existing.getFlowType().isCall()) {
-                if (existing.hasFallthrough()) queue.addLast(existing.getFallThrough());
+                if (existing.hasFallthrough()) {
+                    Address next = existing.getFallThrough();
+                    if (next != null && next.getOffset() != entry.getOffset() &&
+                        methodEntries.contains(next.getOffset())) {
+                        skippedMethodEntries.add(next.getOffset());
+                    } else if (next != null && !visited.contains(next.getOffset())) {
+                        queue.addLast(next);
+                    }
+                }
                 continue;
             }
 
@@ -102,7 +110,12 @@ public class PrepareFlowFunction extends GhidraScript {
             }
             if (existing.hasFallthrough()) {
                 Address next = existing.getFallThrough();
-                if (next != null && !visited.contains(next.getOffset())) queue.addLast(next);
+                if (next != null && next.getOffset() != entry.getOffset() &&
+                    methodEntries.contains(next.getOffset())) {
+                    skippedMethodEntries.add(next.getOffset());
+                } else if (next != null && !visited.contains(next.getOffset())) {
+                    queue.addLast(next);
+                }
             }
         }
 
@@ -117,9 +130,16 @@ public class PrepareFlowFunction extends GhidraScript {
                 throw new IllegalStateException("CreateFunctionCmd failed: " + create.getStatusMsg());
             }
             function = create.getFunction();
+        } else {
+            // Replace any import-created/default body with the exact reachable address set.
+            // If another function overlaps this set, fail instead of silently decompiling a stale body.
+            function.setBody(decoded);
         }
         if (function == null || !function.getEntryPoint().equals(entry)) {
             throw new IllegalStateException("Function entry mismatch for " + name);
+        }
+        if (function.getBody().getNumAddresses() != decoded.getNumAddresses()) {
+            throw new IllegalStateException("Function body does not match reachable address set for " + name);
         }
 
         DecompInterface decompiler = new DecompInterface();
