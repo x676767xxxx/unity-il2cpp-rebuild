@@ -242,3 +242,16 @@ The corrected run has fixed the traversal-side method-entry fence and passed the
 - **Original C# / Unity project / iOS IPA:** not recovered or built.
 
 Next engineering step is to compare the exact decoded address set against Ghidra's decompiler output/control-flow graph, and resolve cold blocks and async state-machine helper targets before expanding this workflow to the remaining texture/cache and page-texture methods.
+
+
+## New validation instrumentation — run 42999506194
+
+Commit [73fc490](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/73fc490e8c9b929e5013588fed0a7255f22cfd5f) adds a second, independent coverage metric to `PrepareFlowFunction.java`:
+
+- collect the set of ARM64 instruction-start addresses traversed by the bounded flow walk;
+- collect unique instruction addresses represented in Ghidra's decompiler `HighFunction` P-code operations;
+- report decoded instruction starts missing from the decompiler output and P-code addresses outside the traversed set.
+
+This is intended to distinguish “the traversal found N instructions” from “the decompiler actually represented those instructions.” It is a diagnostic, not a proof of complete CFG; decompiler P-code can omit unreachable or unsupported instructions.
+
+Push-triggered validation run [42999506194](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999506194), head SHA `73fc490e8c9b929e5013588fed0a7255f22cfd5f`, was observed `in_progress` immediately after creation. No result or Artifact was available at that observation time.
