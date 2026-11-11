@@ -139,6 +139,15 @@ jobs:
           ]},indent=2))
           PY
 
+      - name: Export Unity Texture vtable metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/inspect-il2cpp-texture-vtables.py \
+            --metadata work/input/global-metadata.dat \
+            --linked-evidence work/rea/linked-evidence.json \
+            --out-dir work/rea
+
       - name: Recover all reachable control-flow targets in one Ghidra import
         shell: bash
         env:
