@@ -58,7 +58,7 @@ The `Own` body first checks the supplied Unity object for null/equality, then fo
 
 - `get_HasConsumers` decompiles to `1 < *(int *)(this + 0x18)`. This directly supports a consumer predicate based on the count field at offset `+0x18).
 - `Dispose` decrements that same field and performs cleanup at zero.
-- `Retain` has a fast path: if the integer at observed offset `+0x0c` is nonzero, increment it and return. The remaining path is large and includes LINQ error helpers and indirect collection/iterator control flow. The relationship between this field and the `+0x18` field used by `HasConsumers/Dispose` must not be conflated without class-layout confirmation. In particular, the decompiler's `param_1 + 3` is a byte offset in the generated pseudocode's pointer representation; validate the exact field offset from ARM64 instructions and metadata before naming it.
+- `Retain` has a fast path: if the integer at observed offset `+0x18` is nonzero, increment it and return. The `Retain` parameter is typed as `undefined8 *`, so the decompiler expression `param_1 + 3` means three 8-byte slots, i.e. byte offset `+0x18`. This agrees with the field read by `get_HasConsumers` and decremented by `Dispose`. The remaining path is large and includes LINQ error helpers and indirect collection/iterator control flow; the fast-path evidence establishes the shared counter offset, but not every exceptional or initialization path.
 - `get_EstimatedTextureBytes` calls `System.Linq.Error.ArgumentNull` and `System.Linq.Error.NoElements`, and contains collection/enumerator loops plus guarded arithmetic. The exact collection element type and byte-estimation formula remain unresolved.
 
 ### PageTextureLoader
