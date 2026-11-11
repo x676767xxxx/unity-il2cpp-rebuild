@@ -211,13 +211,7 @@ These are metadata-linked method-pointer RVAs from the same ARM64 ELF/metadata p
 
 ### Confirmed cause of the 34-target batch failure
 
-Run 43001483524 failed in step 9, “Recover all reachable control-flow targets in one Ghidra import.” The current workflow file contains:
-
-```bash
-while IFS= read -r index type method symbol stem entry; do
-```
-
-The file has two literal backslashes before `t`, not the single ANSI-C escape needed to produce a tab delimiter. Therefore the shell does not split the tab-separated target rows into six columns. The Ghidra script receives malformed arguments; the archived log shows examples where the first script argument contains fragments of the TSV row, followed by:
+Run 43001483524 failed in step 9, “Recover all reachable control-flow targets in one Ghidra import.” The current workflow file's TSV reader uses a double-escaped tab literal in its `IFS` assignment, so the shell receives a literal backslash plus `t` rather than a tab delimiter. The six tab-separated columns are therefore not split. The Ghidra script receives malformed arguments; the archived log shows examples where the first script argument contains fragments of the TSV row, followed by:
 
 `java.lang.NumberFormatException` at `PrepareFlowFunction.java:36`.
 
