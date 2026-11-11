@@ -173,6 +173,19 @@ This identifies the cached indirect target behind `0x067e9aa0` as the Unity inte
 
 REA metadata for `UnityEngine.TextureFormat` confirms the enum includes `RGB24`, `DXT1`, and `DXT5`. The estimator's numeric cases 3, 10, and 12 align with those standard enum members; exact numeric field constants are queued for direct metadata default-value extraction to remove the last reliance on enum-order knowledge.
 
+### Run 28: instruction-level verification of Texture vtable mapping and unresolved format helper
+
+Run 28 succeeded (workflow run `43011483442`, artifact `13850124022`, SHA-256 `59b98312e78f346810b479584d242ed0fe62ce996a2157a60ebaa1fa4074fa2e`). The artifact includes the raw ARM64 instruction listing for the unresolved helper at `0x067e9aa0`, as well as the serialized vtable map.
+
+The `RuntimeAtlasTexture.EstimateTextureBytes` listing confirms:
+- `ldp x9,x1,[x8,#0x188]`; `blr x9` → virtual slot 5 → `Texture.get_width()`.
+- `ldp x9,x1,[x8,#0x1a8]`; `blr x9` → virtual slot 7 → `Texture.get_height()`.
+- `ldp x9,x1,[x8,#0x1e8]`; `blr x9` → virtual slot 11 → `Texture.get_isReadable()`.
+
+The serialized `UnityEngine.Texture` vtable contains 12 entries. `Texture2D` and `Texture3D` replace slot 11 with their own `get_isReadable()` implementations; `RenderTexture` replaces slots 5 and 7 with its own width/height getters. All three ARM64 offsets independently imply vtable base `+0x138` when each `VirtualInvokeData` entry is 16 bytes. The final readable flag is masked to bit 0 and used as the shift count for the computed size, so the estimate doubles when readable is true.
+
+The helper at `0x067e9aa0` is now exported with its own ARM64 listing. It lazily resolves and caches a function pointer through `0x0302d9bc`; for a non-null managed Texture it loads the field at object offset `+0x10`, calls `0x0681e418(texture,0)` if that field is null, then dispatches through the cached pointer. For a null Texture it obtains an alternate argument from `0x0302dc94()`. Callers use the helper's W0 result immediately in format-code comparisons (12, 10, and 3). This is strong evidence of a native texture-format query/helper role, but the exact resolved function, return type, and enum identity remain unconfirmed because the two indirect jump targets are not recovered. Do not equate it with the managed virtual `Texture.get_graphicsFormat()` merely because that property exists in slot 4.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
