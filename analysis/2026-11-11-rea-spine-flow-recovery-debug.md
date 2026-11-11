@@ -338,3 +338,19 @@ Important metric caveat: the P-code metric counts unique instruction addresses t
 ## Run 42999979795 — latest observed state
 
 The run has progressed past metadata linking and target-list generation. At the latest status query, step 9 `Recover reachable control-flow blocks and decompile` was still `in_progress`; steps 10 and 11 had not started and no artifact was published. The workflow has a 60-minute job timeout. Do not report success or a failure until GitHub marks the run complete.
+
+
+## TryPngSize instruction-level interpretation — provisional
+
+The archived Ghidra pseudocode for `RuntimeAtlasTexture.TryPngSize` (`0x325c770`, loaded at `0x0335c770`) is sufficiently readable to extract several concrete checks, while keeping the helper's exact semantics open:
+
+1. It initializes both output dimensions to zero.
+2. It rejects a null byte-array reference and arrays of length `<= 32`.
+3. It checks the eight-byte PNG signature at managed-array data offsets `+0x20..+0x27`.
+4. It calls helper `0x0335e4f4` with offset `8` and requires the result to equal `13`, consistent with the PNG IHDR chunk length.
+5. It checks bytes at offsets `0x0c..0x0f` for `IHDR`.
+6. It calls the same helper at offsets `0x10` and `0x14` for width and height.
+7. It rejects dimensions if either has low two bits set, or if either signed dimension is non-positive. Thus accepted width and height must both be positive multiples of four.
+8. It computes a guarded size estimate using height and a rounded-up width expression, then accepts only when the result is below `0x7fffffa4`. This is a bounds/overflow-style guard; its exact equivalence to the later DXT5 allocation calculation still needs confirmation.
+
+The helper is consistent with reading a 32-bit PNG field, but its endianness and bounds behavior must be confirmed from its own disassembly before calling this a verified big-endian parser. The code is also not proof that the entire atlas texture pipeline only accepts PNGs or that all images use DXT5. This function only appears to pre-validate PNG dimensions and a size bound.
