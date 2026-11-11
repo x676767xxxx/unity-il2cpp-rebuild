@@ -211,7 +211,7 @@ public class PrepareFlowFunction extends GhidraScript {
         // into another metadata method and otherwise obscure the adapter instructions.
         if (name.startsWith("RuntimeAtlasTexture_") || name.startsWith("RuntimeSpineLoader_") ||
             name.startsWith("RuntimeSpineAsset_") || name.startsWith("PageTextureLoader_") ||
-            name.equals("DisplayClass4_0_ReadAsync_b0")) {
+            name.equals("DisplayClass4_0_ReadAsync_b0") || name.startsWith("Unresolved_")) {
             StringBuilder listing = new StringBuilder(
                 "address\tmnemonic\tinstruction\tbytes_hex\tflow_type\tflow_targets\tfallthrough\tinside_target_body\n");
             InstructionIterator listingIt = currentProgram.getListing().getInstructions(decoded, true);
