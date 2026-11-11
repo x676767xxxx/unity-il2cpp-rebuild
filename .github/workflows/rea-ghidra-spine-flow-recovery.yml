@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/rea-ghidra-spine-flow-recovery.yml"
       - "scripts/ghidra/PrepareFlowFunction.java"
+      - "scripts/inspect-il2cpp-texture-vtables.py"
 
 permissions:
   contents: read
