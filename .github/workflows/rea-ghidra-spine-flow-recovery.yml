@@ -86,14 +86,15 @@ jobs:
           methods=result["methods"]
           types=result["types"]
           targets=[
-            (25283,"RuntimeAtlasTexture","TryPngSize","runtime-atlas-texture-try-png-size"),
-            (25291,"RuntimeSpineLoader","DestroyOwned","runtime-spine-loader-destroy-owned"),
-            (25292,"RuntimeSpineLoader","AtlasPages","runtime-spine-loader-atlas-pages"),
-            (25293,"RuntimeSpineLoader","Read","runtime-spine-loader-read"),
-            (25294,"RuntimeSpineLoader","ReadAsync","runtime-spine-loader-read-async"),
+            (25283,"RuntimeAtlasTexture","TryPngSize","RuntimeAtlasTexture_TryPngSize","runtime-atlas-texture-try-png-size"),
+            (25286,"RuntimeAtlasTexture","<TryPngSize>g__Read|19_0","RuntimeAtlasTexture_TryPngSize_Read19_0","runtime-atlas-texture-try-png-size-read-helper"),
+            (25291,"RuntimeSpineLoader","DestroyOwned","RuntimeSpineLoader_DestroyOwned","runtime-spine-loader-destroy-owned"),
+            (25292,"RuntimeSpineLoader","AtlasPages","RuntimeSpineLoader_AtlasPages","runtime-spine-loader-atlas-pages"),
+            (25293,"RuntimeSpineLoader","Read","RuntimeSpineLoader_Read","runtime-spine-loader-read"),
+            (25294,"RuntimeSpineLoader","ReadAsync","RuntimeSpineLoader_ReadAsync","runtime-spine-loader-read-async"),
           ]
           rows=[]
-          for index,expected_type,expected_name,stem in targets:
+          for index,expected_type,expected_name,function_name,stem in targets:
               method=methods[index]
               declaring=types[method["declaring_type"]]["name"]
               if declaring!=expected_type or method["name"]!=expected_name:
@@ -102,11 +103,11 @@ jobs:
               if address.get("state")!="code" or not address.get("rva"):
                   raise SystemExit(f"missing code pointer: {expected_type}.{expected_name}")
               entry=int(address["rva"],16)+0x100000
-              rows.append((index,expected_type,expected_name,stem,entry))
+              rows.append((index,expected_type,expected_name,function_name,stem,entry))
           pathlib.Path("work/rea/flow-targets.tsv").write_text(
               "".join("\t".join(map(str,row))+"\n" for row in rows))
           print(json.dumps({"method_entry_count":len(entries),"targets":[
-              {"index":i,"method":f"{t}.{n}","entry":hex(e)} for i,t,n,s,e in rows
+              {"index":i,"method":f"{t}.{n}","function_name":fn,"entry":hex(e)} for i,t,n,fn,s,e in rows
           ]},indent=2))
           PY
 
@@ -117,7 +118,69 @@ jobs:
           JAVA_TOOL_OPTIONS: "-Xmx3G -XX:ActiveProcessorCount=2"
         run: |
           set -euo pipefail
-          while IFS=$'\t' read -r index type method stem entry; do
+          while IFS=
+            PROJECT="$GITHUB_WORKSPACE/work/ghidra-project/${stem}"
+            LOG="$GITHUB_WORKSPACE/work/rea/${stem}-flow-recovery.log"
+            mkdir -p "$PROJECT"
+            "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
+              "$PROJECT" azurearchive-spine-flow \
+              -import "$GITHUB_WORKSPACE/work/input/libil2cpp.so" \
+              -noanalysis \
+              -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
+              -postScript PrepareFlowFunction.java "$entry" 6000 0x4000000 "$symbol" \
+                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c" \
+                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json" \
+                "$GITHUB_WORKSPACE/work/input/all-method-entries.txt" \
+              -max-cpu 2 \
+              2>&1 | tee "$LOG"
+            grep -q "REA_FLOW_FUNCTION_OK" "$LOG"
+            test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c"
+            test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json"
+          done < work/rea/flow-targets.tsv
+
+      - name: Verify flow recovery outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          root=pathlib.Path("work/rea")
+          report={"format":"azurearchive-spine-flow-recovery-v1","targets":[]}
+          for line in (root/"flow-targets.tsv").read_text().splitlines():
+              index,typ,method,stem,entry=line.split("\t")
+              code=(root/f"{stem}-flow-ghidra.c").read_text()
+              meta=json.loads((root/f"{stem}-flow-ghidra.json").read_text())
+              digest=hashlib.sha256(code.encode()).hexdigest()
+              try:
+                  actual_entry=int(meta.get("entry","0"),16)
+              except (TypeError,ValueError):
+                  actual_entry=-1
+              if meta.get("function_name")!=symbol or actual_entry!=int(entry,10):
+                  raise SystemExit(f"{typ}.{method}: identity/entry mismatch (metadata={meta.get('entry')}, expected_decimal={entry})")
+              if meta.get("pseudocode_sha256")!=digest or meta.get("pseudocode_chars")!=len(code):
+                  raise SystemExit(f"{typ}.{method}: pseudocode hash/length mismatch")
+              report["targets"].append({
+                "method":f"{typ}.{method}","function_name":symbol,"entry":entry,
+                "reachable_instructions":meta.get("reachable_instruction_count"),
+                "decoded_instructions":meta.get("decoded_instruction_count"),
+                "decode_failures":meta.get("decode_failures"),
+                "skipped_other_method_entries":meta.get("skipped_other_method_entries"),
+                "pseudocode_chars":len(code),"sha256":digest,
+                "status":"flow_decompiled_and_hash_verified",
+                "limitations":meta.get("limits",[])
+              })
+          (root/"flow-recovery-verification.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          PY
+
+      - name: Upload reachable-flow evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-rea-spine-flow-recovery
+          path: work/rea/
+          if-no-files-found: warn
+\t' read -r index type method symbol stem entry; do
             echo "Recovering $type.$method at $entry"
             PROJECT="$GITHUB_WORKSPACE/work/ghidra-project/${stem}"
             LOG="$GITHUB_WORKSPACE/work/rea/${stem}-flow-recovery.log"
