@@ -354,3 +354,28 @@ The archived Ghidra pseudocode for `RuntimeAtlasTexture.TryPngSize` (`0x325c770`
 8. It computes a guarded size estimate using height and a rounded-up width expression, then accepts only when the result is below `0x7fffffa4`. This is a bounds/overflow-style guard; its exact equivalence to the later DXT5 allocation calculation still needs confirmation.
 
 The helper is consistent with reading a 32-bit PNG field, but its endianness and bounds behavior must be confirmed from its own disassembly before calling this a verified big-endian parser. The code is also not proof that the entire atlas texture pipeline only accepts PNGs or that all images use DXT5. This function only appears to pre-validate PNG dimensions and a size bound.
+
+
+## Exact function-body validation result — run 42999979795
+
+Run [42999979795](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999979795) completed successfully. Artifact [13846101130](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999979795/artifacts/13846101130) is 4,349,984 bytes; digest `sha256:c50d4de69f286a2b2d4e50f7ff1ac8f2208a69f7da69c9aa25e41ca5d1289a94`.
+
+The new exact instruction-start comparison passed for all five targets:
+
+| Method | Reachable starts | Ghidra body starts | Missing from body | Extra in body |
+|---|---:|---:|---:|---:|
+| TryPngSize | 136 | 136 | 0 | 0 |
+| DestroyOwned | 51 | 51 | 0 | 0 |
+| AtlasPages | 225 | 225 | 0 | 0 |
+| Read | 179 | 179 | 0 | 0 |
+| ReadAsync | 329 | 329 | 0 | 0 |
+
+This validates that the function manager body now matches the script's bounded traversal exactly. It does **not** validate that the traversal found every true CFG edge or that the decompiler represented every instruction. The P-code mismatch counts remain unchanged from run 42999506194. In particular, P-code operations appear at 10 addresses outside the TryPngSize body, 40 outside AtlasPages, 57 outside DestroyOwned, 1 outside ReadAsync, and 27 outside Read. These require disassembly/edge attribution; do not automatically label them as erroneous function overlap.
+
+## Newly identified local helper for TryPngSize
+
+The linked IL2CPP metadata identifies the helper called at loaded address `0x0335e4f4` (ELF RVA `0x325e4f4`) as method index 25286:
+
+`RuntimeAtlasTexture.<TryPngSize>g__Read|19_0`
+
+This resolves the helper's ownership: it is a compiler-generated local function belonging to `RuntimeAtlasTexture.TryPngSize`. Its exact byte-reading semantics and bounds behavior are still to be confirmed by decompiling this helper itself. This is the next focused target, rather than guessing its endianness from the caller.
