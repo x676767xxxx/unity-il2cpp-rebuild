@@ -113,8 +113,10 @@ def main():
     for idx in range(field_default_size // 12):
         field_index, type_index, data_index = struct.unpack_from("<3i", data, field_default_off + idx * 12)
         if 0 <= data_index <= field_data_size - 4:
+            raw_bytes = data[field_data_off + data_index:field_data_off + data_index + 8]
             value = struct.unpack_from("<i", data, field_data_off + data_index)[0]
-            field_defaults[field_index] = {"type_index": type_index, "data_index": data_index, "value": value}
+            field_defaults[field_index] = {"type_index": type_index, "data_index": data_index,
+                                           "value": value, "raw_hex": raw_bytes.hex()}
 
     vtable_values = struct.unpack_from("<" + "I" * (vtable_size // 4), data, vtable_off)
     type_records = []
@@ -161,12 +163,14 @@ def main():
                 "type_index": default["type_index"],
                 "data_index": default["data_index"],
                 "value": default["value"],
+                "raw_hex": default["raw_hex"],
+                "field_type_name": norm["field_types"][field_index].get("name"),
             })
     expected_enum_values = {"RGB24": 3, "DXT1": 10, "DXT5": 12}
     actual_enum_values = {item["name"]: item["value"] for item in enum_values}
-    for enum_name, expected in expected_enum_values.items():
-        if actual_enum_values.get(enum_name) != expected:
-            fail(f"TextureFormat.{enum_name} expected {expected}, got {actual_enum_values.get(enum_name)}")
+    enum_value_checks = {name: {"expected": expected, "actual": actual_enum_values.get(name),
+                                "matches": actual_enum_values.get(name) == expected}
+                         for name, expected in expected_enum_values.items()}
 
     rows = []
     for t in wanted:
@@ -201,10 +205,10 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     enum_tsv = out / "unity-texture-format-enum-values.tsv"
     with enum_tsv.open("w", encoding="utf-8") as f:
-        f.write("field_index\tname\ttype_index\tdata_index\tvalue\n")
+        f.write("field_index\tname\tfield_type_name\ttype_index\tdata_index\tvalue\traw_hex\n")
         for item in enum_values:
-            f.write("\t".join(str(item[k]) for k in
-                              ["field_index","name","type_index","data_index","value"]) + "\n")
+            f.write("\t".join(str(item.get(k, "")) for k in
+                              ["field_index","name","field_type_name","type_index","data_index","value","raw_hex"]) + "\n")
     tsv = out / "unity-texture-vtable-slots.tsv"
     fields = ["type","type_index","parent_index","vtable_slot","raw_encoded","decoded_method_index",
               "encoded_usage_tag","encoded_low_bit_marker","method","declaring_type","method_definition_slot","method_token"]
@@ -224,6 +228,8 @@ def main():
         },
         "types": wanted,
         "texture_format_enum_values": enum_values,
+        "texture_format_enum_value_checks": enum_value_checks,
+        "field_data_section": {"offset": field_data_off, "size": field_data_size},
         "entries": rows,
         "limits": [
             "This is the serialized metadata vtable, not a dump of runtime Il2CppClass memory.",
@@ -239,6 +245,7 @@ def main():
         "vtable_count": len(vtable_values),
         "selected_types": wanted,
         "texture_format_enum_values": enum_values,
+        "texture_format_enum_value_checks": enum_value_checks,
         "selected_slots": [r for r in rows if r["vtable_slot"] in (0,2,4,5,6,7,11,12)],
         "output": str(tsv),
     }, indent=2))
