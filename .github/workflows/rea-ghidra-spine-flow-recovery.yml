@@ -119,17 +119,23 @@ jobs:
           set -euo pipefail
           while IFS=$'\t' read -r index type method stem entry; do
             echo "Recovering $type.$method at $entry"
+            PROJECT="$GITHUB_WORKSPACE/work/ghidra-project/\${stem}"
+            LOG="$GITHUB_WORKSPACE/work/rea/\${stem}-flow-recovery.log"
+            mkdir -p "$PROJECT"
             "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
-              "$GITHUB_WORKSPACE/work/ghidra-project" azurearchive-spine-flow \
+              "$PROJECT" azurearchive-spine-flow \
               -import "$GITHUB_WORKSPACE/work/input/libil2cpp.so" \
               -noanalysis \
               -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
-              -postScript PrepareFlowFunction.java "$entry" 6000 0x4000000 "${type}_${method}" \
-                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c" \
-                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json" \
+              -postScript PrepareFlowFunction.java "$entry" 6000 0x4000000 "\${type}_\${method}" \
+                "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.c" \
+                "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.json" \
                 "$GITHUB_WORKSPACE/work/input/all-method-entries.txt" \
               -max-cpu 2 \
-              2>&1 | tee -a work/rea/flow-recovery.log
+              2>&1 | tee "$LOG"
+            grep -q "REA_FLOW_FUNCTION_OK" "$LOG"
+            test -s "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.c"
+            test -s "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.json"
           done < work/rea/flow-targets.tsv
 
       - name: Verify flow recovery outputs
@@ -145,8 +151,12 @@ jobs:
               code=(root/f"{stem}-flow-ghidra.c").read_text()
               meta=json.loads((root/f"{stem}-flow-ghidra.json").read_text())
               digest=hashlib.sha256(code.encode()).hexdigest()
-              if meta.get("function_name")!=f"{typ}_{method}" or meta.get("entry","").lower()!=entry.lower():
-                  raise SystemExit(f"{typ}.{method}: identity/entry mismatch")
+              try:
+                  actual_entry=int(meta.get("entry","0"),16)
+              except (TypeError,ValueError):
+                  actual_entry=-1
+              if meta.get("function_name")!=f"{typ}_{method}" or actual_entry!=int(entry,10):
+                  raise SystemExit(f"{typ}.{method}: identity/entry mismatch (metadata={meta.get('entry')}, expected_decimal={entry})")
               if meta.get("pseudocode_sha256")!=digest or meta.get("pseudocode_chars")!=len(code):
                   raise SystemExit(f"{typ}.{method}: pseudocode hash/length mismatch")
               report["targets"].append({
