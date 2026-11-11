@@ -17,7 +17,7 @@ concurrency:
 jobs:
   recover:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -139,30 +139,38 @@ jobs:
           ]},indent=2))
           PY
 
-      - name: Recover reachable control-flow blocks and decompile
+      - name: Recover all reachable control-flow targets in one Ghidra import
         shell: bash
         env:
           GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
-          JAVA_TOOL_OPTIONS: "-Xmx3G -XX:ActiveProcessorCount=2"
+          JAVA_TOOL_OPTIONS: "-Xmx4G -XX:ActiveProcessorCount=2"
         run: |
           set -euo pipefail
-          while IFS=$'\t' read -r index type method symbol stem entry; do
-            echo "Recovering $type.$method at $entry"
-            PROJECT="$GITHUB_WORKSPACE/work/ghidra-project/${stem}"
-            LOG="$GITHUB_WORKSPACE/work/rea/${stem}-flow-recovery.log"
-            mkdir -p "$PROJECT"
-            "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
-              "$PROJECT" azurearchive-spine-flow \
-              -import "$GITHUB_WORKSPACE/work/input/libil2cpp.so" \
-              -noanalysis \
-              -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
-              -postScript PrepareFlowFunction.java "$entry" 6000 0x4000000 "$symbol" \
-                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c" \
-                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json" \
-                "$GITHUB_WORKSPACE/work/input/all-method-entries.txt" \
-              -max-cpu 2 \
-              2>&1 | tee "$LOG"
-            grep -q "REA_FLOW_FUNCTION_OK" "$LOG"
+          PROJECT="$GITHUB_WORKSPACE/work/ghidra-project/batch"
+          LOG="$GITHUB_WORKSPACE/work/rea/batch-flow-recovery.log"
+          mkdir -p "$PROJECT"
+          ARGS=(
+            "$PROJECT" azurearchive-spine-batch
+            -import "$GITHUB_WORKSPACE/work/input/libil2cpp.so"
+            -noanalysis
+            -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra"
+          )
+          while IFS=$'\\t' read -r index type method symbol stem entry; do
+            echo "Queueing $type.$method at $entry"
+            ARGS+=(
+              -postScript PrepareFlowFunction.java
+              "$entry" 6000 0x4000000 "$symbol"
+              "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c"
+              "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json"
+              "$GITHUB_WORKSPACE/work/input/all-method-entries.txt"
+            )
+          done < work/rea/flow-targets.tsv
+          ARGS+=( -max-cpu 2 )
+          "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" "${ARGS[@]}" 2>&1 | tee "$LOG"
+          EXPECTED="$(wc -l < work/rea/flow-targets.tsv)"
+          ACTUAL="$(grep -c 'REA_FLOW_FUNCTION_OK' "$LOG" || true)"
+          test "$ACTUAL" -eq "$EXPECTED"
+          while IFS=$'\\t' read -r index type method symbol stem entry; do
             test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c"
             test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json"
           done < work/rea/flow-targets.tsv
