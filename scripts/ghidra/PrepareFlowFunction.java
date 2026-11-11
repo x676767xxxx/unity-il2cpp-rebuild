@@ -187,7 +187,7 @@ public class PrepareFlowFunction extends GhidraScript {
                         String ownerEntry = owner == null ? "" : owner.getEntryPoint().toString();
                         String ownerName = owner == null ? "" : owner.getName();
                         boolean insideBody = owner != null && owner.getBody().contains(pcodeAddress);
-                        pcodeProvenance.append(String.format("0x%x\\t%s\\t%s\\t%s\\t%s%n",
+                        pcodeProvenance.append(String.format("0x%x\t%s\t%s\t%s\t%s%n",
                             pcodeAddress.getOffset(), ownerEntry, ownerName, insideBody, op.getMnemonic()));
                     }
                 }
@@ -248,6 +248,7 @@ public class PrepareFlowFunction extends GhidraScript {
             "  \"body_outside_address_sample\": " + quote(bodyOutsideSample) + ",\n" +
             "  \"pseudocode_sha256\": " + quote(digest) + ",\n" +
             "  \"pseudocode_file\": " + quote(codePath.toString()) + ",\n" +
+            "  \"pcode_provenance_file\": " + quote(pcodePath.toString()) + ",\n" +
             "  \"method_entry_list\": " + quote(entriesPath.toString()) + ",\n" +
             "  \"analysis_mode\": \"bounded reachable-flow disassembly; calls not followed; other metadata method entries excluded\",\n" +
             "  \"limits\": [\"indirect jump tables may remain unresolved\", \"exception LSDA edges may be incomplete\", \"reachable blocks are not proof of full source-level CFG\"]\n" +
