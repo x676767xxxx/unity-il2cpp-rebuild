@@ -62,7 +62,7 @@ public class PrepareFlowFunction extends GhidraScript {
 
             Instruction existing = currentProgram.getListing().getInstructionAt(at);
             if (existing == null) {
-                AddressSet one = new AddressSet(at, at);
+                AddressSet one = new AddressSet(at, at.add(3));
                 DisassembleCommand cmd = new DisassembleCommand(at, one, false);
                 if (!cmd.applyTo(currentProgram, monitor)) {
                     decodeFailures++;
