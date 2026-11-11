@@ -164,7 +164,7 @@ public class PrepareFlowFunction extends GhidraScript {
         DecompInterface decompiler = new DecompInterface();
         String pseudocode;
         Set<Long> decompilerInstructionAddresses = new HashSet<>();
-        StringBuilder pcodeProvenance = new StringBuilder("pcode_address\\tcontaining_function_entry\\tcontaining_function_name\\tinside_recovered_body\\topcode\\n");
+        StringBuilder pcodeProvenance = new StringBuilder("pcode_address\tcontaining_function_entry\tcontaining_function_name\tinside_recovered_body\topcode\n");
         try {
             if (!decompiler.openProgram(currentProgram)) {
                 throw new IllegalStateException("Could not open Ghidra program in decompiler");
