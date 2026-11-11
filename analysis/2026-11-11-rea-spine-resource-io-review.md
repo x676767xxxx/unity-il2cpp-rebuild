@@ -66,3 +66,47 @@ The per-function JSON also warns that decompiler output may reference out-of-lin
 ## Current conclusion
 
 The artifact is a valid, hash-verified preliminary evidence set. It is useful for narrowing the next reverse-engineering pass, but it is not yet sufficient to implement the Spine resource loader or diagnose the Husk runtime crash by itself.
+
+
+## Additional metadata cross-check and next target addresses
+
+The linked REA evidence records this exact input pair:
+- `libil2cpp.so` (ARM64, 120,315,032 bytes): SHA-256 `7f15b8e7557eb7948fbea746c629fb15d442d05c649ab2db3667ae08aa2c9b6`.
+- `global-metadata.dat` (17,132,296 bytes): SHA-256 `717236ea9c650b4fcd373e0afc7c03c25d5949726bebe251d3e8301e4da7a144`.
+
+The metadata links the relevant declaring types and return types as follows:
+- `RuntimeSpineLoader.Read` returns `RuntimeSpineLoader.Files`.
+- `RuntimeSpineLoader.ReadAsync` returns `Task<RuntimeSpineLoader.Files>`.
+- `RuntimeSpineLoader.AtlasPages` returns `string[]`.
+- `RuntimeSpineLoader.Files` is a nested type with a constructor.
+- `RuntimeSpineLoader.PageTextureLoader` has `Load` and `Unload` methods.
+- `RuntimeAtlasTexture` has a broader cache/texture pipeline: `Read`, `Load`, `CreateTexture`, `DestroyTexture`, `TryReadCache`, `QueueWrite`, `WriteCache`, `IsCacheFileError`, `Checksum`, `ReadChecksum`, `FinishPendingWritesAsync`, `CanLoadPngAsDxt5`, `DxtBytes`, `TryPngSize`, and `EstimateTextureBytes`.
+
+Exact next ARM64 method-pointer RVAs recovered from the same metadata evidence (not iOS addresses):
+
+| Method | Method index | ELF RVA |
+|---|---:|---:|
+| RuntimeAtlasTexture.Read | 25270 | 0x325c600 |
+| RuntimeAtlasTexture.Load | 25271 | 0x325d080 |
+| RuntimeAtlasTexture.CreateTexture | 25272 | 0x325d49c |
+| RuntimeAtlasTexture.TryReadCache | 25274 | 0x325c9f8 |
+| RuntimeAtlasTexture.QueueWrite | 25275 | 0x325d5f4 |
+| RuntimeAtlasTexture.WriteCache | 25276 | 0x325daf0 |
+| RuntimeAtlasTexture.ReadChecksum | 25279 | 0x325d8f0 |
+| RuntimeAtlasTexture.FinishPendingWritesAsync | 25280 | 0x325e2e4 |
+| RuntimeAtlasTexture.CanLoadPngAsDxt5 | 25281 | 0x325e484 |
+| RuntimeAtlasTexture.DxtBytes | 25282 | 0x325d94c |
+| RuntimeAtlasTexture.EstimateTextureBytes | 25284 | 0x325e56c |
+| RuntimeSpineLoader.Load | 25295 | 0x325f2dc |
+| RuntimeSpineLoader.Create | 25296 | 0x325f32c |
+| PageTextureLoader.Load | 25300 | 0x326004c |
+| PageTextureLoader.Unload | 25301 | 0x32601c4 |
+| RuntimeSpineAsset.Dispose | 25316 | 0x325fd1c |
+
+Priority for the next decompilation pass:
+1. `RuntimeAtlasTexture.Read/Load/TryReadCache/CreateTexture` to establish the PNG/cache/texture path and its memory cost.
+2. `PageTextureLoader.Load/Unload` and `RuntimeSpineAsset.Dispose` to establish page texture ownership and release behavior.
+3. `RuntimeSpineLoader.Load/Create` to connect file parsing to Spine runtime construction.
+4. `RuntimeAtlasTexture.FinishPendingWritesAsync/WriteCache/QueueWrite` to understand background cache writes and task completion.
+
+The current artifact does not contain these next functions' pseudocode; the RVAs above are metadata-derived target pointers only. They must be independently disassembled, CFG-checked, and decompiled before drawing behavioral conclusions.
