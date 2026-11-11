@@ -11,6 +11,9 @@ import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.pcode.HighFunction;
+import ghidra.program.model.pcode.PcodeOpAST;
+import java.util.Iterator;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.SourceType;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +50,7 @@ public class PrepareFlowFunction extends GhidraScript {
         Set<Long> visited = new HashSet<>();
         Set<Long> skippedMethodEntries = new HashSet<>();
         AddressSet decoded = new AddressSet();
+        Set<Long> decodedInstructionStarts = new HashSet<>();
         queue.add(entry);
         int instructionCount = 0;
         int decodeFailures = 0;
@@ -83,6 +87,7 @@ public class PrepareFlowFunction extends GhidraScript {
                 continue;
             }
             decoded.add(at, last);
+            decodedInstructionStarts.add(offset);
             instructionCount++;
 
             if (existing.getFlowType().isCall()) {
@@ -144,6 +149,7 @@ public class PrepareFlowFunction extends GhidraScript {
 
         DecompInterface decompiler = new DecompInterface();
         String pseudocode;
+        Set<Long> decompilerInstructionAddresses = new HashSet<>();
         try {
             if (!decompiler.openProgram(currentProgram)) {
                 throw new IllegalStateException("Could not open Ghidra program in decompiler");
@@ -154,6 +160,14 @@ public class PrepareFlowFunction extends GhidraScript {
                     (result == null ? "no result" : result.getErrorMessage()));
             }
             pseudocode = result.getDecompiledFunction().getC();
+            HighFunction highFunction = result.getHighFunction();
+            if (highFunction != null) {
+                Iterator<PcodeOpAST> pcodeOps = highFunction.getPcodeOps();
+                while (pcodeOps.hasNext()) {
+                    Address pcodeAddress = pcodeOps.next().getSeqnum().getTarget();
+                    if (pcodeAddress != null) decompilerInstructionAddresses.add(pcodeAddress.getOffset());
+                }
+            }
             if (pseudocode == null || pseudocode.trim().isEmpty()) {
                 throw new IllegalStateException("Empty pseudocode for " + name);
             }
@@ -173,6 +187,10 @@ public class PrepareFlowFunction extends GhidraScript {
         Path skippedPath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".skipped-method-entries.txt");
         Files.writeString(skippedPath, skipped.toString(), StandardCharsets.UTF_8);
 
+        Set<Long> missingFromDecompiler = new HashSet<>(decodedInstructionStarts);
+        missingFromDecompiler.removeAll(decompilerInstructionAddresses);
+        Set<Long> outsideDecodedSet = new HashSet<>(decompilerInstructionAddresses);
+        outsideDecodedSet.removeAll(decodedInstructionStarts);
         String digest = sha256(pseudocode.getBytes(StandardCharsets.UTF_8));
         String json = "{\n" +
             "  \"format\": \"azurearchive-flow-ghidra-v1\",\n" +
@@ -184,6 +202,10 @@ public class PrepareFlowFunction extends GhidraScript {
             "  \"decode_failures\": " + decodeFailures + ",\n" +
             "  \"skipped_other_method_entries\": " + skippedMethodEntries.size() + ",\n" +
             "  \"pseudocode_chars\": " + pseudocode.length() + ",\n" +
+            "  \"decoded_instruction_start_count\": " + decodedInstructionStarts.size() + ",\n" +
+            "  \"decompiler_pcode_instruction_address_count\": " + decompilerInstructionAddresses.size() + ",\n" +
+            "  \"decoded_starts_missing_from_decompiler\": " + missingFromDecompiler.size() + ",\n" +
+            "  \"decompiler_addresses_outside_decoded_set\": " + outsideDecodedSet.size() + ",\n" +
             "  \"pseudocode_sha256\": " + quote(digest) + ",\n" +
             "  \"pseudocode_file\": " + quote(codePath.toString()) + ",\n" +
             "  \"method_entry_list\": " + quote(entriesPath.toString()) + ",\n" +
