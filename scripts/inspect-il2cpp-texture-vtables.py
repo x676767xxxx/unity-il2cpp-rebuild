@@ -127,7 +127,6 @@ def main():
             # Since v27, encoded method indices use bit 0 to distinguish
             # MethodSpec and store the index shifted left by one.
             decoded = (raw & 0x1FFFFFFE) >> 1
-            is_method_spec = bool(raw & 1)
             method_name = methods[decoded]["name"] if decoded < len(methods) else "<out-of-range>"
             method_owner_index = methods[decoded].get("declaring_type") if decoded < len(methods) else None
             owner = types[method_owner_index] if isinstance(method_owner_index, int) and 0 <= method_owner_index < len(types) else {}
@@ -139,7 +138,8 @@ def main():
                 "vtable_slot": slot_index,
                 "raw_encoded": f"0x{raw:08x}",
                 "decoded_method_index": decoded,
-                "method_spec_flag": is_method_spec,
+                "encoded_usage_tag": (raw >> 29) & 0x7,
+                "encoded_low_bit_marker": bool(raw & 1),
                 "method": method_name,
                 "declaring_type": (owner.get("namespace","") + "." if owner.get("namespace") else "") + owner.get("name",""),
                 "method_definition_slot": meta.get("slot"),
@@ -150,7 +150,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     tsv = out / "unity-texture-vtable-slots.tsv"
     fields = ["type","type_index","parent_index","vtable_slot","raw_encoded","decoded_method_index",
-              "method_spec_flag","method","declaring_type","method_definition_slot","method_token"]
+              "encoded_usage_tag","encoded_low_bit_marker","method","declaring_type","method_definition_slot","method_token"]
     with tsv.open("w", encoding="utf-8") as f:
         f.write("\t".join(fields) + "\n")
         for row in rows:
@@ -170,7 +170,7 @@ def main():
         "limits": [
             "This is the serialized metadata vtable, not a dump of runtime Il2CppClass memory.",
             "The runtime byte offsets in the ARM64 calls must be matched to the exact Unity 2023.2.22f1 Il2CppClass layout before equating them to vtable slot numbers.",
-            "Generic MethodSpec entries are flagged and their generic instantiation target is not resolved here."
+            "The encoded usage tag and low-bit marker are preserved as raw encoding metadata; the low bit is not interpreted as a generic MethodSpec flag."
         ]
     }
     (out / "unity-texture-vtable-slots.json").write_text(json.dumps(report, indent=2) + "\n")
