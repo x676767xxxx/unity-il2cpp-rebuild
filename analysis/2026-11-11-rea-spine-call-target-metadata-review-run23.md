@@ -205,6 +205,14 @@ All three match the comparisons in `RuntimeAtlasTexture.EstimateTextureBytes`. T
 
 Run 31 also exported the metadata-confirmed method body at `0x067e9b18`, named `Texture2D_get_format_Injected`. It has 15 reachable/decoded instructions, zero decode failures, and zero P-code addresses outside its recovered body. Its pseudocode lazily resolves the same internal-call string `UnityEngine.Texture2D::get_format_Injected(System.IntPtr)` through `0x0302d9bc`, caches the pointer at global `0x073d3998`, and calls it with the IntPtr argument. This corroborates that `0x067e9aa0` is a wrapper/trampoline around this internal call rather than an unrelated format calculator.
 
+### Run 32–33: null-pointer and exception helpers
+
+Run 32 (workflow `43013683848`, artifact `13851009363`) added two direct callees of the format wrapper; Run 33 (workflow `43014033196`, artifact `13852465659`) added their ARM64 instruction listings and dumped the referenced strings.
+
+- `0x0302dc94`: 65 reachable/decoded instructions, zero decode failures, and no P-code addresses outside its recovered body. Its string references resolve to `System`, `OverflowException`, and `Arithmetic operation resulted in an overflow.`. This is an overflow-exception construction/raise path. The `0x067e9aa0` wrapper's null-receiver branch calls this helper; the exact original managed source expression is not recovered, so preserve this as binary control-flow evidence rather than assuming a conventional NullReferenceException.
+- `0x0681e418`: 33 reachable/decoded instructions, zero decode failures, one skipped metadata method entry, and four P-code addresses outside its recovered body. It checks the runtime type hierarchy of the object, conditionally calls `0x068160a4(object,0,0)`, then resolves and tail-dispatches the internal call named `UnityEngine.RectTransform::get_rect_Injected(System.IntPtr,UnityEngine.Rect&)`. This is reached by the format wrapper when the object's +0x10 pointer is zero. It is therefore not a simple pointer-null test; it includes a type-specific RectTransform path. The exact role of that path and the callee at `0x068160a4` remain unresolved.
+- The string dumper now exports multiple resolver/exception strings for every unresolved helper target, and the instruction exporter includes neutral `UnresolvedTarget_*` names. This fixed the earlier filter gap that omitted the helper instruction TSVs.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
