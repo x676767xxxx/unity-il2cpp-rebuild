@@ -286,10 +286,15 @@ public class PrepareFlowFunction extends GhidraScript {
                     for (byte value : targetInstruction.getBytes()) hex.append(String.format("%02x", value & 0xff));
                     targetBytes = hex.toString();
                 }
-                ghidra.program.model.symbol.Reference[] refs =
+                ghidra.program.model.symbol.ReferenceIterator refs =
                     currentProgram.getReferenceManager().getReferencesTo(target);
                 TreeSet<String> refSources = new TreeSet<>();
-                for (ghidra.program.model.symbol.Reference ref : refs) refSources.add(ref.getFromAddress().toString());
+                int refCount = 0;
+                while (refs.hasNext()) {
+                    ghidra.program.model.symbol.Reference ref = refs.next();
+                    refSources.add(ref.getFromAddress().toString());
+                    refCount++;
+                }
                 StringBuilder callSites = new StringBuilder();
                 for (Long site : candidate.getValue()) {
                     if (callSites.length() > 0) callSites.append(",");
@@ -317,7 +322,7 @@ public class PrepareFlowFunction extends GhidraScript {
                     targetBlock != null && targetBlock.isExecute(),
                     targetInstruction != null, targetText, targetBytes,
                     targetOwner == null ? "" : targetOwner.getEntryPoint().toString(),
-                    targetOwner == null ? "" : targetOwner.getName(), refs.length,
+                    targetOwner == null ? "" : targetOwner.getName(), refCount,
                     refList.toString(), callSites.toString(), preceding.toString()));
             }
             Path candidatePath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".call-target-candidates.tsv");
