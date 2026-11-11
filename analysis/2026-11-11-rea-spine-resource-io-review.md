@@ -114,7 +114,7 @@ The current artifact does not contain these next functions' pseudocode; the RVAs
 
 ## Follow-up evidence review — runs 43000801629, 43001386531, and 43001483524
 
-Checked the current branch on 2026-11-11. The branch head is [0e4fd512caa1f96ea7c5f7d6a8a2868f49217dd6](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/0e4fd512caa1f96ea7c5f7d6a8a2868f49217dd6), titled “Batch Spine texture and ownership analysis in one Ghidra import.” No pull requests were returned for this repository.
+At the first post-batch check on 2026-11-11, the workflow/code head was [0e4fd512caa1f96ea7c5f7d6a8a2868f49217dd6](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/0e4fd512caa1f96ea7c5f7d6a8a2868f49217dd6), titled “Batch Spine texture and ownership analysis in one Ghidra import.” The subsequent TSV fix and P-code provenance revisions are documented below. No pull requests were returned for this repository.
 
 ### Successful six-target bounded-flow artifact — run 43000801629
 
@@ -211,7 +211,7 @@ These are metadata-linked method-pointer RVAs from the same ARM64 ELF/metadata p
 
 ### Confirmed cause of the 34-target batch failure
 
-Run 43001483524 failed in step 9, “Recover all reachable control-flow targets in one Ghidra import.” The current workflow file's TSV reader uses a double-escaped tab literal in its `IFS` assignment, so the shell receives a literal backslash plus `t` rather than a tab delimiter. The six tab-separated columns are therefore not split. The Ghidra script receives malformed arguments; the archived log shows examples where the first script argument contains fragments of the TSV row, followed by:
+Run 43001483524 failed in step 9, “Recover all reachable control-flow targets in one Ghidra import.” At workflow commit `0e4fd512`, the TSV reader used a double-escaped tab literal in its `IFS` assignment, so the shell received a literal backslash plus `t` rather than a tab delimiter. The six tab-separated columns were therefore not split. The Ghidra script receives malformed arguments; the archived log shows examples where the first script argument contains fragments of the TSV row, followed by:
 
 `java.lang.NumberFormatException` at `PrepareFlowFunction.java:36`.
 
