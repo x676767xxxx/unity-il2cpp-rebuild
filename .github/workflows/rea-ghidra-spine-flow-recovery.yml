@@ -118,8 +118,10 @@ jobs:
           JAVA_TOOL_OPTIONS: "-Xmx3G -XX:ActiveProcessorCount=2"
         run: |
           set -euo pipefail
-          while IFS="$GITHUB_WORKSPACE/work/ghidra-project/${stem}"
-            LOG="$GITHUB_WORKSPACE/work/rea/${stem}-flow-recovery.log"
+          while IFS=$'\t' read -r index type method symbol stem entry; do
+            echo "Recovering $type.$method at $entry"
+            PROJECT="$GITHUB_WORKSPACE/work/ghidra-project/\${stem}"
+            LOG="$GITHUB_WORKSPACE/work/rea/\${stem}-flow-recovery.log"
             mkdir -p "$PROJECT"
             "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
               "$PROJECT" azurearchive-spine-flow \
@@ -127,14 +129,14 @@ jobs:
               -noanalysis \
               -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
               -postScript PrepareFlowFunction.java "$entry" 6000 0x4000000 "$symbol" \
-                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c" \
-                "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json" \
+                "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.c" \
+                "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.json" \
                 "$GITHUB_WORKSPACE/work/input/all-method-entries.txt" \
               -max-cpu 2 \
               2>&1 | tee "$LOG"
             grep -q "REA_FLOW_FUNCTION_OK" "$LOG"
-            test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.c"
-            test -s "$GITHUB_WORKSPACE/work/rea/${stem}-flow-ghidra.json"
+            test -s "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.c"
+            test -s "$GITHUB_WORKSPACE/work/rea/\${stem}-flow-ghidra.json"
           done < work/rea/flow-targets.tsv
 
       - name: Verify flow recovery outputs
