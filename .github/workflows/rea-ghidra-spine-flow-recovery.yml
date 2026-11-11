@@ -133,6 +133,11 @@ jobs:
                   raise SystemExit(f"missing code pointer: {expected_type}.{expected_name}")
               entry=int(address["rva"],16)+0x100000
               rows.append((index,expected_type,expected_name,function_name,stem,entry))
+          # Unresolved shared helper called by EstimateTextureBytes, Texture Load and PNG-size helper.
+          # It is deliberately labeled by address, not assigned a guessed managed name.
+          rows.append((-1,"unresolved","call-target 0x067e9aa0",
+                       "Unresolved_FormatCodeTarget_067E9AA0",
+                       "unresolved-format-code-target-067e9aa0",0x067e9aa0))
           pathlib.Path("work/rea/flow-targets.tsv").write_text(
               "".join("\t".join(map(str,row))+"\n" for row in rows))
           print(json.dumps({"method_entry_count":len(entries),"targets":[
