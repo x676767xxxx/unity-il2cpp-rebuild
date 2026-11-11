@@ -387,3 +387,57 @@ These observations are useful leads, not source-level facts:
 - A binary-level comparison with legacy iOS 0.7.9.2.
 
 The next pass should prioritize address-level disassembly and call/branch-edge attribution for `TryReadCache`, `WriteCache`, `Load`, `CreateTexture`, `EstimateTextureBytes`, `FinishPendingWritesAsync`, `RuntimeSpineAsset.Dispose`, and `DestroyOwned`. Do not promote the preliminary pseudocode interpretations to implementation requirements until those checks pass. No original C# source, restored Unity project, iOS compilation, or IPA is established.
+
+
+## P-code provenance follow-up — runs 43002455898 and 43002856588
+
+Commit [7fca6b7](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/7fca6b7bebba9dafa6727465e42160d4b495b657) added a per-P-code-operation provenance export. The first run, [43002455898](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43002455898), completed successfully and uploaded artifact [13846951669](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43002455898/artifacts/13846951669) (4,487,966 bytes; ZIP digest `sha256:45f139db1044373f358659b970628aefe3aed2c68c4caf10f842e057fa048f06`). That first provenance export used literal backslash-t/backslash-n separators in both the header and rows, so its files were not valid TSV.
+
+Commit [5f8e6a1](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/5f8e6a11aafe32e6c13f666a4f90c17b0f7b2b7f) corrected the row formatter to emit actual tab separators and added `pcode_provenance_file` to each JSON sidecar. The resulting [run 43002856588](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43002856588) completed successfully; all 11 steps passed. Artifact [13846468132](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43002856588/artifacts/13846468132) is 4,486,758 bytes, digest `sha256:f3c441cc19c1e281a78983f7dd7c14d4d648eb2b1c16079bbc6119e5b1bd463c`. I downloaded and inspected it: 142 files, including 34 C exports, 34 JSON sidecars, 34 P-code provenance files, 34 skipped-entry lists, and the shared metadata/verification files.
+
+The 34 pseudocode hashes and bounded-flow counts are unchanged from run 43001799392. This change adds provenance diagnostics; it does not add new machine-code traversal, branch edges, or CFG recovery.
+
+### Provenance header is still malformed
+
+The data rows in the 430028 provenance files now use actual tabs, but the header initializer in the current `PrepareFlowFunction.java` still contains double-escaped tab and newline sequences. In all 34 files:
+- the header contains literal backslash-t and backslash-n characters rather than tab/newline delimiters;
+- the first data row is concatenated onto that same physical line after the literal backslash-n;
+- subsequent data rows are tab-delimited and can be parsed.
+
+The JSON sidecars point to the provenance files, but the workflow verification step still checks only the C export and JSON identity/hash; it does not parse or validate the provenance TSV. Therefore the successful workflow status does not validate this TSV header. This is a confirmed output-format defect in the latest observed script revision.
+
+### Function-owner attribution is order-dependent
+
+The provenance script asks Ghidra for the function containing each P-code address while it is decompiling the current target. However, the workflow creates and decompiles targets sequentially in TSV order. Later target functions have not yet been created when earlier provenance files are written. The 430028 data confirms this ordering effect:
+
+| Target | P-code addresses | Outside current body | Owner attribution for outside addresses |
+|---|---:|---:|---|
+| `RuntimeAtlasTexture.TryReadCache` | 272 | 0 | All 272 unique P-code addresses belong to its own recovered body |
+| `RuntimeAtlasTexture.Load` | 234 | 109 | All 109 outside addresses are unowned at capture time |
+| `RuntimeSpineLoader.AtlasPages` | 176 | 40 | All 40 outside addresses are unowned at capture time |
+| `RuntimeSpineLoader.Load` | 188 | 185 | All 185 outside addresses are unowned at capture time |
+| `RuntimeSpineLoader.ReadAsync` closure | 40 | 40 | 13 addresses are owned by the already-created `RuntimeSpineLoader.Read`; 27 are unowned |
+| `RuntimeSpineAsset.Own` | 212 | 128 | 22 are owned by earlier DXT5 eligibility functions; 106 are unowned |
+| `RuntimeSpineAsset.Retain` | 1,306 | 1,295 | All 1,295 outside addresses are unowned at capture time |
+| `RuntimeSpineAsset.Dispose` | 128 | 22 | 14 belong to `RuntimeAtlasTexture.CanLoadPngAsDxt5`; 8 belong to `RuntimeSpineLoader.CanLoadPngAsDxt5` |
+| `RuntimeSpineAsset.get_EstimatedTextureBytes` | 622 | 572 | All 572 outside addresses are unowned at capture time |
+
+“Unowned” means that Ghidra's function manager returned no containing function at the time this target's provenance file was written. It does not mean the address is invalid or unreachable. For example, the target order places `RuntimeAtlasTexture.CreateTexture` after `RuntimeAtlasTexture.Load`, `RuntimeSpineLoader.Read` after `RuntimeSpineLoader.AtlasPages`, and `RuntimeSpineLoader.Create` after `RuntimeSpineLoader.Load`; their functions are therefore not yet available to the earlier provenance pass. The `ReadAsync` closure's 13 addresses attributed to `Read` are consistent with cross-function/inlined callback content, but do not by themselves prove the call graph.
+
+The provenance export should be made two-phase: first create and verify all target function bodies, then decompile and record P-code ownership after every target function exists. A final attribution pass over the completed Ghidra program would also work. The TSV header must be fixed and the verification step should validate the file format and row counts.
+
+### What provenance does and does not establish
+
+- It helps distinguish P-code addresses inside the current recovered body, addresses owned by another Ghidra function, and addresses with no function owner at capture time.
+- `RuntimeAtlasTexture.TryReadCache` is currently the cleanest high-priority target by this diagnostic: 272 unique P-code addresses are all inside its recovered body, with zero P-code addresses outside. It still has 107 bounded instruction starts absent from P-code, so this is not a complete-CFG proof.
+- `RuntimeAtlasTexture.DxtBytes` remains the cleanest small method: 15 bounded starts and 15 P-code addresses, with no reported mismatch.
+- The `Read/ReadAsync/AtlasPages/Load/Create` and asset-lifetime exports remain provisional because their P-code/body mismatches are large or order-dependent.
+- Provenance records P-code instruction addresses, containing function, body membership, and opcode. It is not a raw ARM64 disassembly or a direct-branch edge list, and it does not recover indirect jump tables or exception/LSDA edges.
+
+### Next evidence pass
+
+1. Fix the header's Java string escaping and make the verifier parse every provenance file, including checking that the first data row is not merged with the header.
+2. Split target processing into function-body creation and decompilation/provenance phases so future target functions are already known when owners are attributed.
+3. Compare each P-code address against the final function-body set and attribute every outside address to a target function, non-target function, or genuinely unowned block.
+4. Export raw ARM64 instruction bytes/disassembly and direct branch/fall-through edges; separately resolve indirect jump tables and exception/LSDA paths.
+5. Revisit the cache and ownership findings only after the provenance map is complete. No code or workflow files were changed during this evidence review.
