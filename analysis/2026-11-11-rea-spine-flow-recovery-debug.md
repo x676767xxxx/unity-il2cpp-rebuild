@@ -194,3 +194,16 @@ This is a source-level corrective change only. A subsequent GitHub Actions run u
 - Full CFG recovery, exception/LSDA edges, async state-machine recovery, and exact branch-target audit remain outstanding.
 - No texture/cache target beyond `TryPngSize` has yet received this reachable-flow treatment.
 - No original C# recovery, restored Unity project, iOS build, or IPA is established by this work.
+
+
+## Corrected rerun started
+
+The script correction commit [b4d545a](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/b4d545a071f3e9b8799b17c7dda0d7d47bbd5c7b) triggered a new push workflow:
+
+- [Run 42997601270](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42997601270)
+- Head SHA: `b4d545a071f3e9b8799b17c7dda0d7d47bbd5c7b`
+- Current observed state at report update: `in_progress`
+- Steps 1–5 completed; step 6 (download Android 1.0 APK and extract IL2CPP inputs) was in progress; steps 7–11 pending.
+- No Artifact was available yet.
+
+This is the first run that includes both the fall-through method-entry guard and explicit Ghidra function-body replacement/size verification. Its eventual success or failure remains to be observed.
