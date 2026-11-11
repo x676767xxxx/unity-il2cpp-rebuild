@@ -164,7 +164,7 @@ public class PrepareFlowFunction extends GhidraScript {
         DecompInterface decompiler = new DecompInterface();
         String pseudocode;
         Set<Long> decompilerInstructionAddresses = new HashSet<>();
-        StringBuilder pcodeProvenance = new StringBuilder("pcode_address\tcontaining_function_entry\tcontaining_function_name\tinside_recovered_body\topcode\n");
+        StringBuilder pcodeProvenance = new StringBuilder("pcode_address\tcontaining_function_entry\tcontaining_function_name\tinside_target_recovered_body\tcontaining_function_body_contains_address\topcode\n");
         try {
             if (!decompiler.openProgram(currentProgram)) {
                 throw new IllegalStateException("Could not open Ghidra program in decompiler");
@@ -186,9 +186,10 @@ public class PrepareFlowFunction extends GhidraScript {
                         Function owner = currentProgram.getFunctionManager().getFunctionContaining(pcodeAddress);
                         String ownerEntry = owner == null ? "" : owner.getEntryPoint().toString();
                         String ownerName = owner == null ? "" : owner.getName();
-                        boolean insideBody = owner != null && owner.getBody().contains(pcodeAddress);
-                        pcodeProvenance.append(String.format("0x%x\t%s\t%s\t%s\t%s%n",
-                            pcodeAddress.getOffset(), ownerEntry, ownerName, insideBody, op.getMnemonic()));
+                        boolean insideTargetBody = function.getBody().contains(pcodeAddress);
+                        boolean ownerBodyContainsAddress = owner != null && owner.getBody().contains(pcodeAddress);
+                        pcodeProvenance.append(String.format("0x%x\t%s\t%s\t%s\t%s\t%s%n",
+                            pcodeAddress.getOffset(), ownerEntry, ownerName, insideTargetBody, ownerBodyContainsAddress, op.getMnemonic()));
                     }
                 }
             }
