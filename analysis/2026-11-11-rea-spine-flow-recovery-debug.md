@@ -323,3 +323,18 @@ This is a separate compression-stream state machine. It must not be mistaken for
 ## Latest strict body-set run status
 
 Run [42999979795](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999979795), head commit `9f830a77429d4844079ea4e3bed400e071446942`, remains `in_progress` at the latest check. Ghidra install and APK extraction passed; metadata linking was running; no Artifact exists yet. Do not infer a timeout or success from the apparent pause.
+
+
+## ReadAsync/Read decompiler warning review — 2026-11-11
+
+Inspection of the archived pseudocode and the per-target Ghidra log adds a concrete warning:
+
+- `RuntimeSpineLoader.ReadAsync` pseudocode consists of static-class initialization calls followed by a single indirect call through a class/method pointer and return. It does not show path reading, file construction, or task completion logic.
+- The same log lists many “Removing unreachable block” warnings at addresses outside the small visible pseudocode body, including ranges near `0x04051054` and `0x04b82764`. This is consistent with a mismatch between the bounded traversal's collected blocks and the decompiler's own control-flow model, but does not by itself identify which blocks are valid or invalid.
+- `RuntimeSpineLoader.Read` pseudocode similarly contains initialization and object setup, while Ghidra warns about removed blocks around `0x0335eebc` onward. The overlap in warnings between Read and AtlasPages indicates that the current traversal/function-body construction needs strict boundary validation before semantic interpretation.
+
+Important metric caveat: the P-code metric counts unique instruction addresses that have at least one P-code operation. It is not a literal percentage of all machine instructions translated; branches, returns, and other instructions may not yield ordinary P-code operations. The very low Read/ReadAsync counts remain a strong diagnostic because their pseudocode is visibly only a wrapper, but the count alone is not a formal completeness percentage.
+
+## Run 42999979795 — latest observed state
+
+The run has progressed past metadata linking and target-list generation. At the latest status query, step 9 `Recover reachable control-flow blocks and decompile` was still `in_progress`; steps 10 and 11 had not started and no artifact was published. The workflow has a 60-minute job timeout. Do not report success or a failure until GitHub marks the run complete.
