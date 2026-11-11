@@ -208,7 +208,7 @@ public class PrepareFlowFunction extends GhidraScript {
         // This distinguishes missing function ownership from missing/non-executable code bytes.
         if (name.equals("RuntimeSpineLoader_Load") || name.equals("RuntimeSpineAsset_Retain") ||
             name.equals("RuntimeSpineAsset_get_EstimatedTextureBytes")) {
-            StringBuilder forensic = new StringBuilder("pcode_address\tmemory_block\tinitialized\texecutable\tinstruction_present\tmnemonic\tinstruction_text\tbytes_hex\tflow_type\tflow_targets\towner_entry\towner_name\ttarget_body\n");
+            StringBuilder forensic = new StringBuilder("pcode_address\tmemory_block\tinitialized\texecutable\tinstruction_present\tmnemonic\tinstruction_text\tbytes_hex\tflow_type\tflow_targets\tflow_target_owners\towner_entry\towner_name\ttarget_body\n");
             TreeSet<Long> sortedPcodeAddresses = new TreeSet<>(decompilerInstructionAddresses);
             for (Long rawAddress : sortedPcodeAddresses) {
                 Address address = toAddr(rawAddress);
