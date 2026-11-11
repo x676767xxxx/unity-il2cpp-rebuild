@@ -164,6 +164,7 @@ public class PrepareFlowFunction extends GhidraScript {
         DecompInterface decompiler = new DecompInterface();
         String pseudocode;
         Set<Long> decompilerInstructionAddresses = new HashSet<>();
+        StringBuilder pcodeProvenance = new StringBuilder("pcode_address\\tcontaining_function_entry\\tcontaining_function_name\\tinside_recovered_body\\topcode\\n");
         try {
             if (!decompiler.openProgram(currentProgram)) {
                 throw new IllegalStateException("Could not open Ghidra program in decompiler");
@@ -178,8 +179,17 @@ public class PrepareFlowFunction extends GhidraScript {
             if (highFunction != null) {
                 Iterator<PcodeOpAST> pcodeOps = highFunction.getPcodeOps();
                 while (pcodeOps.hasNext()) {
-                    Address pcodeAddress = pcodeOps.next().getSeqnum().getTarget();
-                    if (pcodeAddress != null) decompilerInstructionAddresses.add(pcodeAddress.getOffset());
+                    PcodeOpAST op = pcodeOps.next();
+                    Address pcodeAddress = op.getSeqnum().getTarget();
+                    if (pcodeAddress != null) {
+                        decompilerInstructionAddresses.add(pcodeAddress.getOffset());
+                        Function owner = currentProgram.getFunctionManager().getFunctionContaining(pcodeAddress);
+                        String ownerEntry = owner == null ? "" : owner.getEntryPoint().toString();
+                        String ownerName = owner == null ? "" : owner.getName();
+                        boolean insideBody = owner != null && owner.getBody().contains(pcodeAddress);
+                        pcodeProvenance.append(String.format("0x%x\\t%s\\t%s\\t%s\\t%s%n",
+                            pcodeAddress.getOffset(), ownerEntry, ownerName, insideBody, op.getMnemonic()));
+                    }
                 }
             }
             if (pseudocode == null || pseudocode.trim().isEmpty()) {
@@ -196,6 +206,8 @@ public class PrepareFlowFunction extends GhidraScript {
         Files.createDirectories(codePath.getParent());
         Files.createDirectories(metaPath.getParent());
         Files.writeString(codePath, pseudocode, StandardCharsets.UTF_8);
+        Path pcodePath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".pcode-provenance.tsv");
+        Files.writeString(pcodePath, pcodeProvenance.toString(), StandardCharsets.UTF_8);
         StringBuilder skipped = new StringBuilder();
         for (Long value : skippedMethodEntries) skipped.append(String.format("0x%x%n", value));
         Path skippedPath = metaPath.resolveSibling(metaPath.getFileName().toString() + ".skipped-method-entries.txt");
