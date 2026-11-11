@@ -86,6 +86,17 @@ Run 24 added ARM64 instruction listings for the Spine-family methods. The archiv
 - `RuntimeSpineLoader.Read` has 179 reachable decoded instructions and 40 distinct P-code source addresses. Its body performs several static initializations, obtains a delegate-like object through an indirect invoke, retrieves a value from a singleton/static object chain, and calls an unresolved shared/native target at `0x05686294`; this call target is not an exact metadata method entry. It then stores the resulting object into the returned `Files` object at offset `+0x28`. The exact source of the files and the meaning of the unresolved call remain unknown.
 - `RuntimeSpineLoader.AtlasPages` metadata-confirms `System.IO.StringReader`, `Spine.Atlas`, `Spine.Atlas.Dispose`, and `Spine.Unity.NoOpTextureLoader` constructor calls. Its pseudocode constructs/uses a StringReader and Spine Atlas, obtains page/region data through collections and virtual calls, and disposes the temporary Atlas object on the shown path.
 
+### Metadata field-layout cross-check from Run 24
+
+The linked metadata record provides concrete declared field types for the Spine loader data containers:
+
+- `RuntimeSpineLoader.Files`: `BasePath : string`, `AtlasText : string`, `Skeleton : byte[]`, `Pages : Dictionary<string, RuntimeAtlasTexture.Source>`.
+- `RuntimeSpineAsset`: `owned : HashSet<UnityEngine.Object>`, `references : int`, `<Asset>k__BackingField : Spine.Unity.SkeletonDataAsset`.
+- `PageTextureLoader`: `materials : Dictionary<string, UnityEngine.Material>`.
+- `<>c__DisplayClass4_0`: `basePath : string`, `supportsDxt5 : bool`.
+
+This metadata strongly supports interpreting the two file-read results in `RuntimeSpineLoader.Read` as the Atlas text and skeleton byte array, with the page dictionary populated from Atlas page paths. The `EstimatedTextureBytes` method begins from the `owned` field at `this+0x10` and contains collection/enumerator plus virtual-dispatch loops. It is therefore traversing the owned Unity-object set; the exact texture subtype filter and per-texture size formula are still not resolved. Do not assume the total is simply width × height × 4 or DXT5 block size without recovering the virtual targets and arithmetic.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
