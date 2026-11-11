@@ -103,6 +103,7 @@ jobs:
             (25281,"RuntimeAtlasTexture","CanLoadPngAsDxt5","RuntimeAtlasTexture_CanLoadPngAsDxt5","runtime-atlas-texture-can-load-png-dxt5"),
             (25282,"RuntimeAtlasTexture","DxtBytes","RuntimeAtlasTexture_DxtBytes","runtime-atlas-texture-dxt-bytes"),
             (25284,"RuntimeAtlasTexture","EstimateTextureBytes","RuntimeAtlasTexture_EstimateTextureBytes","runtime-atlas-texture-estimate-bytes"),
+            (93062,"Texture2D","get_format_Injected","Texture2D_get_format_Injected","unity-texture2d-get-format-injected"),
             (25287,"Source","get_HasDxtCache","Source_get_HasDxtCache","source-has-dxt-cache"),
             (25290,"<>c__DisplayClass11_0","<QueueWrite>b__0","DisplayClass11_0_QueueWrite_b0","runtime-atlas-texture-queue-write-callback"),
             (25291,"RuntimeSpineLoader","DestroyOwned","RuntimeSpineLoader_DestroyOwned","runtime-spine-loader-destroy-owned"),
