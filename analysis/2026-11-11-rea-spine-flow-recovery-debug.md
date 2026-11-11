@@ -255,3 +255,14 @@ Commit [73fc490](https://github.com/x676767xxxx/unity-il2cpp-rebuild/commit/73fc
 This is intended to distinguish “the traversal found N instructions” from “the decompiler actually represented those instructions.” It is a diagnostic, not a proof of complete CFG; decompiler P-code can omit unreachable or unsupported instructions.
 
 Push-triggered validation run [42999506194](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42999506194), head SHA `73fc490e8c9b929e5013588fed0a7255f22cfd5f`, was observed `in_progress` immediately after creation. No result or Artifact was available at that observation time.
+
+
+## Metadata cross-check for ReadAsync — 2026-11-11
+
+The linked IL2CPP metadata artifact was queried independently for the `RuntimeSpineLoader` type and its nested types:
+
+- `RuntimeSpineLoader.ReadAsync` is metadata method index 25294, return type `System.Threading.Tasks.Task<RuntimeSpineLoader+Files>`, entry RVA `0x325f1c0`.
+- `RuntimeSpineLoader` has five nested types in the metadata inventory: `Files`, `PageTextureLoader`, `<>c`, `<>c__DisplayClass4_0`, and `<>c__DisplayClass6_0`.
+- None of those five nested types is a compiler-generated `<ReadAsync>d__...` state-machine type. The metadata search did not identify a state machine directly nested under `RuntimeSpineLoader`.
+
+This narrows but does not settle the short `ReadAsync` pseudocode question: it may be a non-async Task-returning wrapper or delegate work to a helper/state machine declared elsewhere. Do not associate unrelated `<ReadAsync>d__...` types elsewhere in the large metadata image without a proven call/reference path. Next step is to identify the actual callees and cross-reference the wrapper's ARM64 call targets with metadata method entries.
