@@ -388,3 +388,17 @@ Metadata index 25286 identifies the caller's local helper `RuntimeAtlasTexture.<
 The first three push-triggered attempts (runs 43000546124, 43000609947, and 43000676656) failed immediately during workflow-file editing. The shell loop and TSV column schema were being changed, and duplicate trailing workflow fragments were found in the file. The workflow has now been reduced to one copy of each step, with a six-column TSV reader and matching six-column verifier. Current workflow cleanup commit: `f284da5992c863056cb36e6248f5c45636b822e6`.
 
 The cleaned file currently contains one recovery loop, one verification step, and one artifact-upload step. A successful run for this cleaned commit has not yet been observed; do not treat the helper analysis as completed until a new Artifact includes its pseudocode and metadata JSON.
+
+
+## Clean helper-target workflow validation — run 43000801629
+
+After removing duplicated trailing workflow fragments and correcting the six-column loop, GitHub created [run 43000801629](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43000801629) on commit `f284da5992c863056cb36e6248f5c45636b822e6`.
+
+At the latest status query:
+- Ghidra installation: completed.
+- Android APK download and IL2CPP extraction: completed.
+- REA metadata linking: in progress.
+- Target-list build, six-function decompilation, verification, and artifact upload: pending.
+- No Artifact has been published yet.
+
+The run is now executing the cleaned workflow. The local reader helper remains unverified until its own pseudocode and JSON appear in the uploaded Artifact.
