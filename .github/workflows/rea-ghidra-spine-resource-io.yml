@@ -1,0 +1,204 @@
+name: REA Ghidra decompile Android Spine resource IO
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/rea-ghidra-spine-resource-io.yml"
+      - "scripts/ghidra/PrepareFocusedFunction.java"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-ghidra-spine-resource-io
+  cancel-in-progress: true
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Linux Ghidra runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y procps xvfb unzip
+
+      - name: Download and install Ghidra 12.1.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tools
+          curl -fL --retry 3 -o tools/ghidra.zip "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip"
+          unzip -q tools/ghidra.zip -d tools
+          test -x tools/ghidra_12.1.4_PUBLIC/support/analyzeHeadless
+
+      - name: Download Android 1.0 APK and extract native analysis inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/android work/input work/rea
+          curl -fL --retry 3 -o work/android/base.apk "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk"
+          unzip -q work/android/base.apk -d work/android/unpacked
+          LIB="$(find work/android/unpacked -type f -path '*/arm64-v8a/libil2cpp.so' -print -quit)"
+          METADATA="$(find work/android/unpacked -type f -name global-metadata.dat -print -quit)"
+          test -n "$LIB" || { echo "libil2cpp.so not found" >&2; exit 1; }
+          test -n "$METADATA" || { echo "global-metadata.dat not found" >&2; exit 1; }
+          cp "$LIB" work/input/libil2cpp.so
+          cp "$METADATA" work/input/global-metadata.dat
+          sha256sum work/input/libil2cpp.so work/input/global-metadata.dat | tee work/rea/input-sha256.txt
+
+      - name: Link exact method addresses with REA
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes rea-agents@6.8.0 inspect-il2cpp-metadata work/input/global-metadata.dat \
+            --binary work/input/libil2cpp.so \
+            --detail summary \
+            --evidence_output work/rea/linked-evidence.json \
+            --ghidra-seeds work/input/ghidra-method-seeds.txt \
+            --json 2>&1 | tee work/rea/metadata-link.log
+          test -s work/rea/linked-evidence.json
+          test -s work/input/ghidra-method-seeds.txt
+
+      - name: Resolve target ranges from linked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib
+          evidence = json.loads(pathlib.Path("work/rea/linked-evidence.json").read_text())
+          result = evidence["records"][0]["normalized_result"]
+          # Stable metadata method indices from the paired Android 1.0 image.
+          targets = [
+              (25283, "RuntimeAtlasTexture", "TryPngSize", "runtime-atlas-texture-try-png-size"),
+              (25291, "RuntimeSpineLoader", "DestroyOwned", "runtime-spine-loader-destroy-owned"),
+              (25292, "RuntimeSpineLoader", "AtlasPages", "runtime-spine-loader-atlas-pages"),
+              (25293, "RuntimeSpineLoader", "Read", "runtime-spine-loader-read"),
+              (25294, "RuntimeSpineLoader", "ReadAsync", "runtime-spine-loader-read-async"),
+          ]
+          addresses = result["method_addresses"]
+          methods = result["methods"]
+          types = result["types"]
+          code = []
+          for index, expected_type, expected_name, stem in targets:
+              method = methods[index]
+              declaring = types[method["declaring_type"]]["name"]
+              address = addresses[index]
+              if declaring != expected_type or method["name"] != expected_name:
+                  raise SystemExit(f"method identity mismatch at {index}: {declaring}.{method['name']}")
+              if address.get("state") != "code" or not address.get("rva"):
+                  raise SystemExit(f"method {expected_type}.{expected_name} has no linked code RVA")
+              rva = int(address["rva"], 16)
+              following = []
+              for other_index, other in enumerate(addresses):
+                  if other.get("state") == "code" and other.get("rva"):
+                      candidate = int(other["rva"], 16)
+                      if candidate > rva:
+                          following.append((candidate, other_index))
+              if not following:
+                  raise SystemExit(f"no next code pointer found for {expected_type}.{expected_name}")
+              end_rva, next_index = min(following)
+              if end_rva <= rva:
+                  raise SystemExit(f"invalid range for {expected_type}.{expected_name}")
+              entry = rva + 0x100000
+              end = end_rva + 0x100000
+              code.append((index, expected_type, expected_name, stem, rva, end_rva, entry, end, next_index))
+          with open("work/rea/targets.tsv", "w") as f:
+              for row in code:
+                  f.write("\t".join(map(str, row)) + "\n")
+          print(json.dumps([
+              {"index": i, "method": f"{t}.{n}", "rva": hex(r), "end_rva": hex(e),
+               "ghidra_entry": hex(a), "ghidra_end_exclusive": hex(b), "next_method_index": ni}
+              for i,t,n,s,r,e,a,b,ni in code
+          ], indent=2))
+          PY
+
+      - name: Extract focused Ghidra pseudocode for resource IO methods
+        shell: bash
+        env:
+          GHIDRA_INSTALL_DIR: ${{ github.workspace }}/tools/ghidra_12.1.4_PUBLIC
+          JAVA_TOOL_OPTIONS: "-Xmx2G -XX:ActiveProcessorCount=2"
+        run: |
+          set -euo pipefail
+          rm -rf work/ghidra-project
+          mkdir -p work/ghidra-project
+          args=()
+          while IFS=$'\t' read -r index type method stem rva end_rva entry end next_index; do
+            args+=( -postScript PrepareFocusedFunction.java "0x$(printf '%x' "$entry")" "0x$(printf '%x' "$end")" "${type}_${method}" \
+              "$GITHUB_WORKSPACE/work/rea/${stem}-ghidra.c" \
+              "$GITHUB_WORKSPACE/work/rea/${stem}-ghidra.json" )
+          done < work/rea/targets.tsv
+          "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
+            "$GITHUB_WORKSPACE/work/ghidra-project" azurearchive-spine-resource-io \
+            -import "$GITHUB_WORKSPACE/work/input/libil2cpp.so" \
+            -noanalysis \
+            -scriptPath "$GITHUB_WORKSPACE/scripts/ghidra" \
+            "${args[@]}" \
+            -max-cpu 2 \
+            2>&1 | tee work/rea/ghidra-resource-io.log
+          for stem in \
+            runtime-atlas-texture-try-png-size \
+            runtime-spine-loader-destroy-owned \
+            runtime-spine-loader-atlas-pages \
+            runtime-spine-loader-read \
+            runtime-spine-loader-read-async; do
+            test -s "work/rea/${stem}-ghidra.c"
+            test -s "work/rea/${stem}-ghidra.json"
+          done
+
+      - name: Verify pseudocode hashes and metadata-derived ranges
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path("work/rea")
+          rows = []
+          for line in (root / "targets.tsv").read_text().splitlines():
+              index, typ, method, stem, rva, end_rva, entry, end, next_index = line.split("\t")
+              code = (root / f"{stem}-ghidra.c").read_text()
+              meta = json.loads((root / f"{stem}-ghidra.json").read_text())
+              digest = hashlib.sha256(code.encode()).hexdigest()
+              expected_name = f"{typ}_{method}"
+              if meta.get("function_name") != expected_name:
+                  raise SystemExit(f"{expected_name}: function identity mismatch")
+              if int(meta["entry"], 16) != int(entry):
+                  raise SystemExit(f"{expected_name}: entry mismatch")
+              if int(meta["metadata_end_exclusive"], 16) != int(end):
+                  raise SystemExit(f"{expected_name}: end mismatch")
+              if meta.get("pseudocode_sha256") != digest or meta.get("pseudocode_chars") != len(code):
+                  raise SystemExit(f"{expected_name}: hash/length mismatch")
+              rows.append({"method_index": int(index), "method": f"{typ}.{method}",
+                           "elf_rva": hex(int(rva)), "end_rva_exclusive": hex(int(end_rva)),
+                           "ghidra_entry": hex(int(entry)), "ghidra_end_exclusive": hex(int(end)),
+                           "next_method_index": int(next_index), "instructions": meta["instruction_count"],
+                           "pseudocode_chars": len(code), "sha256": digest,
+                           "status": "extracted_and_hash_verified"})
+          report = {"format":"azurearchive-spine-resource-io-v1",
+                    "binary_sha256": (root / "input-sha256.txt").read_text().splitlines()[0].split()[0],
+                    "targets": rows,
+                    "limitations":["metadata-bounded extraction is not proof of complete CFG or LSDA coverage",
+                                   "pseudocode is not recovered C# source",
+                                   "Android ARM64 RVAs are not iOS addresses",
+                                   "no Unity project or IPA is produced"]}
+          (root / "resource-io-verification.json").write_text(json.dumps(report, indent=2)+"\n")
+          print(json.dumps(report, indent=2))
+          PY
+
+      - name: Upload REA resource IO evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-rea-spine-resource-io
+          path: work/rea/
+          if-no-files-found: warn
