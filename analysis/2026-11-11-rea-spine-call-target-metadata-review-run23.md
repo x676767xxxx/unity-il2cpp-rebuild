@@ -163,6 +163,16 @@ Ghidra recovered 30 reachable instructions with zero decode failures. On the non
 
 The callsites consume the helper's W0 result as a numeric format code (compared against 12, 10 and 3), although Ghidra's standalone decompilation currently assigns a `void` prototype because no metadata method entry supplies the signature. Treat the result-as-format-code role as callsite-derived evidence; the actual engine function pointer target, exact return signature, and meaning of the +0x10 field are not yet proven. REA metadata confirms the receiver type is `UnityEngine.Texture` and that `UnityEngine.Object` declares `m_CachedPtr`, but no field-offset table has yet tied that name to +0x10 in this build.
 
+### Run 29: internal-call resolver string identifies the format getter
+
+Run 29 succeeded (workflow run `43011865300`, artifact `13850587811`, SHA-256 `45f78f19954cf6b4caabb282830480a988b81c0379c50e7b73f2e42b7bd8eb75`). The Ghidra script read the resolver argument string directly from loaded address `0x013fed17` and recovered the exact name:
+
+`UnityEngine.Texture2D::get_format_Injected(System.IntPtr)`
+
+This identifies the cached indirect target behind `0x067e9aa0` as the Unity internal-call implementation of `Texture2D.get_format_Injected(IntPtr)`. The trampoline passes the object field at +0x10 as the IntPtr argument, then tail-branches to the resolved internal-call pointer. The caller uses the returned W0 value in the format comparisons. The signature string omits a return type, so the conclusion that W0 is the `TextureFormat` enum is based on the callsite comparisons and the presence of `UnityEngine.TextureFormat` in metadata, not on a return-type declaration in the resolver string.
+
+REA metadata for `UnityEngine.TextureFormat` confirms the enum includes `RGB24`, `DXT1`, and `DXT5`. The estimator's numeric cases 3, 10, and 12 align with those standard enum members; exact numeric field constants are queued for direct metadata default-value extraction to remove the last reliance on enum-order knowledge.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
