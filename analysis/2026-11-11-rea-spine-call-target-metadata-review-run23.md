@@ -126,6 +126,12 @@ After a Unity-object null/equality guard, it obtains a format code and dimension
 
 The dimension rounding is implemented as `(dimension + 3) >> 2` for the block paths. The code does not currently show a mip-level summation loop in this method. This is a per-texture estimate, not yet proof that the outer `RuntimeSpineAsset.EstimatedTextureBytes` returns the sum of precisely these values: its virtual dispatch chain still needs to be mapped to establish that relationship.
 
+### Run 25: texture creation/destruction dispatch pairing
+
+The decompilations of `RuntimeAtlasTexture.CreateTexture` and `DestroyTexture` share the same two-way dispatch structure. Both query a runtime capability flag, initialize the corresponding cached function pointer, and dispatch through one of two indirect entry points. Creation passes the created native object's payload (field at +0x10) with a zero/format argument ordering; destruction calls the same cached dispatch families with the corresponding payload and inverse argument ordering. The target function pointers are initialized from nearby embedded data and Ghidra cannot resolve their jump tables, so the concrete native graphics API/backend function names are not proven. This does establish that destruction is not an empty managed method and that create/destroy are paired through the same runtime-selected backend path.
+
+`RuntimeAtlasTexture.DxtBytes(width,height)` independently confirms the DXT5-style block estimate `ceil(width/4) × ceil(height/4) × 16`, with signed-safe rounding. This matches the format-12 branch in `EstimateTextureBytes`.
+
 ## Important caveats
 
 1. The `metadata_method_entry` flag is the strongest call-target identity evidence in this report; other executable candidates can be native helpers, shared runtime helpers, inlined code, or unresolved managed targets.
