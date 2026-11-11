@@ -214,7 +214,49 @@ These are metadata-linked method-pointer RVAs from the same ARM64 ELF/metadata p
 Run 43001483524 failed in step 9, “Recover all reachable control-flow targets in one Ghidra import.” The current workflow file contains:
 
 ```bash
-while IFS=$'\\\\t' read -r index type method symbol stem entry; do
+while IFS= read -r index type method symbol stem entry; do
+```
+
+The file has two literal backslashes before `t`, not the single ANSI-C escape needed to produce a tab delimiter. Therefore the shell does not split the tab-separated target rows into six columns. The Ghidra script receives malformed arguments; the archived log shows examples where the first script argument contains fragments of the TSV row, followed by:
+
+`java.lang.NumberFormatException` at `PrepareFlowFunction.java:36`.
+
+The same malformed loop appears again in the verification step, which was skipped after step 9 failed. This is a confirmed workflow quoting/TSV parsing defect, not a Ghidra binary-analysis failure and not evidence that the 34 methods lack code. No source or workflow file was modified during this review.
+
+A preceding run, [43001386531](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43001386531), was cancelled during metadata linking after a newer push; its partial artifact [13847005216](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/43001386531/artifacts/13847005216) is not a successful flow-recovery result.
+
+## Updated evidence classification
+
+### Verified facts
+- The current branch head is `0e4fd512caa1f96ea7c5f7d6a8a2868f49217dd6`; no PRs are open/returned.
+- The same Android 1.0 ARM64 ELF and metadata hashes are reproduced in the latest run.
+- Run 43000801629 produced six bounded reachable-flow exports and matching function-body instruction-start sets, with zero decode failures.
+- The expanded run 43001483524 generated and archived 34 metadata-linked target rows, but failed before producing any new target pseudocode.
+- The 430014 partial artifact's hash validates the ZIP bytes only; it does not validate CFG recovery or any target body.
+
+### Preliminary inferences
+- The local reader helper appears to read 32-bit PNG fields in big-endian order.
+- The caller's four-byte dimension alignment and size guard may relate to compressed-texture constraints, but the exact DXT5 policy and allocation size are not established.
+- `ReadAsync` appears wrapper-like; no associated Spine-loader state-machine implementation has been proven.
+
+### Unresolved
+- Direct branch target inventory, instruction-by-instruction ARM64 disassembly, full CFG including indirect branches and LSDA/exception edges.
+- Attribution of the P-code addresses outside each bounded function body and the missing P-code addresses.
+- Actual cache hit/miss path, checksum semantics, PNG-to-DXT5 conversion, texture memory formula, and pending-write task completion.
+- `PageTextureLoader.Load/Unload`, `RuntimeSpineAsset.Own/Retain/Dispose`, and `DestroyOwned` ownership/release behavior.
+- The relationship between `ReadAsync` and any compiler-generated state machine or downstream async helper.
+- A body-level comparison against the old iOS 0.7.9.2 binary. Existing metadata/API-gap evidence says the old iOS build lacks the new runtime loader/asset/texture-loader API surface; Android RVAs must not be reused as iOS addresses.
+
+### Next evidence pass
+1. Correct the TSV delimiter in the workflow and validate the parsed six fields before invoking Ghidra; do not modify this report's evidence status until a new artifact contains target C files and JSON sidecars.
+2. Make P-code/body-set discrepancies a visible acceptance gate or explicitly classify/attribute each mismatch; retain the exact body-start equality check.
+3. Export per-instruction disassembly and direct branch/fall-through edges, including the exact skipped method-entry edges and cap/termination reason.
+4. Prioritize `RuntimeAtlasTexture.Read/Load/TryReadCache/CreateTexture`, `CanLoadPngAsDxt5/DxtBytes/EstimateTextureBytes`, then `WriteCache/FinishPendingWritesAsync`.
+5. Trace `PageTextureLoader.Load/Unload` and `RuntimeSpineAsset.Own/Retain/Dispose` together with `DestroyOwned` before making ownership claims.
+6. Recover the actual `ReadAsync` downstream task/state-machine path and compare behavior with old iOS only using the matching iOS binary/metadata.
+
+No original C# source, restored Unity project, iOS compilation, or IPA is established by these artifacts.
+\\t' read -r index type method symbol stem entry; do
 ```
 
 The file has two literal backslashes before `t`, not the single ANSI-C escape needed to produce a tab delimiter. Therefore the shell does not split the tab-separated target rows into six columns. The Ghidra script receives malformed arguments; the archived log shows examples where the first script argument contains fragments of the TSV row, followed by:
