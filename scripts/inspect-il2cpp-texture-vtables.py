@@ -90,6 +90,32 @@ def main():
             "parameter_count": argc,
         })
 
+    # v29 field/default-value sections: field definitions are 12 bytes,
+    # field-default records are (fieldIndex, typeIndex, dataIndex), each 12 bytes.
+    field_off, field_size = sections[11]
+    field_default_off, field_default_size = sections[7]
+    field_data_off, field_data_size = sections[8]
+    if field_size % 12 or field_default_size % 12:
+        fail("field/default-value section size is not divisible by 12")
+    for name, off, size in [
+        ("fields", field_off, field_size),
+        ("field_default_values", field_default_off, field_default_size),
+        ("field_default_data", field_data_off, field_data_size),
+    ]:
+        if off < HEADER_SIZE_V29 or size < 0 or off + size > len(data):
+            fail(f"invalid {name} section range: {off}, {size}, file={len(data)}")
+    field_records = []
+    for idx in range(field_size // 12):
+        name_idx, type_index, token = struct.unpack_from("<IiI", data, field_off + idx * 12)
+        field_records.append({"name": read_cstr(data, string_off, name_idx),
+                              "type_index": type_index, "token": token})
+    field_defaults = {}
+    for idx in range(field_default_size // 12):
+        field_index, type_index, data_index = struct.unpack_from("<3i", data, field_default_off + idx * 12)
+        if 0 <= data_index <= field_data_size - 4:
+            value = struct.unpack_from("<i", data, field_data_off + data_index)[0]
+            field_defaults[field_index] = {"type_index": type_index, "data_index": data_index, "value": value}
+
     vtable_values = struct.unpack_from("<" + "I" * (vtable_size // 4), data, vtable_off)
     type_records = []
     for idx in range(typedef_size // TYPE_DEF_SIZE_V29):
@@ -108,6 +134,8 @@ def main():
             "vtable_count": vtable_count,
             "method_start": method_start,
             "method_count": method_count,
+            "field_start": field_start,
+            "field_count": field_count,
             "token": token,
         })
 
@@ -117,6 +145,29 @@ def main():
     }]
     if not any(t["name"] == "Texture" for t in wanted):
         fail("UnityEngine.Texture type not found")
+    texture_format_type = next((t for t in type_records
+                                 if t["namespace"] == "UnityEngine" and t["name"] == "TextureFormat"), None)
+    if texture_format_type is None:
+        fail("UnityEngine.TextureFormat enum type not found")
+    enum_values = []
+    for field_index in range(texture_format_type["field_start"],
+                             texture_format_type["field_start"] + texture_format_type["field_count"]):
+        field = field_records[field_index]
+        default = field_defaults.get(field_index)
+        if default is not None:
+            enum_values.append({
+                "field_index": field_index,
+                "name": field["name"],
+                "type_index": default["type_index"],
+                "data_index": default["data_index"],
+                "value": default["value"],
+            })
+    expected_enum_values = {"RGB24": 3, "DXT1": 10, "DXT5": 12}
+    actual_enum_values = {item["name"]: item["value"] for item in enum_values}
+    for enum_name, expected in expected_enum_values.items():
+        if actual_enum_values.get(enum_name) != expected:
+            fail(f"TextureFormat.{enum_name} expected {expected}, got {actual_enum_values.get(enum_name)}")
+
     rows = []
     for t in wanted:
         start, count = t["vtable_start"], t["vtable_count"]
@@ -148,6 +199,12 @@ def main():
 
     out = pathlib.Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    enum_tsv = out / "unity-texture-format-enum-values.tsv"
+    with enum_tsv.open("w", encoding="utf-8") as f:
+        f.write("field_index\tname\ttype_index\tdata_index\tvalue\n")
+        for item in enum_values:
+            f.write("\t".join(str(item[k]) for k in
+                              ["field_index","name","type_index","data_index","value"]) + "\n")
     tsv = out / "unity-texture-vtable-slots.tsv"
     fields = ["type","type_index","parent_index","vtable_slot","raw_encoded","decoded_method_index",
               "encoded_usage_tag","encoded_low_bit_marker","method","declaring_type","method_definition_slot","method_token"]
@@ -166,6 +223,7 @@ def main():
             "type_definitions": {"offset": typedef_off, "size": typedef_size, "count": len(type_records)},
         },
         "types": wanted,
+        "texture_format_enum_values": enum_values,
         "entries": rows,
         "limits": [
             "This is the serialized metadata vtable, not a dump of runtime Il2CppClass memory.",
@@ -180,6 +238,7 @@ def main():
         "method_count": len(method_records),
         "vtable_count": len(vtable_values),
         "selected_types": wanted,
+        "texture_format_enum_values": enum_values,
         "selected_slots": [r for r in rows if r["vtable_slot"] in (0,2,4,5,6,7,11,12)],
         "output": str(tsv),
     }, indent=2))
