@@ -112,3 +112,25 @@ No successful run of this corrected revision has yet been observed. The availabl
 ## Delivery boundary
 
 This report documents metadata, a single bounded reachable-flow export, workflow failures and a workflow-only correction. It does not claim complete CFG recovery, original C# recovery, a reconstructed Unity project, an iOS build, or an IPA.
+
+
+## Follow-up check — workflow run 42997115705 and static script review
+
+Checked again on 2026-11-11:
+
+- Branch head is now `8d170bef80efef2002c1a3e79bf7f54289d3800f`.
+- Run [42997115705](https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/42997115705) still reports `in_progress`; its job remains at step 9, “Recover reachable control-flow blocks and decompile”. Steps 1–8 completed successfully. Steps 10–11 have not started.
+- No artifact is attached to this run yet.
+- No open pull requests are present.
+
+### Static review of the flow script
+
+The current workflow target list is still limited to five methods: `TryPngSize`, `DestroyOwned`, `AtlasPages`, `Read`, and `ReadAsync`. It does not yet produce reachable-flow exports for the remaining texture/cache methods (`RuntimeAtlasTexture.Read/Load/TryReadCache/CreateTexture/WriteCache/FinishPendingWritesAsync`), nor `PageTextureLoader.Load/Unload` or `RuntimeSpineAsset.Dispose`.
+
+The Java script follows decoded instruction flow edges and fall-throughs, deliberately does not follow call targets, and excludes branch destinations that match another metadata method entry. It records decode failures and skipped method entries. This is useful bounded reachable-block evidence, but the implementation itself explicitly leaves indirect jump tables and exception/LSDA edges unresolved. Therefore even a successful run cannot, by itself, prove a complete CFG.
+
+Additional review point: if Ghidra has already created a function at the target entry during import, the script reuses that function rather than explicitly replacing its body with the newly collected `decoded` address set. The resulting decompiler body should be checked against the exported reachable instruction set before treating it as a full recovered function. This is a validation risk, not a confirmed defect in the current artifact.
+
+### Next verification gate
+
+Do not infer that the current run is merely slow or successful. Wait for its terminal status and logs. If it times out or fails, inspect the exact target log and per-target project state, then adjust the script. If it succeeds, verify all five JSON metadata files, pseudocode hashes, entry addresses, decode failures, and skipped method-entry lists before widening the target list to the remaining texture/cache and ownership functions.
