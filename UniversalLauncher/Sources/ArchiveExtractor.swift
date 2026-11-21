@@ -22,8 +22,7 @@ enum ArchiveExtractor {
     static func isSafeRelativePath(_ path: String) -> Bool {
         guard !path.isEmpty,
               !path.hasPrefix("/"),
-              !path.contains("\\\\"),
-              !path.contains("\\0") else {
+              !path.unicodeScalars.contains(where: { $0.value == 0x5C || $0.value == 0 }) else {
             return false
         }
 
