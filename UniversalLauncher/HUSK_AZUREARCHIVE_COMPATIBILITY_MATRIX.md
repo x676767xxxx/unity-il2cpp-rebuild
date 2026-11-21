@@ -68,3 +68,59 @@ Only gate 7 proves the game can reach the user's main functional goal; a success
 ## Scope boundary
 
 This work is for AzureArchive Android 1.0 through Husk 3.4's native Translation Layer. QEMU Android guest remains a fallback only if the native path has a specific blocker. Windows EXE execution is not covered by Husk 3.4's Android runtime; ZIP extraction is not Windows execution.
+
+
+## Exact ARM64 dependency findings from CI
+
+The ELF dependency inventory job completed successfully on run https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44913798823. The latest version of the inventory script is being regression-checked in the current run after correcting its symbol-table parser.
+
+The eight ARM64 libraries and their direct `DT_NEEDED` relationships are:
+
+- `libSpineSkeletonDataConverterLib.so`
+- `lib_burst_generated.so`
+- `libc++_shared.so`
+- `libil2cpp.so`
+- `libmain.so`
+- `libsqlite3.so`
+- `libswappywrapper.so`
+- `libunity.so`
+
+Direct dependencies observed:
+- Packaged: `libc++_shared.so`, `libmain.so`.
+- Android platform: `libEGL.so`, `libandroid.so`, `libc.so`, `libdl.so`, `liblog.so`, `libm.so`, `libmediandk.so`, `libz.so`.
+- No additional third-party .so dependency outside the APK was found in the direct DT_NEEDED set. This does not rule out later dlopen() calls.
+
+### Important known compatibility limitation: Media NDK
+
+Husk 3.4's `husk-tl-bionic-ndk.c` explicitly states that `libmediandk` decoding is not provided:
+- `AMediaCodec_createDecoderByType` and `AMediaExtractor_new` return NULL.
+- Codec/extractor configure, start, buffer, seek and decode operations return an error.
+- Several `AMediaFormat` setters are no-ops.
+
+Because `libunity.so` directly depends on `libmediandk.so`, this shim is part of the library-load compatibility contract even if the game never calls a decoder. If AzureArchive uses Unity VideoPlayer, intro movies, cutscenes or SDK-driven video, media playback is a likely missing feature. Do not implement a large media bridge speculatively: first inspect the corrected undefined-symbol inventory and runtime trace to determine whether the game calls these functions. If it does, the compatibility work will need an AVFoundation-backed Android MediaCodec/Extractor adapter or a clearly reported unsupported-media fallback.
+
+### Existing NDK compatibility already present
+
+The same Husk source file already provides wrappers for:
+- ALooper and AChoreographer frame callbacks;
+- AAssetManager / AAsset read, seek, directory and file-descriptor operations;
+- ANativeWindow, input queue and motion/key event accessors;
+- AConfiguration and device properties;
+- thermal and performance hint APIs;
+- AAudio and OpenSL ES-related entry points.
+
+These are not all full Android implementations. For example, `AConfiguration_getSdkVersion` currently returns 34, and configuration values are largely host defaults. The app's manifest target SDK is 30, so SDK-level checks may observe a different runtime API level. This needs a deliberate compatibility policy rather than blindly changing the value to 30.
+
+### Graphics relationship
+
+Husk's EGL shim loads ANGLE and requires `eglGetPlatformDisplayEXT`, then requests ANGLE's Metal platform. It wraps EGL config selection and window surfaces, including Android-specific config attributes. This gives AzureArchive a real GLES-to-Metal path, but it is not proof that every Unity 2023.2.22f1 GL extension or render path works. The first runtime test must retain EGL/GL error logs and actual frame-present counts.
+
+### How to interpret the undefined-symbol inventory
+
+A zero or non-zero undefined-symbol count alone is not a compatibility verdict. The final parser must distinguish symbol-table metadata from actual undefined symbol names, then resolve each import against:
+1. another packaged ARM64 library;
+2. Husk's Bionic/NDK/EGL wrappers;
+3. the native Unity driver;
+4. a runtime-loaded library or JNI registration.
+
+Any remaining unresolved symbol is a real gap only after that resolution chain is checked.
