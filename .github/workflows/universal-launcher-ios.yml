@@ -1,0 +1,28 @@
+name: Universal Launcher iOS Build
+
+on:
+  push:
+    branches:
+      - feature/universal-launcher-mvp
+    paths:
+      - "UniversalLauncher/**"
+      - ".github/workflows/universal-launcher-ios.yml"
+  pull_request:
+    paths:
+      - "UniversalLauncher/**"
+      - ".github/workflows/universal-launcher-ios.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: UniversalLauncher
+        run: xcodegen generate
+      - name: Build iOS Simulator app
+        working-directory: UniversalLauncher
+        run: xcodebuild -project UniversalLauncher.xcodeproj -scheme UniversalLauncher -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
