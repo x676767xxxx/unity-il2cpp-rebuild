@@ -78,7 +78,7 @@ jobs:
               raise SystemExit("fixture does not carry the Unity 6 heuristic marker")
           il2cpp = Path("scan/libil2cpp.so").read_bytes()
           def make(path, version):
-              header = b"UnityFS\\0" + struct.pack(">I", 6) + b"5.x.x\\0" + version.encode() + b"\\0"
+              header = b"UnityFS\0" + struct.pack(">I", 6) + b"5.x.x\0" + version.encode() + b"\0"
               with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
                   z.writestr("assets/bin/Data/data.unity3d", header + b"fixture")
                   z.writestr("lib/arm64-v8a/libunity.so", unity)
