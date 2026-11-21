@@ -31,6 +31,7 @@ jobs:
       - name: Run Husk 3.4 page-layout regression test
         run: |
           set -euo pipefail
+          mkdir -p scan
           SRC="Husk/src/translation-layer"
           TESTS="Husk/tests/translation-layer"
           cc -std=gnu11 -O2 -g -Wall -Wextra -Werror -I"$SRC" \
