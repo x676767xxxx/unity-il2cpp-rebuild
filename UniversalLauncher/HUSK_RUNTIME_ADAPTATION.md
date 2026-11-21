@@ -157,3 +157,28 @@ Therefore the previous Husk scanner label “Unity 6” is a false positive for 
 **Required fix before the first device launch:** make engine classification version-aware using the UnityFS engine-version header (or equivalent authoritative build metadata), not a bare class-name string. For this APK the expected classification is Unity (IL2CPP), with the dedicated native Unity driver. Keep the raw scanner output in the report so the heuristic discrepancy remains auditable. Do not patch the upstream submodule in place; implement and test an isolated integration patch against the pinned commit first.
 
 This is now a concrete integration issue, not an unknown Unity version. The actual Unity version is verified as 2023.2.22f1.
+
+
+## Version-aware correction implemented and CI-verified
+
+The isolated overlay is now implemented in scripts/apply_husk_3_4_unity_version_fix.py. It adds a bounded ZIP-prefix reader and uses the UnityFS header's engine-version field when available, avoiding decompression of the full 168 MiB data.unity3d file. The old UnityPlayerForActivityOrService string remains a fallback only when no UnityFS version is available.
+
+GitHub Actions run 44913246560 successfully:
+- applied the overlay to the pinned Husk 3.4 submodule;
+- compiled Husk's own APK scanner with warnings treated as errors;
+- scanned the exact AzureArchive release APK;
+- asserted the corrected engine result is Unity (IL2CPP);
+- retained the raw Unity marker and UnityFS header as diagnostic evidence.
+
+The resulting classification selects Husk's dedicated native Unity driver (.unity), not the Unity 6 Java path. This is a static scanner/driver-selection validation, not a device launch.
+
+## Reproducible full app build entry
+
+The wrapper scripts/build_husk_azurearchive_ipa.sh verifies the exact submodule pin, applies the same overlay, then runs Husk's complete scripts/ci_build.sh pipeline.
+
+Manual command on a prepared Mac:
+
+    git submodule update --init --recursive
+    bash scripts/build_husk_azurearchive_ipa.sh
+
+A manual-only macOS Actions workflow is also available at .github/workflows/build-husk-ipa.yml. Its confirmation input defaults to false because the full build can take hours and consume macOS Actions minutes. It has not been triggered. No IPA has yet been produced.

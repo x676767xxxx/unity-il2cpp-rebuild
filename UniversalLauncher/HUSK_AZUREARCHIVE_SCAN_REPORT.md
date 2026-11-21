@@ -57,3 +57,18 @@ Does not prove:
 - The game reaches logo, login screen or gameplay.
 
 Next acceptance gate: correct the Unity-version classification, build/install the pinned Husk 3.4 app on the physical iPhone, then capture unity-run.log and record the first-frame/login checkpoints.
+
+
+## Version-aware correction test
+
+The raw UnityFS header proves the engine version is 2023.2.22f1. The first scanner run mislabeled it Unity 6 because it matched UnityPlayerForActivityOrService in libunity.so. An isolated overlay was added at scripts/apply_husk_3_4_unity_version_fix.py to read only the UnityFS header prefix and prefer its version over the ambiguous class-name marker.
+
+The patched scanner run passed: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44913246560
+
+It reports:
+- ok = true
+- verdict = native
+- engine = Unity (IL2CPP)
+- ABIs = arm64-v8a, armeabi-v7a, x86_64, x86
+
+The workflow explicitly fails unless the corrected engine is Unity (IL2CPP). This confirms the APK will be routed to the dedicated native Unity driver in Husk's app. It still does not prove the app can run on the physical iPhone.

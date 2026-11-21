@@ -49,3 +49,12 @@ Windows EXE execution is separate. Husk 3.4's release notes say Winlator contain
 ## Current verified state
 
 The upstream Husk 3.4 source is pinned as a submodule. This branch has not yet built an IPA, installed it on the iPhone or launched AzureArchive. No such success is claimed.
+
+
+## Current AzureArchive validation
+
+The exact Android 1.0 APK in the XR1 release has been scanned with Husk 3.4's own scanner. The UnityFS header confirms Unity 2023.2.22f1. An isolated, version-aware overlay fixes an upstream scanner false positive and the patched CI scan now reports Unity (IL2CPP), selecting the native Unity driver.
+
+See [HUSK_AZUREARCHIVE_SCAN_REPORT.md](HUSK_AZUREARCHIVE_SCAN_REPORT.md) and [HUSK_RUNTIME_ADAPTATION.md](HUSK_RUNTIME_ADAPTATION.md).
+
+A reproducible full-build wrapper is at scripts/build_husk_azurearchive_ipa.sh. The opt-in macOS workflow is .github/workflows/build-husk-ipa.yml; it has not been triggered and no IPA is claimed.
