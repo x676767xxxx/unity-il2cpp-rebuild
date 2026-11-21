@@ -58,3 +58,8 @@ The exact Android 1.0 APK in the XR1 release has been scanned with Husk 3.4's ow
 See [HUSK_AZUREARCHIVE_SCAN_REPORT.md](HUSK_AZUREARCHIVE_SCAN_REPORT.md) and [HUSK_RUNTIME_ADAPTATION.md](HUSK_RUNTIME_ADAPTATION.md).
 
 A reproducible full-build wrapper is at scripts/build_husk_azurearchive_ipa.sh. The opt-in macOS workflow is .github/workflows/build-husk-ipa.yml; it has not been triggered and no IPA is claimed.
+
+
+## AzureArchive compatibility work
+
+See [the evidence-based Husk × AzureArchive compatibility matrix](HUSK_AZUREARCHIVE_COMPATIBILITY_MATRIX.md) for the verified APK profile, direct ARM64 ELF dependencies, existing Husk shims, confirmed media API limitations, and the ordered runtime gap queue. The CI scan is at https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44914330242.
