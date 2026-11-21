@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f .gitmodules
-          test -d Husk/.git
+          test -e Husk/.git
           actual="$(git -C Husk rev-parse HEAD)"
           expected="acfd7bcb6d1d2f6655a24e43d1d6f87cf142667a"
           echo "Husk submodule: $actual"
