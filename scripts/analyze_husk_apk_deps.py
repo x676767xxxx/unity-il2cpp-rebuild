@@ -77,6 +77,24 @@ for dep, owners in sorted(needed_by.items()):
     else:
         status = "not packaged / needs mapping review"
     report.append(f"- **{dep}** — {status}; required by: {', '.join(sorted(owners))}")
+report += ["", "## Husk source-level Android NDK shim risks", ""]
+ndk_source = Path("Husk/src/translation-layer-next/husk-tl-bionic-ndk.c")
+if ndk_source.exists():
+    source = ndk_source.read_text()
+    null_media = sorted(set(re.findall(r'MEDIA_NULL\\("([^"]+)"\\)', source)))
+    error_media = sorted(set(re.findall(r'MEDIA_ERRF\\("([^"]+)"\\)', source)))
+    if "libmediandk.so" in needed_by:
+        report.append("**RISK: libmediandk.so is a direct DT_NEEDED dependency of libunity.so.**")
+        report.append("Husk 3.4 currently provides explicit NULL/error stubs for MediaCodec/MediaExtractor; this is not full video decoding.")
+        report += [f"- NULL stub: {name}" for name in null_media]
+        report += [f"- Error stub: {name}" for name in error_media]
+        report.append("This matters only if the game actually invokes these APIs; verify imports/call sites and runtime logs before implementing an AVFoundation bridge.")
+    sdk_match = re.search(r'b_AConfiguration_getSdkVersion\\([^)]*\\)\\s*\\{[^}]*return\\s+(\\d+)', source, re.S)
+    if sdk_match:
+        report.append(f"Husk NDK AConfiguration_getSdkVersion currently returns {sdk_match.group(1)}; compare with the APK's target SDK 30 before relying on SDK-gated behavior.")
+else:
+    report.append("Husk NDK shim source not present in checkout; source-level risk check skipped.")
+
 report += ["", "## Undefined dynamic symbol counts", ""]
 for name, symbols in sorted(undefined_by.items()):
     report.append(f"- {name}: {len(symbols)} undefined dynamic symbols")
