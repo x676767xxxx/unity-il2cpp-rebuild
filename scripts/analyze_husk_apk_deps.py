@@ -51,7 +51,7 @@ for name in sorted(provided):
     if dyn.returncode:
         report.append(f"## {name}\n- readelf dynamic table failed: {dyn.stderr.strip()}")
         continue
-    needed = sorted(set(re.findall(r"Shared library: \\[([^]]+)\\]", dyn.stdout)))
+    needed = sorted(set(re.findall(r"Shared library: \[([^]]+)\]", dyn.stdout)))
     for dep in needed:
         needed_by[dep].append(name)
     und = set()
