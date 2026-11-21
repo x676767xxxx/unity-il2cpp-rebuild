@@ -28,3 +28,17 @@ targets:
         SUPPORTS_MACCATALYST: NO
     scheme:
       gatherCoverageData: false
+
+  UniversalLauncherTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: UniversalLauncher
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.universallauncher.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/UniversalLauncher.app/UniversalLauncher"
+        BUNDLE_LOADER: "$(TEST_HOST)"
