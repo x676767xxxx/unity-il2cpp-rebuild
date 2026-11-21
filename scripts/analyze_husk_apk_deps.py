@@ -106,7 +106,6 @@ if ndk_source.exists():
                 break
     if sdk_value:
         report.append(f"Husk NDK AConfiguration_getSdkVersion currently returns {sdk_value}; compare with the APK's target SDK 30 before relying on SDK-gated behavior.")
-        report.append(f"Husk NDK AConfiguration_getSdkVersion currently returns {sdk_match.group(1)}; compare with the APK's target SDK 30 before relying on SDK-gated behavior.")
 else:
     report.append("Husk NDK shim source not present in checkout; source-level risk check skipped.")
 
