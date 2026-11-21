@@ -56,13 +56,12 @@ for name in sorted(provided):
         needed_by[dep].append(name)
     und = set()
     for line in syms.stdout.splitlines():
-        if " UND " in line:
-            parts = line.split()
-            if parts:
-                sym = parts[-1].split("@", 1)[0]
-                if sym and sym not in ("_ITM_deregisterTMCloneTable", "_ITM_registerTMCloneTable",
-                                       "__gmon_start__", "__cxa_finalize"):
-                    und.add(sym)
+        match = re.match(r"^\\s*\\d+:\\s+\\S+\\s+\\d+\\s+\\S+\\s+\\S+\\s+\\S+\\s+UND\\s+(\\S+)", line)
+        if match:
+            sym = match.group(1).split("@", 1)[0]
+            if sym and sym not in ("_ITM_deregisterTMCloneTable", "_ITM_registerTMCloneTable",
+                                   "__gmon_start__", "__cxa_finalize"):
+                und.add(sym)
     undefined_by[name] = sorted(und)
 
 report += ["## Packaged ARM64 libraries", ""]
