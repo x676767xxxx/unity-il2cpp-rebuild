@@ -24,7 +24,7 @@ struct ContentView: View {
             }
             .navigationTitle("Universal Launcher")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         isImporting = true
                     } label: {
@@ -50,11 +50,16 @@ struct ContentView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("No games or files yet", systemImage: "square.stack.3d.up")
-        } description: {
+        VStack(spacing: 16) {
+            Image(systemName: "square.stack.3d.up")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("No games or files yet")
+                .font(.title3.weight(.semibold))
             Text("Import an APK or an archive. The launcher will identify the file type automatically.")
-        } actions: {
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
             Button {
                 isImporting = true
             } label: {
@@ -62,6 +67,7 @@ struct ContentView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+        .padding()
     }
 
     private func fileRow(_ file: ImportedFile) -> some View {
@@ -69,7 +75,7 @@ struct ContentView: View {
             Image(systemName: file.kind.systemImage)
                 .font(.title2)
                 .frame(width: 34)
-                .foregroundStyle(file.kind == .apk ? .blue : .green)
+                .foregroundColor(file.kind == .apk ? .blue : .green)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(file.name)
