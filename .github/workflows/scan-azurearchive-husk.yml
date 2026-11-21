@@ -77,6 +77,37 @@ jobs:
               raise SystemExit("Husk scanner could not parse the APK")
           PY
 
+      - name: Extract Unity version and Unity 6 classification evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          scan/scan_cli entry scan/base.apk lib/arm64-v8a/libunity.so 30000000 > scan/libunity.so
+          echo "Unity 6 marker in libunity.so:"
+          strings -a scan/libunity.so | grep -F 'UnityPlayerForActivityOrService' | head -10 || true
+          echo "Unity version strings in libunity.so:"
+          strings -a scan/libunity.so | grep -E '2023\\.2\\.22f1|6000\\.[0-9]+|2023\\.[0-9]+' | head -20 || true
+          echo "Unity data file entries:"
+          unzip -Z1 scan/base.apk | grep -E '(^|/)globalgamemanagers$|(^|/)boot\\.config        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-husk-3.4-scan
+          path: |
+            scan/husk-report.json
+          if-no-files-found: error
+          retention-days: 14
+ | head -20 || true
+          if unzip -Z1 scan/base.apk | grep -q '^assets/bin/Data/globalgamemanagers        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-husk-3.4-scan
+          path: |
+            scan/husk-report.json
+          if-no-files-found: error
+          retention-days: 14
+; then
+            scan/scan_cli entry scan/base.apk assets/bin/Data/globalgamemanagers 20000000 > scan/globalgamemanagers
+            echo "Unity version in globalgamemanagers:"
+            strings -a scan/globalgamemanagers | head -20 || true
+          fi
+
       - name: Upload APK scan evidence
         uses: actions/upload-artifact@v4
         with:
