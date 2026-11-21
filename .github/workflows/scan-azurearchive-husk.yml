@@ -28,10 +28,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zlib1g-dev clang lld llvm python3
 
-      - name: Run Husk 3.4 translation-layer regression suite
+      - name: Run Husk 3.4 page-layout regression test
         run: |
           set -euo pipefail
-          Husk/tests/translation-layer/run.sh
+          SRC="Husk/src/translation-layer"
+          TESTS="Husk/tests/translation-layer"
+          cc -std=gnu11 -O2 -g -Wall -Wextra -Werror -I"$SRC" \
+            -o scan/plan_test "$TESTS/plan_test.c" "$SRC/husk-tl-elf.c"
+          scan/plan_test
 
       - name: Download the existing AzureArchive Android 1.0 APK
         run: |
@@ -57,6 +61,44 @@ jobs:
             "$SRC/husk-tl-scan.c" \
             "$SRC/husk-tl-probe.c" \
             -lz -lpthread
+
+      - name: Test version-aware Unity classification with real native libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          scan/scan_cli entry scan/base.apk lib/arm64-v8a/libunity.so 30000000 > scan/libunity.so
+          scan/scan_cli entry scan/base.apk lib/arm64-v8a/libil2cpp.so 150000000 > scan/libil2cpp.so
+          python3 - <<'PY'
+          import struct, zipfile
+          from pathlib import Path
+          marker = b"UnityPlayerForActivityOrService"
+          unity = Path("scan/libunity.so").read_bytes()
+          if marker not in unity:
+              raise SystemExit("fixture does not carry the Unity 6 heuristic marker")
+          il2cpp = Path("scan/libil2cpp.so").read_bytes()
+          def make(path, version):
+              header = b"UnityFS\\0" + struct.pack(">I", 6) + b"5.x.x\\0" + version.encode() + b"\\0"
+              with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+                  z.writestr("assets/bin/Data/data.unity3d", header + b"fixture")
+                  z.writestr("lib/arm64-v8a/libunity.so", unity)
+                  z.writestr("lib/arm64-v8a/libil2cpp.so", il2cpp)
+          make("scan/unity-2023.apk", "2023.2.22f1")
+          make("scan/unity-6.apk", "6000.0.0f1")
+          PY
+          scan/scan_cli scan scan/unity-2023.apk > scan/unity-2023.json
+          scan/scan_cli scan scan/unity-6.apk > scan/unity-6.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          old = json.loads(Path("scan/unity-2023.json").read_text())
+          new = json.loads(Path("scan/unity-6.json").read_text())
+          print("Unity 2023 fixture:", old.get("engine"))
+          print("Unity 6 fixture:", new.get("engine"))
+          if old.get("engine") != "Unity (IL2CPP)":
+              raise SystemExit("Unity 2023 fixture was misclassified")
+          if new.get("engine") != "Unity 6":
+              raise SystemExit("Unity 6 fixture lost its Java-driver classification")
+          PY
 
       - name: Scan APK and summarize runtime compatibility report
         run: |
