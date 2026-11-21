@@ -156,3 +156,8 @@ The CI source-risk detector now enumerates the exact MediaCodec/MediaExtractor N
 - `AConfiguration_getSdkVersion` returns 34, while this APK targets SDK 30.
 
 These are now tracked compatibility risks, not assumed launch blockers. We must determine whether AzureArchive actually invokes media APIs and SDK-gated branches. If media APIs are called, add an AVFoundation-backed compatibility adapter or a safe unsupported-media fallback; do not silently return a fake successful decoder.
+
+
+### SDK level semantics clarification
+
+The NDK shim's `AConfiguration_getSdkVersion() == 34` describes the Android runtime environment Husk presents to the app; it is not supposed to mirror the APK's `targetSdkVersion=30`. Android apps routinely run on a newer OS API level than their target SDK. Do **not** change the shim to return 30 simply to match the manifest. Instead, test whether AzureArchive behaves correctly when running as a target-30 app on the API-34 compatibility environment and capture any SDK-gated branches.
