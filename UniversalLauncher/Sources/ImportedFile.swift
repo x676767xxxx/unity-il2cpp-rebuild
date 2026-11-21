@@ -35,7 +35,7 @@ enum ImportedFileKind: String, Codable {
     }
 }
 
-struct ImportedFile: Identifiable {
+struct ImportedFile: Identifiable, Codable {
     let id: UUID
     let name: String
     let storedURL: URL
