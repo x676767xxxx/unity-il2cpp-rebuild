@@ -1,13 +1,20 @@
 # Universal Launcher MVP
 
-A native iOS file launcher prototype that automatically classifies imported APK and archive files.
+A native iOS launcher prototype that automatically classifies imported APK and archive files.
 
-## MVP scope
+## Implemented in this branch
 - Import files through the iOS Files picker.
 - Copy selected files into the app sandbox.
 - Classify APK, ZIP, RAR, and 7Z by extension.
-- Display imported items and clearly distinguish analysis/import from execution.
-- Keep the Android runtime behind a future engine adapter.
+- Persist imported-file metadata and restore existing files on relaunch.
+- Extract ZIP archives into a dedicated app-sandbox folder.
+- Reject archive entries that escape the extraction folder and reject symbolic links.
+
+## Not implemented yet
+- RAR and 7Z extraction.
+- APK package metadata inspection (package name, version, ABI).
+- Android runtime or APK execution.
+- Windows EXE execution.
 
 ## Important platform boundary
 An APK is not executable on iOS merely because it can be parsed or imported. Real APK execution requires a compatible Android runtime, CPU translation where needed, graphics translation, Android system services, and a permitted JIT/runtime strategy. This MVP does **not** claim to run APKs.
@@ -23,8 +30,11 @@ xcodegen generate
 xcodebuild -project UniversalLauncher.xcodeproj -scheme UniversalLauncher -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
+The project uses ZIPFoundation for ZIP extraction. Xcode must resolve Swift Package dependencies before building.
+
 ## Next milestones
-1. Add ZIP listing and safe extraction with path traversal protection.
-2. Persist library metadata and restore it on relaunch.
-3. Add APK metadata inspection (package name, version, ABI) without executing it.
-4. Evaluate a real Android runtime separately on the target iOS version/device before promising game execution.
+1. Verify the macOS GitHub Actions build.
+2. Add ZIP extraction tests, including malformed and path-traversal archives.
+3. Add RAR/7Z support after licensing and dependency review.
+4. Add APK metadata inspection without executing the APK.
+5. Evaluate a real Android runtime separately on the target iOS version/device before promising game execution.
