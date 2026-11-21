@@ -31,7 +31,10 @@ jobs:
           curl --fail --location --retry 3 \
             --output scan/base.apk \
             https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk
-          echo "APK bytes: $(stat -c %s scan/base.apk)"
+          actual="$(stat -c %s scan/base.apk)"
+          expected="364837539"
+          echo "APK bytes: $actual"
+          test "$actual" = "$expected"
 
       - name: Build Husk's own APK scanner
         run: |
