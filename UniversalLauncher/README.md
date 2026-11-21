@@ -7,6 +7,7 @@ A native iOS launcher prototype that automatically classifies imported APK and a
 - Copy selected files into the app sandbox.
 - Classify APK, ZIP, RAR, and 7Z by extension.
 - Persist imported-file metadata and restore existing files on relaunch.
+- Inspect APK ZIP structure, manifest presence, DEX count, and native ABI folders without executing it.
 - Extract ZIP archives into a dedicated app-sandbox folder.
 - Reject archive entries that escape the extraction folder and reject symbolic links.
 
@@ -34,7 +35,7 @@ The project uses ZIPFoundation for ZIP extraction. Xcode must resolve Swift Pack
 
 ## Next milestones
 1. Verify the macOS GitHub Actions build.
-2. Add ZIP extraction tests, including malformed and path-traversal archives.
-3. Add RAR/7Z support after licensing and dependency review.
-4. Add APK metadata inspection without executing the APK.
+2. Add automated ZIP extraction tests, including malformed and path-traversal archives.
+3. Parse binary AndroidManifest.xml to extract package name and version.
+4. Add RAR/7Z support after licensing and dependency review.
 5. Evaluate a real Android runtime separately on the target iOS version/device before promising game execution.
