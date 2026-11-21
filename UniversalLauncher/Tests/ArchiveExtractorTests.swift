@@ -20,8 +20,8 @@ final class ArchiveExtractorTests: XCTestCase {
     }
 
     func testRejectsWindowsSeparatorsAndNUL() {
-        XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("..\\\\outside.txt"))
-        XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("folder\\\\file.txt"))
+        XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("..\\outside.txt"))
+        XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("folder\\file.txt"))
         XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("folder/\0file.txt"))
     }
 }
