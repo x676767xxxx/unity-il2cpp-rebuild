@@ -29,7 +29,7 @@ jobs:
       - name: Build iOS Simulator app
         working-directory: UniversalLauncher
         run: xcodebuild -project UniversalLauncher.xcodeproj -scheme UniversalLauncher -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
-      - name: Upload simulator app
+      - name: Run unit tests\n        working-directory: UniversalLauncher\n        run: xcodebuild test -project UniversalLauncher.xcodeproj -scheme UniversalLauncher -destination "platform=iOS Simulator,name=iPhone 16" -derivedDataPath build CODE_SIGNING_ALLOWED=NO\n      - name: Upload simulator app
         uses: actions/upload-artifact@v4
         with:
           name: UniversalLauncher-iOS-Simulator
