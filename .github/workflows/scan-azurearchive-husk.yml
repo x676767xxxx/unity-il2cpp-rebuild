@@ -1,0 +1,84 @@
+name: Scan AzureArchive APK with Husk 3.4
+
+on:
+  push:
+    branches:
+      - integration/husk-runtime-template
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout pinned Husk submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install scanner dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zlib1g-dev
+
+      - name: Download the existing AzureArchive Android 1.0 APK
+        run: |
+          mkdir -p scan
+          curl --fail --location --retry 3 \
+            --output scan/base.apk \
+            https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk
+          echo "APK bytes: $(stat -c %s scan/base.apk)"
+
+      - name: Build Husk's own APK scanner
+        run: |
+          set -euo pipefail
+          SRC="Husk/src/translation-layer"
+          TESTS="Husk/tests/translation-layer"
+          cc -std=gnu11 -O2 -g -Wall -Wextra -Werror -I"$SRC" \
+            -o scan/scan_cli "$TESTS/scan_cli.c" \
+            "$SRC/husk-tl-json.c" \
+            "$SRC/husk-tl-zip.c" \
+            "$SRC/husk-tl-elf.c" \
+            "$SRC/husk-tl-scan.c" \
+            "$SRC/husk-tl-probe.c" \
+            -lz -lpthread
+
+      - name: Scan APK and summarize runtime compatibility report
+        run: |
+          set -euo pipefail
+          scan/scan_cli scan scan/base.apk > scan/husk-report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("scan/husk-report.json")
+          report = json.loads(p.read_text())
+          print("ok:", report.get("ok"))
+          print("verdict:", report.get("verdict"))
+          print("summary:", report.get("summary"))
+          print("engine:", report.get("engine"))
+          print("ABIs:", report.get("abis"))
+          libs = report.get("libraries") or []
+          print("native library count:", len(libs))
+          for lib in libs:
+              print(
+                  lib.get("abi"), lib.get("name"),
+                  "bytes=", lib.get("bytes"),
+                  "status=", lib.get("status"),
+                  "notes=", "; ".join(lib.get("notes") or [])
+              )
+          if not report.get("ok"):
+              raise SystemExit("Husk scanner could not parse the APK")
+          PY
+
+      - name: Upload APK scan evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: azurearchive-husk-3.4-scan
+          path: |
+            scan/husk-report.json
+          if-no-files-found: error
+          retention-days: 14
