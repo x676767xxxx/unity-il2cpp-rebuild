@@ -142,3 +142,18 @@ Earlier project evidence recorded Unity 2023.2.22f1 for AzureArchive. The Husk 3
 The follow-up workflow extracts libunity.so and globalgamemanagers to record the exact marker and embedded Unity version. Until that evidence is checked, do not hardcode either .java or .unity for AzureArchive. The native verdict and ARM64 libraries are positive evidence, but the correct Unity driver is still an unresolved gate.
 
 This scan is static compatibility analysis only. It does not prove that the iOS device loader maps every library, that JIT works, or that AzureArchive reaches its login screen.
+
+
+## Confirmed Unity version and scanner false-positive
+
+The follow-up APK evidence run (GitHub Actions run 44913060578) read the UnityFS header from assets/bin/Data/data.unity3d:
+
+- Bundle header: UnityFS, player version 5.x.x, engine version 2023.2.22f1.
+- The APK DEX contains both UnityPlayerActivity and UnityPlayerForActivityOrService class names.
+- libunity.so also contains UnityPlayerForActivityOrService.
+
+Therefore the previous Husk scanner label “Unity 6” is a false positive for this APK. The scanner currently marks Unity 6 merely when that class-name string occurs in libunity.so; the string is also present in this Unity 2023.2.22f1 APK. Husk's Swift mapping then routes “Unity 6” to the Java driver, whereas other Unity versions use the dedicated Unity driver.
+
+**Required fix before the first device launch:** make engine classification version-aware using the UnityFS engine-version header (or equivalent authoritative build metadata), not a bare class-name string. For this APK the expected classification is Unity (IL2CPP), with the dedicated native Unity driver. Keep the raw scanner output in the report so the heuristic discrepancy remains auditable. Do not patch the upstream submodule in place; implement and test an isolated integration patch against the pinned commit first.
+
+This is now a concrete integration issue, not an unknown Unity version. The actual Unity version is verified as 2023.2.22f1.
