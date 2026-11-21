@@ -28,10 +28,10 @@ final class AXMLManifestParserTests: XCTestCase {
     }
 
     func testParsesRealAzureArchiveManifestWhenProvided() throws {
-        guard let path = ProcessInfo.processInfo.environment["AZUREARCHIVE_MANIFEST_PATH"] else {
-            throw XCTSkip("Real APK manifest fixture was not supplied by this workflow.")
-        }
-        let manifestURL = URL(fileURLWithPath: path)
+        let manifestURL = try XCTUnwrap(
+            Bundle(for: Self.self).url(forResource: "AzureArchive-AndroidManifest", withExtension: "xml"),
+            "Required AzureArchive manifest fixture is missing from the test bundle."
+        )
         let manifest = try Data(contentsOf: manifestURL, options: .mappedIfSafe)
         let info = try AXMLManifestParser.parse(manifest)
         XCTAssertEqual(info.packageName, "com.foxxlight.AzureArchive")
