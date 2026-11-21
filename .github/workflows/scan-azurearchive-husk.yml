@@ -26,7 +26,12 @@ jobs:
       - name: Install scanner dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y zlib1g-dev
+          sudo apt-get install -y zlib1g-dev clang lld llvm python3
+
+      - name: Run Husk 3.4 translation-layer regression suite
+        run: |
+          set -euo pipefail
+          Husk/tests/translation-layer/run.sh
 
       - name: Download the existing AzureArchive Android 1.0 APK
         run: |
