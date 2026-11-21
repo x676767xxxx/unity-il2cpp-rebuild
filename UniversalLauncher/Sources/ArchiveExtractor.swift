@@ -19,6 +19,18 @@ enum ArchiveExtractionError: LocalizedError {
 }
 
 enum ArchiveExtractor {
+    static func isSafeRelativePath(_ path: String) -> Bool {
+        guard !path.isEmpty,
+              !path.hasPrefix("/"),
+              !path.contains("\\\\"),
+              !path.contains("\\0") else {
+            return false
+        }
+
+        let components = path.split(separator: "/", omittingEmptySubsequences: true)
+        return !components.isEmpty && components.allSatisfy { $0 != "." && $0 != ".." }
+    }
+
     static func extractZIP(at archiveURL: URL) throws -> URL {
         guard archiveURL.pathExtension.lowercased() == "zip" else {
             throw ArchiveExtractionError.unsupportedFormat
@@ -35,24 +47,34 @@ enum ArchiveExtractor {
             .appendingPathComponent("Extracted", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        var extractionSucceeded = false
+        defer {
+            if !extractionSucceeded {
+                try? manager.removeItem(at: root)
+            }
+        }
 
         let archive = try Archive(url: archiveURL, accessMode: .read)
         let rootPath = root.standardizedFileURL.path + "/"
 
         for entry in archive {
             let relativePath = entry.path
-            let destination = root.appendingPathComponent(relativePath).standardizedFileURL
-
-            guard destination.path.hasPrefix(rootPath) else {
+            guard isSafeRelativePath(relativePath) else {
                 throw ArchiveExtractionError.unsafeEntry(relativePath)
             }
             guard entry.type != .symlink else {
                 throw ArchiveExtractionError.symbolicLink(relativePath)
             }
 
+            let destination = root.appendingPathComponent(relativePath).standardizedFileURL
+            guard destination.path.hasPrefix(rootPath) else {
+                throw ArchiveExtractionError.unsafeEntry(relativePath)
+            }
+
             try archive.extract(entry, to: destination)
         }
 
+        extractionSucceeded = true
         return root
     }
 }
