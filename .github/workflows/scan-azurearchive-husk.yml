@@ -20,6 +20,9 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Apply isolated Unity version classification correction
+        run: python3 scripts/apply_husk_3_4_unity_version_fix.py
+
       - name: Install scanner dependency
         run: |
           sudo apt-get update
@@ -62,6 +65,8 @@ jobs:
           print("verdict:", report.get("verdict"))
           print("summary:", report.get("summary"))
           print("engine:", report.get("engine"))
+          if report.get("engine") != "Unity (IL2CPP)":
+              raise SystemExit("Expected Unity 2023.2.22f1 to use the native Unity driver")
           print("ABIs:", report.get("abis"))
           libs = report.get("libraries") or []
           print("native library count:", len(libs))
