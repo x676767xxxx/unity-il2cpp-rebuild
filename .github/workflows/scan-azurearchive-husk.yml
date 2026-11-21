@@ -124,6 +124,25 @@ jobs:
                       print(name)
           PY
 
+      - name: Read Unity bundle header and boot configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee -a scan/unity-evidence.txt
+          import zipfile
+          with zipfile.ZipFile("scan/base.apk") as z:
+              for name in ("assets/bin/Data/data.unity3d", "assets/bin/Data/boot.config"):
+                  try:
+                      info = z.getinfo(name)
+                  except KeyError:
+                      print(name, "not present")
+                      continue
+                  print(name, "uncompressed_bytes=", info.file_size)
+                  with z.open(name) as f:
+                      head = f.read(512)
+                  print(head.decode("latin1", "replace"))
+          PY
+
       - name: Upload APK scan evidence
         uses: actions/upload-artifact@v4
         with:
