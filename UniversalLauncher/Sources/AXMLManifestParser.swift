@@ -47,8 +47,9 @@ enum AXMLManifestParser {
         var strings: [String]?
         var result = ManifestInfo()
         var elementStack: [String] = []
-        var activityHasMain = false
-        var activityHasLauncher = false
+        var insideIntentFilter = false
+        var filterHasMain = false
+        var filterHasLauncher = false
         var currentActivity: String?
 
         var offset = 8
@@ -64,6 +65,7 @@ enum AXMLManifestParser {
                 strings = try parseStringPool(reader: reader, offset: offset, headerSize: headerSize, chunkSize: chunkSize)
             } else if type == 0x0102 {
                 guard let pool = strings else { throw ParseError.missingStringPool }
+                guard chunkSize >= headerSize + 20 else { throw ParseError.malformedChunk }
                 let attributes = try parseStartElement(reader: reader, offset: offset, headerSize: headerSize, chunkSize: chunkSize, strings: pool)
                 let elementName = try reader.stringIndex(at: offset + 20, strings: pool)
                 elementStack.append(elementName)
@@ -80,24 +82,32 @@ enum AXMLManifestParser {
                     if let name = map["name"] { result.permissions.append(name) }
                 } else if elementName == "activity" || elementName == "activity-alias" {
                     currentActivity = map["name"]
-                    activityHasMain = false
-                    activityHasLauncher = false
                     if let currentActivity { result.activities.append(currentActivity) }
-                } else if elementName == "action", map["name"] == "android.intent.action.MAIN" {
-                    activityHasMain = true
-                } else if elementName == "category", map["name"] == "android.intent.category.LAUNCHER" {
-                    activityHasLauncher = true
+                } else if elementName == "intent-filter" {
+                    insideIntentFilter = true
+                    filterHasMain = false
+                    filterHasLauncher = false
+                } else if insideIntentFilter, elementName == "action", map["name"] == "android.intent.action.MAIN" {
+                    filterHasMain = true
+                } else if insideIntentFilter, elementName == "category", map["name"] == "android.intent.category.LAUNCHER" {
+                    filterHasLauncher = true
                 }
             } else if type == 0x0103 {
+                guard chunkSize >= headerSize + 8 else { throw ParseError.malformedChunk }
                 if let pool = strings {
                     let name = try reader.stringIndex(at: offset + 20, strings: pool)
-                    if name == "activity" || name == "activity-alias" {
-                        if activityHasMain && activityHasLauncher, let currentActivity {
+                    if name == "intent-filter" {
+                        if insideIntentFilter, filterHasMain && filterHasLauncher, let currentActivity {
                             result.launcherActivities.append(currentActivity)
                         }
+                        insideIntentFilter = false
+                        filterHasMain = false
+                        filterHasLauncher = false
+                    } else if name == "activity" || name == "activity-alias" {
                         currentActivity = nil
-                        activityHasMain = false
-                        activityHasLauncher = false
+                        insideIntentFilter = false
+                        filterHasMain = false
+                        filterHasLauncher = false
                     }
                 }
                 if !elementStack.isEmpty { elementStack.removeLast() }
@@ -129,17 +139,19 @@ enum AXMLManifestParser {
             guard start >= offset, start < offset + chunkSize else { throw ParseError.truncated }
             if utf8 {
                 var cursor = start
-                _ = try reader.length8(at: &cursor)
-                let byteLength = try reader.length8(at: &cursor)
-                guard byteLength <= offset + chunkSize - cursor else { throw ParseError.truncated }
+                let chunkEnd = offset + chunkSize
+                _ = try reader.length8(at: &cursor, limit: chunkEnd)
+                let byteLength = try reader.length8(at: &cursor, limit: chunkEnd)
+                guard cursor <= chunkEnd, byteLength <= chunkEnd - cursor else { throw ParseError.truncated }
                 let bytes = try reader.bytes(at: cursor, count: byteLength)
                 guard let string = String(data: bytes, encoding: .utf8) else { throw ParseError.malformedChunk }
                 values.append(string)
             } else {
                 var cursor = start
-                let unitLength = try reader.length16(at: &cursor)
+                let chunkEnd = offset + chunkSize
+                let unitLength = try reader.length16(at: &cursor, limit: chunkEnd)
+                guard cursor <= chunkEnd, unitLength <= (chunkEnd - cursor) / 2 else { throw ParseError.truncated }
                 let byteLength = unitLength * 2
-                guard byteLength <= offset + chunkSize - cursor else { throw ParseError.truncated }
                 let bytes = try reader.bytes(at: cursor, count: byteLength)
                 guard let string = String(data: bytes, encoding: .utf16LittleEndian) else { throw ParseError.malformedChunk }
                 values.append(string)
@@ -220,19 +232,23 @@ enum AXMLManifestParser {
             return strings[Int(index)]
         }
 
-        func length8(at offset: inout Int) throws -> Int {
+        func length8(at offset: inout Int, limit: Int) throws -> Int {
+            guard offset >= 0, offset < limit else { throw ParseError.truncated }
             let first = Int(try u8(at: offset))
             offset += 1
             if first & 0x80 == 0 { return first }
+            guard offset < limit else { throw ParseError.truncated }
             let second = Int(try u8(at: offset))
             offset += 1
             return ((first & 0x7F) << 8) | second
         }
 
-        func length16(at offset: inout Int) throws -> Int {
+        func length16(at offset: inout Int, limit: Int) throws -> Int {
+            guard offset >= 0, offset <= limit - 2 else { throw ParseError.truncated }
             let first = Int(try u16(at: offset))
             offset += 2
             if first & 0x8000 == 0 { return first }
+            guard offset <= limit - 2 else { throw ParseError.truncated }
             let second = Int(try u16(at: offset))
             offset += 2
             return ((first & 0x7FFF) << 16) | second
