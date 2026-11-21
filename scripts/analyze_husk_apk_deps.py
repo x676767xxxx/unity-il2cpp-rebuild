@@ -109,6 +109,16 @@ if ndk_source.exists():
 else:
     report.append("Husk NDK shim source not present in checkout; source-level risk check skipped.")
 
+report += ["", "## High-interest Android imports", ""]
+api_prefixes = ("AMedia", "AAsset", "ANativeWindow", "ALooper", "AChoreographer",
+                "AConfiguration", "ASensor", "AAudio", "egl", "gl", "__android_log")
+for name, symbols in sorted(undefined_by.items()):
+    selected = [sym for sym in symbols if sym.startswith(api_prefixes)]
+    if selected:
+        report.append(f"### {name}")
+        report += [f"- {sym}" for sym in selected]
+        report.append("")
+
 report += ["", "## Undefined dynamic symbol counts", ""]
 for name, symbols in sorted(undefined_by.items()):
     report.append(f"- {name}: {len(symbols)} undefined dynamic symbols")
