@@ -1,0 +1,59 @@
+name: Build patched Husk 3.4 IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_full_build:
+        description: "Confirm a full macOS build (can take hours and consume macOS Actions minutes)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: ${{ inputs.confirm_full_build == true }}
+    runs-on: macos-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout pinned Husk submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify pinned source
+        run: |
+          set -euo pipefail
+          test "$(git -C Husk rev-parse HEAD)" = "acfd7bcb6d1d2f6655a24e43d1d6f87cf142667a"
+          xcode-select -p
+          xcodebuild -version
+
+      - name: Install Husk build tools
+        run: |
+          brew update
+          brew install meson ninja pkg-config python xcodegen qemu
+          rustup target add aarch64-apple-ios
+          meson --version
+          ninja --version
+          xcodegen --version
+          qemu-img --version
+
+      - name: Build patched Husk IPA and TrollStore package
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build_husk_azurearchive_ipa.sh "$GITHUB_WORKSPACE/Husk/build/Husk-AzureArchive.ipa" 2>&1 | tee build-husk.log
+
+      - name: Upload installable packages and build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: Husk-3.4-AzureArchive-iOS-packages
+          path: |
+            Husk/build/Husk-AzureArchive.ipa
+            Husk/build/Husk-AzureArchive.tipa
+            build-husk.log
+          if-no-files-found: error
+          retention-days: 14
