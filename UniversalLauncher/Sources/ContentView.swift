@@ -5,6 +5,9 @@ struct ContentView: View {
     @State private var isImporting = false
     @State private var importedFiles: [ImportedFile] = []
     @State private var errorMessage: String?
+    @State private var infoMessage: String?
+
+    private let libraryKey = "UniversalLauncher.importedFiles"
 
     var body: some View {
         NavigationStack {
@@ -38,13 +41,17 @@ struct ContentView: View {
                 allowsMultipleSelection: true,
                 onCompletion: handleImport
             )
-            .alert("Import error", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
+            .onAppear(perform: loadLibrary)
+            .alert("Notice", isPresented: Binding(
+                get: { errorMessage != nil || infoMessage != nil },
+                set: { if !$0 { errorMessage = nil; infoMessage = nil } }
             )) {
-                Button("OK", role: .cancel) { errorMessage = nil }
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                    infoMessage = nil
+                }
             } message: {
-                Text(errorMessage ?? "Unknown error")
+                Text(errorMessage ?? infoMessage ?? "")
             }
         }
     }
@@ -77,7 +84,7 @@ struct ContentView: View {
                 .frame(width: 34)
                 .foregroundColor(file.kind == .apk ? .blue : .green)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(file.name)
                     .font(.headline)
                     .lineLimit(2)
@@ -88,6 +95,16 @@ struct ContentView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if file.kind == .zip {
+                    Button {
+                        extract(file)
+                    } label: {
+                        Label("Extract ZIP", systemImage: "archivebox")
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -102,11 +119,36 @@ struct ContentView: View {
                 do {
                     let imported = try copyIntoLibrary(sourceURL)
                     importedFiles.append(imported)
+                    saveLibrary()
                 } catch {
                     errorMessage = "\(sourceURL.lastPathComponent): \(error.localizedDescription)"
                     break
                 }
             }
+        }
+    }
+
+    private func loadLibrary() {
+        guard let data = UserDefaults.standard.data(forKey: libraryKey),
+              let saved = try? JSONDecoder().decode([ImportedFile].self, from: data) else {
+            return
+        }
+        importedFiles = saved.filter {
+            FileManager.default.fileExists(atPath: $0.storedURL.path)
+        }
+    }
+
+    private func saveLibrary() {
+        guard let data = try? JSONEncoder().encode(importedFiles) else { return }
+        UserDefaults.standard.set(data, forKey: libraryKey)
+    }
+
+    private func extract(_ file: ImportedFile) {
+        do {
+            let destination = try ArchiveExtractor.extractZIP(at: file.storedURL)
+            infoMessage = "ZIP extracted successfully. Folder: \(destination.lastPathComponent)"
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
