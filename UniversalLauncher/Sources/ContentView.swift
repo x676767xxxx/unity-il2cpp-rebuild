@@ -105,6 +105,16 @@ struct ContentView: View {
                     .font(.caption)
                     .buttonStyle(.bordered)
                 }
+
+                if file.kind == .apk {
+                    Button {
+                        inspectAPK(file)
+                    } label: {
+                        Label("Inspect APK", systemImage: "doc.text.magnifyingglass")
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -147,6 +157,15 @@ struct ContentView: View {
         do {
             let destination = try ArchiveExtractor.extractZIP(at: file.storedURL)
             infoMessage = "ZIP extracted successfully. Folder: \(destination.lastPathComponent)"
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func inspectAPK(_ file: ImportedFile) {
+        do {
+            let report = try APKInspector.inspect(file.storedURL)
+            infoMessage = report.summary
         } catch {
             errorMessage = error.localizedDescription
         }
