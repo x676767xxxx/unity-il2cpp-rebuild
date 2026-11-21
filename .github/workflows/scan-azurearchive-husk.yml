@@ -26,7 +26,7 @@ jobs:
       - name: Install scanner dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y zlib1g-dev clang lld llvm python3
+          sudo apt-get install -y zlib1g-dev clang lld llvm python3 binutils
 
       - name: Run Husk 3.4 page-layout regression test
         run: |
@@ -126,6 +126,13 @@ jobs:
           if not report.get("ok"):
               raise SystemExit("Husk scanner could not parse the APK")
           PY
+
+      - name: Build ARM64 ELF dependency and undefined-symbol map
+        run: |
+          set -euo pipefail
+          python3 scripts/analyze_husk_apk_deps.py scan/base.apk scan
+          test -s scan/elf-dependency-map.md
+          echo "Dependency map generated: $(wc -l < scan/elf-dependency-map.md) lines"
 
       - name: Extract Unity version and Unity 6 classification evidence
         shell: bash
