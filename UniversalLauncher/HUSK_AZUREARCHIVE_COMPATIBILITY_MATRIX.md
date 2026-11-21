@@ -124,3 +124,23 @@ A zero or non-zero undefined-symbol count alone is not a compatibility verdict. 
 4. a runtime-loaded library or JNI registration.
 
 Any remaining unresolved symbol is a real gap only after that resolution chain is checked.
+
+
+### Corrected undefined-symbol inventory
+
+The parser regression was corrected and re-run successfully in CI:
+- Run: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44914063579
+- Artifact: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44914063579/artifacts/14710847883
+- The report now records real undefined dynamic-symbol imports instead of ELF symbol-table metadata.
+
+Undefined import counts in the eight packaged ARM64 libraries:
+- Spine converter: 164
+- Burst: 2
+- libc++_shared: 159
+- IL2CPP: 293
+- libmain: 10
+- SQLite: 104
+- Swappy wrapper: 103
+- Unity: 401
+
+These counts are expected for dynamically linked ELF shared libraries and are not themselves 1,236 missing functions. Each symbol must be resolved through the library's DT_NEEDED closure, Husk's Bionic/NDK/EGL exports, or a runtime-loaded/JNI path. The next step is a symbol-by-symbol provider map; only imports with no provider and a runtime call site become implementation tasks.
