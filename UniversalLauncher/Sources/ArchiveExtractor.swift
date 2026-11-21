@@ -27,6 +27,10 @@ enum ArchiveExtractor {
         }
 
         let components = path.split(separator: "/", omittingEmptySubsequences: true)
+        guard let first = components.first,
+              first.range(of: #"^[A-Za-z]:$"#, options: .regularExpression) == nil else {
+            return false
+        }
         return !components.isEmpty && components.allSatisfy { $0 != "." && $0 != ".." }
     }
 
