@@ -144,3 +144,15 @@ Undefined import counts in the eight packaged ARM64 libraries:
 - Unity: 401
 
 These counts are expected for dynamically linked ELF shared libraries and are not themselves 1,236 missing functions. Each symbol must be resolved through the library's DT_NEEDED closure, Husk's Bionic/NDK/EGL exports, or a runtime-loaded/JNI path. The next step is a symbol-by-symbol provider map; only imports with no provider and a runtime call site become implementation tasks.
+
+
+## Latest source-risk detector run
+
+Run https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44914330242 completed successfully. Artifact: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44914330242/artifacts/14710584937.
+
+The CI source-risk detector now enumerates the exact MediaCodec/MediaExtractor NULL/error stubs in Husk 3.4 and confirms:
+- `libmediandk.so` is a direct `DT_NEEDED` dependency of `libunity.so`.
+- MediaCodec and MediaExtractor calls are explicitly unsupported by the current NDK shim.
+- `AConfiguration_getSdkVersion` returns 34, while this APK targets SDK 30.
+
+These are now tracked compatibility risks, not assumed launch blockers. We must determine whether AzureArchive actually invokes media APIs and SDK-gated branches. If media APIs are called, add an AVFoundation-backed compatibility adapter or a safe unsupported-media fallback; do not silently return a fake successful decoder.
