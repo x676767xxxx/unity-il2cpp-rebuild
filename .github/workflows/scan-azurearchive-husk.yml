@@ -103,6 +103,27 @@ jobs:
             strings -a scan/globalgamemanagers | head -30 | tee -a scan/unity-evidence.txt
           fi
 
+      - name: Check DEX and Unity asset layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "DEX entries:"
+          unzip -Z1 scan/base.apk | grep -E '(^|/)classes[0-9]*\\.dex$' | tee -a scan/unity-evidence.txt || true
+          if unzip -Z1 scan/base.apk | grep -q '^classes.dex$'; then
+            scan/scan_cli entry scan/base.apk classes.dex 10000000 > scan/classes.dex
+            echo "Unity activity names in classes.dex:" | tee -a scan/unity-evidence.txt
+            strings -a scan/classes.dex | grep -E 'UnityPlayer(Activity|ForActivityOrService|ForGameActivity)' | sort -u | tee -a scan/unity-evidence.txt || true
+          fi
+          echo "Unity-related APK asset paths:" | tee -a scan/unity-evidence.txt
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("scan/base.apk") as z:
+              for name in z.namelist():
+                  low = name.lower()
+                  if "unity" in low or "globalgamemanagers" in low or "boot.config" in low or "il2cpp" in low:
+                      print(name)
+          PY
+
       - name: Upload APK scan evidence
         uses: actions/upload-artifact@v4
         with:
