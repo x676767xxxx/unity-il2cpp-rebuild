@@ -81,16 +81,31 @@ report += ["", "## Husk source-level Android NDK shim risks", ""]
 ndk_source = Path("Husk/src/translation-layer-next/husk-tl-bionic-ndk.c")
 if ndk_source.exists():
     source = ndk_source.read_text()
-    null_media = sorted(set(re.findall(r'MEDIA_NULL\("([^"]+)"\)', source)))
-    error_media = sorted(set(re.findall(r'MEDIA_ERRF\("([^"]+)"\)', source)))
+    def macro_names(macro):
+        found = []
+        for part in source.split(macro + "(")[1:]:
+            arg = part.split(")", 1)[0].strip()
+            if arg.startswith('"'):
+                found.append(arg.split('"', 2)[1])
+        return sorted(set(found))
+    null_media = macro_names("MEDIA_NULL")
+    error_media = macro_names("MEDIA_ERRF")
     if "libmediandk.so" in needed_by:
         report.append("**RISK: libmediandk.so is a direct DT_NEEDED dependency of libunity.so.**")
         report.append("Husk 3.4 currently provides explicit NULL/error stubs for MediaCodec/MediaExtractor; this is not full video decoding.")
         report += [f"- NULL stub: {name}" for name in null_media]
         report += [f"- Error stub: {name}" for name in error_media]
         report.append("This matters only if the game actually invokes these APIs; verify imports/call sites and runtime logs before implementing an AVFoundation bridge.")
-    sdk_match = re.search(r'b_AConfiguration_getSdkVersion.*?return\s+(\d+)', source, re.S)
-    if sdk_match:
+    sdk_value = None
+    for line in source.splitlines():
+        if "b_AConfiguration_getSdkVersion" in line and "return" in line:
+            tail = line.split("return", 1)[1]
+            digits = "".join(ch for ch in tail if ch.isdigit())
+            if digits:
+                sdk_value = digits
+                break
+    if sdk_value:
+        report.append(f"Husk NDK AConfiguration_getSdkVersion currently returns {sdk_value}; compare with the APK's target SDK 30 before relying on SDK-gated behavior.")
         report.append(f"Husk NDK AConfiguration_getSdkVersion currently returns {sdk_match.group(1)}; compare with the APK's target SDK 30 before relying on SDK-gated behavior.")
 else:
     report.append("Husk NDK shim source not present in checkout; source-level risk check skipped.")
