@@ -27,6 +27,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SUPPORTS_MACCATALYST: NO
     scheme:
+      testTargets:
+        - UniversalLauncherTests
       gatherCoverageData: false
 
   UniversalLauncherTests:
