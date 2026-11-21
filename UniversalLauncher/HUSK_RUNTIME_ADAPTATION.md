@@ -1,99 +1,115 @@
-# Husk runtime template adaptation plan
+# Husk 3.4 runtime baseline and AzureArchive adaptation
 
-Status: integration branch created; this document records the verified template boundary and the first implementation sequence. It does not claim that the runtime has been merged or that AzureArchive launches.
+## Pinned upstream template
 
-## Product decision
+- Upstream: https://github.com/Leviidev/Husk
+- Release/tag: 3.4
+- Exact commit: acfd7bcb6d1d2f6655a24e43d1d6f87cf142667a
+- Integration uses a Git submodule at repository root: Husk/
+- The submodule gitlink pins the exact commit above. Do not silently track upstream main.
 
-Use **Husk as the application and runtime template**, not as a Swift package to bolt onto the existing file-import prototype.
+The Husk/ directory is the actual upstream source checkout, not a copied UI mock or a Swift Package. Update it only by an intentional submodule commit change after checking release notes, source diffs and compatibility.
 
-Keep the old `UniversalLauncher` prototype as a source of reusable APK-inspection code only. Do not continue its file-manager-first UI. Keep the AzureArchive iOS-port branch separate.
+## Correct runtime model
 
-## Verified upstream template
+Husk 3.4 has two Android execution routes:
 
-Upstream: https://github.com/Leviidev/Husk
+1. Translation Layer / native runtime — preferred for games. The app's ARM64 native libraries run on Apple silicon in Husk's process with Android ABI/framework shims and engine drivers. No Android guest boot is required.
+2. Full Android under QEMU — fallback. A LineageOS guest is booted for apps that the native Translation Layer cannot handle. The upstream release notes explicitly warn that full Android is slow and recommend the Translation Layer for games.
 
-Files inspected on `main`:
+Do not describe the whole Translation Layer as “not implemented”. The older docs/04-translation-layer.md is a design/milestone document and still contains a historical “nothing opens yet” status. The 3.4 application source has since added the translation-layer-next runtime and Unity driver. Use the tagged source and actual launch path as the implementation evidence, while treating release compatibility claims as upstream-tested claims rather than proof for our specific APK/device.
 
-- `README.md`: Husk is an iOS app for Android apps/games; documents sideloading and JIT requirements.
-- `src/app/project.yml`: XcodeGen project definition; iOS deployment target 15.5; arm64; app, JIT helper and download widget targets; links the QEMU runtime, ANGLE and supporting frameworks.
-- `src/app/Husk/ContentView.swift`: existing app shell and tabs (Home, Library, Store, Settings), guest-screen routing, incoming-file handling, JIT coordinator and runtime state.
-- `scripts/ci_build.sh`: full macOS build pipeline (fetch sources, native dependencies, ANGLE, QEMU, Husk integration, guest kernel/firmware, MoltenVK, pairing library, IPA packaging).
-- `scripts/package_ipa.sh`: regenerates Xcode project from project.yml and packages/validates IPA.
-- `docs/01-licensing.md`: GPL/QEMU and bundled-component obligations.
-- `docs/04-translation-layer.md`: Android Translation Layer is experimental; the document explicitly says the experimental UI can inspect apps but does not yet open them.
-- `docs/06-built-in-jit.md`: JIT choices and requirements, including StikDebug, TrollStore and Built-in StikJIT.
+## Source evidence inspected at the pinned tag
 
-Important status distinction: Husk's established fallback is a full Android guest under QEMU. The translation-layer path is experimental and must not be treated as a proven APK launcher until the upstream source and tests demonstrate that an APK actually opens through it. Some high-level project descriptions mention Unity support, but the detailed translation-layer status document is the safer acceptance criterion.
+- src/app/project.yml compiles both src/translation-layer and src/translation-layer-next into the Husk app. It also embeds ANGLE, QEMU, MoltenVK, JIT helper and supporting frameworks.
+- src/app/Husk/TranslationLayer.swift maps Unity APKs to the .unity native engine (Unity 6 is treated separately).
+- src/app/Husk/TLUnityView.swift creates the game's Metal layer, prepares the runtime and calls husk_unity_launch(...) for Unity.
+- src/translation-layer-next/husk-tl-unity-app.c dispatches the Unity engine and manages launch state, package metadata, crash logs and the runtime thread.
+- src/translation-layer-next/husk-tl-unity.c implements UnityPlayer/JNI setup, loads Unity native libraries, invokes JNI_OnLoad, calls NativeLoader.load, starts UnityMain, and drives nativeRender.
+- src/app/Husk/GameStatus.swift persists actual last-run outcomes (plays, crashed, failed), which can be used instead of a fake “launch successful” state.
+- src/app/Husk/ApkMetadata.swift contains APK metadata and icon parsing; reuse it rather than maintaining a second parallel parser.
 
-## Target-device and APK profile
+Useful upstream links:
+- https://github.com/Leviidev/Husk/tree/3.4
+- https://github.com/Leviidev/Husk/blob/3.4/src/app/project.yml
+- https://github.com/Leviidev/Husk/blob/3.4/src/app/Husk/TranslationLayer.swift
+- https://github.com/Leviidev/Husk/blob/3.4/src/app/Husk/TLUnityView.swift
+- https://github.com/Leviidev/Husk/blob/3.4/src/translation-layer-next/husk-tl-unity-app.c
+- https://github.com/Leviidev/Husk/blob/3.4/src/translation-layer-next/husk-tl-unity.c
+- https://github.com/Leviidev/Husk/releases/tag/3.4
 
-Target device from the project requirements: iPhone 14 Pro Max, iOS 26.5.
+## AzureArchive target profile
 
-AzureArchive Android package profile previously inspected:
+- Package: com.foxxlight.AzureArchive
+- Version: 1.0.0
+- Unity: 2023.2.22f1
+- Scripting backend: IL2CPP
+- Native ABI: arm64-v8a
+- Launcher: com.unity3d.player.UnityPlayerActivity
+- Previously inspected manifest: min API 23, target API 30
+- Target device: iPhone 14 Pro Max, iOS 26.5
 
-- package: `com.foxxlight.AzureArchive`
-- version: `1.0.0`
-- Unity: `2023.2.22f1`
-- scripting backend: IL2CPP
-- native ABI: `arm64-v8a`
-- launcher: `com.unity3d.player.UnityPlayerActivity`
-- Android manifest: min API 23, target API 30
+This is a strong candidate for the Husk 3.4 Unity driver: it is an ARM64 Unity IL2CPP package, not an x86 or 32-bit-only APK. The upstream Unity driver directly interacts with UnityPlayer and IL2CPP. Compatibility is still unverified for this specific Unity patch version and game: Unity plugins, JNI methods, graphics extensions, Android services, memory/address-space layout and game-specific protections may block it.
 
-This is a suitable first compatibility test for Husk's Android guest path because the package contains ARM64 native libraries. It is not proof of compatibility: Unity native graphics, JNI, Android framework APIs, memory pressure, audio and JIT behavior still need on-device validation.
+## Required runtime path
 
-## Integration architecture
+APK import -> Husk APK metadata/icon parse -> native scan/report -> Unity engine classification -> TLUnityView -> husk_unity_launch -> UnityPlayer/JNI -> libmain/libunity/libil2cpp -> UnityMain/nativeRender
 
-1. **Husk app shell remains the owner of the runtime.** Retain its library, incoming-file routing, guest lifecycle, logging, settings and JIT coordination.
-2. **Game catalogue becomes the primary product surface.** Reuse Husk's Library patterns; add per-game metadata and compatibility state only where needed.
-3. **APK inspection is an import/diagnostic service.** Port only the useful, tested AXML/ABI/Unity detection logic from the old prototype. It must not become a second file manager.
-4. **Runtime selection is explicit and truthful.** First path: Husk's QEMU Android guest. Translation Layer may appear as experimental/unsupported until it has a demonstrated launch path. Never display “Running” merely because an APK was imported or parsed.
-5. **AzureArchive is the first real-game acceptance test.** Measure cold start, time to first frame, login-screen reachability, sustained frame rate, memory use, audio and repeat launches.
-6. **Windows EXE execution is out of scope for this Android runtime milestone.** Archive extraction is not Windows execution.
+The first attempt should use Husk 3.4's native Translation Layer. Do not boot QEMU first unless the native path rejects the APK or logs identify an unsupported dependency.
 
-## Build and integration constraints
+## iOS 26.5 JIT strategy
 
-- Build the upstream app using its own `src/app/project.yml` and `scripts/ci_build.sh` pipeline on macOS with Xcode and the documented native toolchain. Do not transplant only ContentView.swift or add Husk as a Swift Package.
-- Preserve the upstream build scripts and native dependency versions initially. Avoid changing QEMU, ANGLE, MoltenVK or JIT internals while establishing the baseline.
-- Check upstream changes before copying or patching files; prefer a clean fork/upstream relationship so future runtime fixes can be merged.
-- Husk is GPL-2.0-or-later and links QEMU (GPLv2). Any distributed combined build must comply with the applicable GPL source and notice requirements. Review every additional dependency's licence before vendoring it.
-- JIT is a runtime requirement for many workloads. On iOS 26.5, verify the selected JIT method on the actual phone; do not assume that the presence of StikDebug or a pairing file means JIT is active.
-- A simulator build is not evidence of runtime success. The acceptance device must be the physical iPhone.
+Husk 3.4 documents:
+- Automatic JIT method selection: StikDebug first if installed, otherwise TrollStore where applicable, otherwise built-in StikJIT.
+- Built-in StikJIT requires iOS 26+, LocalDevVPN and a valid device pairing file. On iOS 27, Husk can pair directly from the phone; on iOS 26.5, use an existing/imported pairing file or StikDebug.
+- “Play without JIT” can be available after importing the certificate used to install Husk; this is a separate route and must be tested per game.
 
-## First implementation milestones
+Do not infer that JIT is active from VPN connected, pairing-file presence or a helper being installed. Verify Husk's own JIT status and capture the runtime log before testing the game.
 
-### M0 — Establish a reproducible Husk baseline
-- Pin the exact upstream Husk commit/release used as the template.
-- Build an unmodified Husk IPA from a clean macOS checkout.
-- Install it on the iPhone 14 Pro Max and verify JIT status.
-- Launch one known-compatible ARM64 Android app and record logs.
+## Build baseline
 
-Exit criteria: clean build, install, JIT confirmation and a known-good guest launch. No custom launcher changes before this gate.
+On macOS with Xcode and the upstream dependencies installed, use the pinned submodule's own full build:
 
-### M1 — AzureArchive compatibility test
-- Import the exact AzureArchive Android 1.0 APK into unmodified Husk.
-- Capture APK inspection output, guest/runtime logs and crash reports.
-- Test launch to Unity splash, login screen and interactive scene.
-- Record memory, frame pacing, audio and repeatability.
+    git submodule update --init --recursive
+    cd Husk
+    ./scripts/ci_build.sh
 
-Exit criteria: reproducible launch to login screen at minimum; otherwise a specific blocking dependency/error is identified.
+Expected output: Husk/build/Husk.ipa.
 
-### M2 — Bring the existing launcher value into Husk
-- Port AXML parser and ABI/Unity metadata inspection as a small isolated module.
-- Add automatic mode recommendation with evidence and a reason string.
-- Keep Husk's runtime lifecycle and JIT coordinator authoritative.
-- Add a clear unsupported state for APKs that cannot launch.
+The upstream full build fetches and builds native dependencies including QEMU, ANGLE/virglrenderer, MoltenVK and the on-device pairing library, then packages the app. It can take hours on a clean checkout. Do not replace it with a simulator-only build or claim success from Xcode project generation alone.
 
-Exit criteria: import -> inspect -> choose runtime -> actual runtime launch; no duplicate runtime implementation.
+Husk 3.4 requires macOS/Xcode and tools including Meson, Ninja, pkg-config, Python 3, XcodeGen, qemu-img and Rust with the aarch64-apple-ios target. The current environment has not run this macOS build; no IPA has been produced here.
 
-### M3 — Optimize only after the first frame works
-- Profile CPU translation, GPU path, memory and loading.
-- Reduce background services and duplicate asset copies where safe.
-- Compare QEMU guest performance with any future proven translation-layer path.
+## First device test protocol
 
-## Known blockers / do not assume
+1. Build/install the pinned Husk 3.4 baseline unchanged.
+2. Verify JIT method and status on the iPhone 14 Pro Max / iOS 26.5.
+3. Import the exact AzureArchive Android 1.0 APK.
+4. Save Husk's scan report. Confirm it identifies Unity and arm64-v8a and records every native library, dependency and unsupported flag.
+5. Start through the native Translation Layer, not QEMU.
+6. Preserve unity-run.log, Husk crash report and iOS jetsam report if it exits.
+7. Record checkpoints separately: runtime accepted APK; UnityPlayer initialized; first rendered frame; game logo; login screen; interactive scene.
+8. Measure cold start, memory/VM region use, frame pacing, audio, touch and repeat launch.
 
-- The detailed upstream translation-layer document currently says no app opens through that experimental path.
-- QEMU full-system emulation may be slower than native execution; do not promise near-native speed for Unity games.
-- APK manifest parsing does not establish compatibility.
-- The old iOS 0.7.9.2 resource archive and IL2CPP reverse-engineering reports are not substitutes for the Android APK's runtime dependencies.
-- No IPA, real-device launch or AzureArchive compatibility result is claimed by this plan.
+A parser pass, successful import, husk_unity_launch returning true, Unity splash or a few frames is not a pass. The first meaningful acceptance gate is reproducibly reaching the login screen; sustained gameplay is a later gate.
+
+## Integration strategy for this repository
+
+- The Husk/ submodule is the runtime/application base and owns its existing library, UI, JIT and launch lifecycle.
+- The old UniversalLauncher prototype is not the application base. Reuse only any parser/tests that are demonstrably more complete than Husk's existing code.
+- Do not duplicate ApkMetadata, TranslationLayerStore, TLReport, TLUnityView, GameStatusStore or the C Unity driver.
+- Add AzureArchive-specific diagnostics and test fixtures in a separate integration layer, without changing upstream runtime behavior until a baseline reproduces.
+- Keep the old progress/azurearchive-ios-port-20261031 branch isolated. Its iOS resource pack and Spine/IL2CPP port work are separate from Android APK runtime execution.
+- Windows EXE execution remains a separate engine project. Husk's 3.4 release notes say Winlator containers do not run; archive handling is not Windows execution.
+
+## Licensing and distribution
+
+Husk is GPL-2.0-or-later and links QEMU (GPLv2); follow the upstream licence and corresponding-source requirements for any distributed derivative. Review every added dependency. Do not assume an App Store distribution route; Husk's own documentation says it is for sideloading.
+
+## Verified state of this integration branch
+
+- A dedicated branch exists: integration/husk-runtime-template.
+- A real Git submodule Husk/ is pinned to upstream tag 3.4 commit acfd7bcb6d1d2f6655a24e43d1d6f87cf142667a.
+- The README and this document describe the actual 3.4 native Unity launch route.
+- No upstream runtime files have been modified.
+- No macOS build, IPA creation, device install or AzureArchive launch has yet been performed by this workflow.

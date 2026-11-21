@@ -1,53 +1,51 @@
-# Universal Launcher — Husk-based runtime integration
+# Universal Launcher — Husk 3.4 based
 
-This branch pivots the prototype toward a real iPhone game launcher by using [Husk](https://github.com/Leviidev/Husk) as the application/runtime template.
+This branch now uses the actual upstream **Husk 3.4 source tree as a pinned Git submodule**. Husk owns the iOS application, game library, Android runtime, graphics integration, JIT coordination and game lifecycle. The old UniversalLauncher prototype is only a source of optional APK-inspection utilities, not the app foundation.
 
-## Product direction
+## Pinned runtime
 
-- Husk owns the iOS app shell, game library, Android guest lifecycle, graphics/runtime integration and JIT coordination.
-- The existing `UniversalLauncher` prototype contributes only reusable APK inspection and import code.
-- The first real execution path to validate is Husk's QEMU-backed Android guest.
-- Husk's Android Translation Layer is treated as experimental until an APK is demonstrably launched through it.
-- AzureArchive Android 1.0 is the first target game for real-device compatibility testing.
-- Windows EXE execution is a separate future engine project. ZIP/RAR/7Z archive support is not Windows execution.
+- Upstream: https://github.com/Leviidev/Husk
+- Release: 3.4
+- Commit: acfd7bcb6d1d2f6655a24e43d1d6f87cf142667a
+- Submodule path: Husk/
 
-## Upstream template
+Initialize it with:
 
-- [Husk source repository](https://github.com/Leviidev/Husk)
-- [Husk XcodeGen project definition](https://github.com/Leviidev/Husk/blob/main/src/app/project.yml)
-- [Husk build pipeline](https://github.com/Leviidev/Husk/blob/main/scripts/ci_build.sh)
-- [Husk runtime/translation-layer status](https://github.com/Leviidev/Husk/blob/main/docs/04-translation-layer.md)
-- [Husk JIT setup and methods](https://github.com/Leviidev/Husk/blob/main/docs/06-built-in-jit.md)
-- [Husk licensing notes](https://github.com/Leviidev/Husk/blob/main/docs/01-licensing.md)
+    git submodule update --init --recursive
 
-Read [HUSK_RUNTIME_ADAPTATION.md](HUSK_RUNTIME_ADAPTATION.md) before making integration changes. It records the inspected upstream files, runtime boundaries, build constraints and acceptance gates.
+## Runtime choice
 
-## AzureArchive target profile
+- **Primary for games:** Husk's native Android Translation Layer. ARM64 game libraries run on Apple silicon with Android compatibility shims; no Android guest boot.
+- **Fallback:** full Android under QEMU when the native route cannot run an app.
 
-- Package: `com.foxxlight.AzureArchive`
-- Version: `1.0.0`
-- Unity: `2023.2.22f1`
-- Scripting backend: IL2CPP
-- Native ABI: `arm64-v8a`
-- Launcher activity: `com.unity3d.player.UnityPlayerActivity`
-- Previously inspected manifest: min API 23, target API 30
+Husk 3.4 includes a native Unity driver. Its app classifies Unity APKs and routes them through TLUnityView to husk_unity_launch. This is the route to test AzureArchive first.
 
-These facts make the APK a useful ARM64 Unity test target; they do not prove it is compatible with Husk.
+## First target: AzureArchive Android 1.0
 
-## Existing prototype code
+com.foxxlight.AzureArchive, Unity 2023.2.22f1, IL2CPP, arm64-v8a, UnityPlayerActivity. This is a promising match for Husk's native Unity driver, but the exact APK is not yet proven compatible.
 
-The earlier prototype has a SwiftUI importer, APK ZIP/AXML inspection, ABI detection, metadata persistence and basic ZIP extraction. It does not execute APKs. Keep these modules isolated and port only what the Husk library needs; do not preserve the file-manager-first UI as the product architecture.
+Target device: iPhone 14 Pro Max / iOS 26.5.
 
-## Acceptance standard
+## Build
 
-A successful build, APK import, manifest parse, guest boot or splash screen is not a successful game launch. The first runtime milestone requires a reproducible physical-device launch to AzureArchive's login screen, with logs and memory/runtime measurements. Sustained gameplay and performance optimization come afterward.
+Husk requires macOS/Xcode and native dependencies. From the repository root:
 
-## Build boundary
+    git submodule update --init --recursive
+    cd Husk
+    ./scripts/ci_build.sh
 
-Husk's documented build pipeline requires macOS, Xcode and its native toolchain. A simulator build is not a substitute for a physical iPhone test. JIT must be verified on the actual target device and selected installation method.
+This full clean build can take hours and produces Husk/build/Husk.ipa. A simulator build is not a substitute for a physical-device runtime test.
 
-Husk is GPL-2.0-or-later and links QEMU (GPLv2). Any derivative distribution must preserve applicable source, notices and licence obligations. Review every added dependency before vendoring it.
+## Acceptance
 
-## Current status
+Importing/parsing the APK is not running it. Track each checkpoint: native runtime accepted APK, UnityPlayer initialized, first frame, logo, login screen, interactive scene. Preserve Unity logs and crash/jetsam reports. The first meaningful pass is a reproducible login-screen launch.
 
-This branch currently contains the integration plan and product-direction correction. It does **not** yet contain a merged Husk runtime, a new IPA, or a successful AzureArchive launch.
+See HUSK_RUNTIME_ADAPTATION.md for source evidence, JIT requirements, build procedure, device test protocol and licensing.
+
+## Scope
+
+Windows EXE execution is separate. Husk 3.4's release notes say Winlator containers do not run; archive support does not equal Windows game execution.
+
+## Current verified state
+
+The upstream Husk 3.4 source is pinned as a submodule. This branch has not yet built an IPA, installed it on the iPhone or launched AzureArchive. No such success is claimed.
