@@ -20,6 +20,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Download AzureArchive APK manifest fixture
+        run: |
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk" \
+            --output /tmp/azurearchive-base.apk
+          mkdir -p UniversalLauncher/Tests/Fixtures
+          unzip -p /tmp/azurearchive-base.apk AndroidManifest.xml > UniversalLauncher/Tests/Fixtures/AzureArchive-AndroidManifest.xml
+          test -s UniversalLauncher/Tests/Fixtures/AzureArchive-AndroidManifest.xml
+          shasum -a 256 /tmp/azurearchive-base.apk
+          ls -lh /tmp/azurearchive-base.apk UniversalLauncher/Tests/Fixtures/AzureArchive-AndroidManifest.xml
       - name: Generate Xcode project
         working-directory: UniversalLauncher
         run: xcodegen generate
@@ -29,20 +39,9 @@ jobs:
       - name: Build iOS Simulator app
         working-directory: UniversalLauncher
         run: xcodebuild -project UniversalLauncher.xcodeproj -scheme UniversalLauncher -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
-      - name: Download AzureArchive APK manifest fixture
-        run: |
-          curl --fail --location --retry 3 --retry-delay 2 \
-            "https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk" \
-            --output /tmp/azurearchive-base.apk
-          unzip -p /tmp/azurearchive-base.apk AndroidManifest.xml > /tmp/AzureArchive-AndroidManifest.xml
-          test -s /tmp/AzureArchive-AndroidManifest.xml
-          shasum -a 256 /tmp/azurearchive-base.apk
-          ls -lh /tmp/azurearchive-base.apk /tmp/AzureArchive-AndroidManifest.xml
       - name: Run unit tests
         timeout-minutes: 25
         working-directory: UniversalLauncher
-        env:
-          AZUREARCHIVE_MANIFEST_PATH: /tmp/AzureArchive-AndroidManifest.xml
         run: xcodebuild test -project UniversalLauncher.xcodeproj -scheme UniversalLauncher -destination "platform=iOS Simulator,name=iPhone 16,OS=latest" -parallel-testing-enabled NO -derivedDataPath build CODE_SIGNING_ALLOWED=NO
       - name: Upload simulator app
         uses: actions/upload-artifact@v4
