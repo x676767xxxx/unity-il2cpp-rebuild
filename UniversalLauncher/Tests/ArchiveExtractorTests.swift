@@ -11,6 +11,8 @@ final class ArchiveExtractorTests: XCTestCase {
     func testRejectsEmptyAndAbsolutePaths() {
         XCTAssertFalse(ArchiveExtractor.isSafeRelativePath(""))
         XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("/private/file.txt"))
+        XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("C:/outside.txt"))
+        XCTAssertFalse(ArchiveExtractor.isSafeRelativePath("D:outside.txt"))
     }
 
     func testRejectsParentAndCurrentDirectoryTraversal() {
