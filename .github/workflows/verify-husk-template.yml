@@ -1,0 +1,52 @@
+name: Verify pinned Husk runtime template
+
+on:
+  push:
+    branches:
+      - integration/husk-runtime-template
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch and pinned submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify exact upstream pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .gitmodules
+          test -d Husk/.git
+          actual="$(git -C Husk rev-parse HEAD)"
+          expected="acfd7bcb6d1d2f6655a24e43d1d6f87cf142667a"
+          echo "Husk submodule: $actual"
+          test "$actual" = "$expected"
+
+      - name: Verify native Unity runtime integration points
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f Husk/src/app/project.yml
+          test -f Husk/src/app/Husk/TranslationLayer.swift
+          test -f Husk/src/app/Husk/TLUnityView.swift
+          test -f Husk/src/translation-layer-next/husk-tl-unity-app.c
+          test -f Husk/src/translation-layer-next/husk-tl-unity.c
+          grep -q 'husk_unity_launch' Husk/src/app/Husk/TLUnityView.swift
+          grep -q 'tl_unity_start' Husk/src/translation-layer-next/husk-tl-unity.c
+          grep -q 'tl_unity_run' Husk/src/translation-layer-next/husk-tl-unity.c
+
+      - name: Verify AzureArchive test asset is referenced
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'releases/download/XR1/base.apk' .github/workflows/inspect-azurearchive.yml
+          grep -q 'com.foxxlight.AzureArchive' UniversalLauncher/HUSK_RUNTIME_ADAPTATION.md
+          echo "Static template checks passed. This job does not build an IPA or run the game."

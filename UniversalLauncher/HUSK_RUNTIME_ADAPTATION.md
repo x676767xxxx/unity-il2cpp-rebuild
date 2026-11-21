@@ -51,6 +51,12 @@ Useful upstream links:
 
 This is a strong candidate for the Husk 3.4 Unity driver: it is an ARM64 Unity IL2CPP package, not an x86 or 32-bit-only APK. The upstream Unity driver directly interacts with UnityPlayer and IL2CPP. Compatibility is still unverified for this specific Unity patch version and game: Unity plugins, JNI methods, graphics extensions, Android services, memory/address-space layout and game-specific protections may block it.
 
+## Existing AzureArchive test asset
+
+The XR1 GitHub Release was checked directly. It contains the exact Android test package at `base.apk` (364,837,539 bytes), alongside the older iOS IPA and Windows ZIP. The existing `.github/workflows/inspect-azurearchive.yml` downloads this asset from the release. The APK is therefore already available to CI; do not ask the user to upload it again or commit the 365 MB binary into Git.
+
+Release asset: https://github.com/x676767xxxx/unity-il2cpp-rebuild/releases/download/XR1/base.apk
+
 ## Required runtime path
 
 APK import -> Husk APK metadata/icon parse -> native scan/report -> Unity engine classification -> TLUnityView -> husk_unity_launch -> UnityPlayer/JNI -> libmain/libunity/libil2cpp -> UnityMain/nativeRender
