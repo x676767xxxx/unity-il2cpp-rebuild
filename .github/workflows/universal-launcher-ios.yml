@@ -1,5 +1,9 @@
 name: Universal Launcher iOS Build
 
+concurrency:
+  group: universal-launcher-ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
