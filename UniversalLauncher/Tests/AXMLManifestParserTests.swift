@@ -26,6 +26,17 @@ final class AXMLManifestParserTests: XCTestCase {
     func testRejectsTruncatedDocument() {
         XCTAssertThrowsError(try AXMLManifestParser.parse(Data([0x03, 0x00, 0x08])))
     }
+
+    func testParsesRealAzureArchiveManifestWhenProvided() throws {
+        guard let path = ProcessInfo.processInfo.environment["AZUREARCHIVE_MANIFEST_PATH"] else {
+            throw XCTSkip("Real APK manifest fixture was not supplied by this workflow.")
+        }
+        let manifestURL = URL(fileURLWithPath: path)
+        let manifest = try Data(contentsOf: manifestURL, options: .mappedIfSafe)
+        let info = try AXMLManifestParser.parse(manifest)
+        XCTAssertEqual(info.packageName, "com.foxxlight.AzureArchive")
+        print("AzureArchive manifest: package=\(info.packageName ?? "nil"), versionName=\(info.versionName ?? "nil"), minSDK=\(info.minSDK ?? "nil"), targetSDK=\(info.targetSDK ?? "nil"), activities=\(info.activities.count), launcherActivities=\(info.launcherActivities.count)")
+    }
 }
 
 private enum AXMLFixture {
