@@ -65,9 +65,9 @@ enum AXMLManifestParser {
                 strings = try parseStringPool(reader: reader, offset: offset, headerSize: headerSize, chunkSize: chunkSize)
             } else if type == 0x0102 {
                 guard let pool = strings else { throw ParseError.missingStringPool }
-                guard chunkSize >= headerSize + 20 else { throw ParseError.malformedChunk }
+                guard headerSize >= 16, chunkSize >= headerSize + 20 else { throw ParseError.malformedChunk }
                 let attributes = try parseStartElement(reader: reader, offset: offset, headerSize: headerSize, chunkSize: chunkSize, strings: pool)
-                let elementName = try reader.stringIndex(at: offset + 20, strings: pool)
+                let elementName = try reader.stringIndex(at: offset + headerSize + 4, strings: pool)
                 elementStack.append(elementName)
 
                 let map = Dictionary(attributes.map { ($0.name, $0.value) }, uniquingKeysWith: { first, _ in first })
@@ -93,9 +93,9 @@ enum AXMLManifestParser {
                     filterHasLauncher = true
                 }
             } else if type == 0x0103 {
-                guard chunkSize >= headerSize + 8 else { throw ParseError.malformedChunk }
+                guard headerSize >= 16, chunkSize >= headerSize + 8 else { throw ParseError.malformedChunk }
                 if let pool = strings {
-                    let name = try reader.stringIndex(at: offset + 20, strings: pool)
+                    let name = try reader.stringIndex(at: offset + headerSize + 4, strings: pool)
                     if name == "intent-filter" {
                         if insideIntentFilter, filterHasMain && filterHasLauncher, let currentActivity {
                             result.launcherActivities.append(currentActivity)
@@ -110,7 +110,10 @@ enum AXMLManifestParser {
                         filterHasLauncher = false
                     }
                 }
-                if !elementStack.isEmpty { elementStack.removeLast() }
+                if let pool = strings {
+                    let closingName = try reader.stringIndex(at: offset + headerSize + 4, strings: pool)
+                    guard elementStack.popLast() == closingName else { throw ParseError.malformedChunk }
+                }
             }
             offset += chunkSize
         }
@@ -126,9 +129,9 @@ enum AXMLManifestParser {
         let count = Int(try reader.u32(at: offset + 8))
         let flags = try reader.u32(at: offset + 16)
         let stringsStart = Int(try reader.u32(at: offset + 20))
-        guard count >= 0, count <= 100_000,
-              offset + headerSize + count * 4 <= offset + chunkSize,
-              stringsStart >= headerSize, stringsStart <= chunkSize else { throw ParseError.malformedChunk }
+        guard count <= 100_000,
+              count <= (chunkSize - headerSize) / 4,
+              stringsStart >= headerSize + count * 4, stringsStart <= chunkSize else { throw ParseError.malformedChunk }
 
         let utf8 = (flags & 0x100) != 0
         var values: [String] = []
@@ -168,7 +171,8 @@ enum AXMLManifestParser {
         let attributeCount = Int(try reader.u16(at: extensionOffset + 12))
         guard attributeSize >= 20, attributeCount <= 4096 else { throw ParseError.malformedChunk }
         let firstAttribute = extensionOffset + attributeStart
-        guard firstAttribute >= offset, firstAttribute + attributeCount * attributeSize <= offset + chunkSize else { throw ParseError.truncated }
+        guard firstAttribute >= extensionOffset, firstAttribute <= offset + chunkSize,
+              attributeCount <= (offset + chunkSize - firstAttribute) / attributeSize else { throw ParseError.truncated }
 
         var attributes: [Attribute] = []
         for index in 0..<attributeCount {
