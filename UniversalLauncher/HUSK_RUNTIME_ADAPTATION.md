@@ -119,3 +119,26 @@ Husk is GPL-2.0-or-later and links QEMU (GPLv2); follow the upstream licence and
 - The README and this document describe the actual 3.4 native Unity launch route.
 - No upstream runtime files have been modified.
 - No macOS build, IPA creation, device install or AzureArchive launch has yet been performed by this workflow.
+
+## First real APK scan with Husk 3.4
+
+The pinned Husk scanner was compiled from its own C sources on GitHub Actions and run against the existing XR1 release asset (364,837,539 bytes). Run: https://github.com/x676767xxxx/unity-il2cpp-rebuild/actions/runs/44912811502
+
+Observed report:
+- Scanner parse: ok = true
+- Verdict: native
+- Reported engine: Unity 6
+- ABIs: arm64-v8a, armeabi-v7a, x86_64, x86
+- 16 native library entries total; 8 arm64 libraries
+- arm64 libil2cpp.so: 120,315,032 bytes
+- arm64 libunity.so: 19,229,160 bytes
+- arm64 libSpineSkeletonDataConverterLib.so: 8,293,128 bytes
+- arm64 lib_burst_generated.so: 130,104 bytes; the old scanner reports one 16 KiB page with executable/writable conflict (status work). Husk's newer loader has mixed-page writable-copy handling, but this must be confirmed in the device runtime log.
+
+### Engine classification discrepancy — must resolve before selecting the launch route
+
+Earlier project evidence recorded Unity 2023.2.22f1 for AzureArchive. The Husk 3.4 scanner currently reports “Unity 6”. In the pinned source, TranslationLayer.swift maps engine == "Unity 6" to the Java runtime path, while other Unity versions map to the dedicated native Unity driver. The scanner's Unity 6 heuristic checks for the string UnityPlayerForActivityOrService inside libunity.so. Therefore this is not a cosmetic label: it changes the launch path.
+
+The follow-up workflow extracts libunity.so and globalgamemanagers to record the exact marker and embedded Unity version. Until that evidence is checked, do not hardcode either .java or .unity for AzureArchive. The native verdict and ARM64 libraries are positive evidence, but the correct Unity driver is still an unresolved gate.
+
+This scan is static compatibility analysis only. It does not prove that the iOS device loader maps every library, that JIT works, or that AzureArchive reaches its login screen.
