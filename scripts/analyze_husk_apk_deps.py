@@ -56,7 +56,7 @@ for name in sorted(provided):
         needed_by[dep].append(name)
     und = set()
     for line in syms.stdout.splitlines():
-        match = re.match(r"^\\s*\\d+:\\s+\\S+\\s+\\d+\\s+\\S+\\s+\\S+\\s+\\S+\\s+UND\\s+(\\S+)", line)
+        match = re.match(r"^\s*\d+:\s+\S+\s+\d+\s+\S+\s+\S+\s+\S+\s+UND\s+(\S+)", line)
         if match:
             sym = match.group(1).split("@", 1)[0]
             if sym and sym not in ("_ITM_deregisterTMCloneTable", "_ITM_registerTMCloneTable",
